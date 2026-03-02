@@ -11,6 +11,8 @@ pub mod vtt;
 #[cfg(feature = "pdf")]
 pub mod pdf;
 
+pub mod epub;
+
 // pub mod json;
 
 // #[non_exhaustive]

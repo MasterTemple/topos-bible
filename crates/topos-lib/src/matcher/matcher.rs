@@ -9,7 +9,8 @@ use crate::{
     matcher::{
         instance::BibleMatch,
         location::{
-            html::HTMLMatchError, line_col::LineColLocation, pdf::PDFMatchError, srt::SRTMatchError,
+            epub::EPUBMatchError, html::HTMLMatchError, line_col::LineColLocation,
+            pdf::PDFMatchError, srt::SRTMatchError,
         },
         matches::{ComplexFilter, FilteredBibleMatches},
     },
@@ -52,6 +53,8 @@ pub type MatchResult<T> = core::result::Result<T, MatchError>;
 
 #[derive(thiserror::Error, Debug)]
 pub enum MatchError {
+    #[error("EPUB: {0}")]
+    EPUB(#[from] EPUBMatchError),
     #[error("SRT: {0}")]
     SRT(#[from] SRTMatchError),
     #[error("HTML: {0}")]
