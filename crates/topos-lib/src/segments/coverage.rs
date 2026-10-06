@@ -4,27 +4,25 @@ use std::ops::RangeInclusive;
 
 use crate::{
     data::chapter_verses::ChapterVerses,
-    segments::{passage::Passage, verse_bounds::VerseBounds},
+    segments::{passage::Passage, units::chapter_verse::ChapterVerse, verse_bounds::VerseBounds},
 };
 
 /// Without versification, a chapter is treated as this many verses long
 const UNKNOWN_CHAPTER_LENGTH: u32 = 999;
 
-/// An inclusive range of verses, with every field filled in (`3:16-18` is 3:16 to 3:18)
+/// An inclusive range of verses with both ends written out (`3:16-18` is 3:16 to 3:18)
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct VerseRange {
-    pub start_chapter: u8,
-    pub start_verse: u8,
-    pub end_chapter: u8,
-    /// `0` when a whole chapter ends the range and its length is unknown (no versification)
-    pub end_verse: u8,
+    pub start: ChapterVerse,
+    /// A whole chapter ends at its last verse, or verse `0` when its length is unknown
+    pub end: ChapterVerse,
 }
 
 impl Passage {
     /**
     Each segment as an explicit verse range
     - Whole chapters use the versification for their last verse, so `John 3` is 3:1-3:36
-    - Without versification, a whole chapter's `end_verse` is `0`
+    - Without versification, a whole chapter ends at verse `0`
     */
     pub fn ranges(&self, versification: Option<&ChapterVerses>) -> Vec<VerseRange> {
         self.segments
@@ -37,13 +35,39 @@ impl Passage {
                         .unwrap_or(0)
                 });
                 VerseRange {
-                    start_chapter: seg.starting_chapter(),
-                    start_verse: seg.starting_verse(),
-                    end_chapter,
-                    end_verse,
+                    start: ChapterVerse::new(seg.starting_chapter(), seg.starting_verse()),
+                    end: ChapterVerse::new(end_chapter, end_verse),
                 }
             })
             .collect()
+    }
+
+    /**
+    Every verse in the passage, in order (`John 3:16-18` is 3:16, 3:17, and 3:18)
+    - Segments are listed as written, so overlapping segments repeat verses
+    - Chapters whose length is unknown (no versification) are left out
+    */
+    pub fn verses(&self, versification: Option<&ChapterVerses>) -> Vec<ChapterVerse> {
+        let mut verses = vec![];
+        for range in self.ranges(versification) {
+            for chapter in range.start.chapter..=range.end.chapter {
+                let first = if chapter == range.start.chapter {
+                    range.start.verse
+                } else {
+                    1
+                };
+                let last = if chapter == range.end.chapter && range.end.verse > 0 {
+                    range.end.verse
+                } else {
+                    match versification.and_then(|v| v.get_last_verse(chapter)) {
+                        Some(last) => last,
+                        None => continue,
+                    }
+                };
+                verses.extend((first..=last).map(|verse| ChapterVerse::new(chapter, verse)));
+            }
+        }
+        verses
     }
 
     /**
@@ -144,15 +168,15 @@ mod tests {
     }
 
     #[test]
-    fn explicit_ranges() {
+    fn explicit_ranges_and_verses() {
         let data = BibleData::default();
         let versification = data.chapter_verses().get_chapter_verses(&BookId(43));
+        let passage = |reference: &str| data.books().parse(reference).unwrap();
         let ranges = |reference: &str, versification| {
-            let passage = data.books().parse(reference).unwrap();
-            passage
+            passage(reference)
                 .ranges(versification)
                 .iter()
-                .map(|r| (r.start_chapter, r.start_verse, r.end_chapter, r.end_verse))
+                .map(|r| (r.start.chapter, r.start.verse, r.end.chapter, r.end.verse))
                 .collect::<Vec<_>>()
         };
         assert_eq!(
@@ -166,6 +190,26 @@ mod tests {
         assert_eq!(ranges("John 3-4", versification), [(3, 1, 4, 54)]);
         // Without versification, a whole chapter's end is unknown
         assert_eq!(ranges("John 3", None), [(3, 1, 3, 0)]);
+
+        let verses = |reference: &str, versification| {
+            passage(reference)
+                .verses(versification)
+                .iter()
+                .map(|cv| (cv.chapter, cv.verse))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            verses("John 3:16-18", versification),
+            [(3, 16), (3, 17), (3, 18)]
+        );
+        assert_eq!(
+            verses("John 3:35-4:2", versification),
+            [(3, 35), (3, 36), (4, 1), (4, 2)]
+        );
+        assert_eq!(verses("John 3", versification).len(), 36);
+        // Chapter 3 has an unknown length here, so it is left out
+        assert_eq!(verses("John 3:36-4:1", None), [(4, 1)]);
+        assert!(verses("John 3", None).is_empty());
     }
 
     #[test]

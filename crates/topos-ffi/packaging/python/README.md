@@ -41,17 +41,40 @@ The package is imported as `topos_bible`.
 | `search(text, unit)` | Every reference in `text`, as `Match(passage, start, end, line, column)` |
 | `parse(reference, style)` | One reference (`Jn 3:16` or OSIS `John.3.16`) as a `Passage`, or `None` |
 | `complete(text, cursor, unit, style, limit)` | Completions for the reference ending at `cursor` (`limit` 0 means no limit) |
+| `verse_ranges(passage)` | Each segment as a `VerseRange(start, end)`, with whole chapters expanded to their verses |
+| `verses(passage)` | Every verse in the passage, in order, as `ChapterVerse(chapter, verse)` |
+| `contains(outer, inner)` / `overlaps(a, b)` | Whether one passage contains, or shares any verse with, another |
 
 - `Passage(book_id, book, reference, segments, osis)`, with `reference` written in the
   requested `BookStyle` (`NAME`, `ABBREVIATION`, or `OSIS`)
-- `segments` lists each part of the reference as a `VerseRange(start_chapter, start_verse,
-  end_chapter, end_verse)`, always fully filled in: `John 3:16-18,20-4:2` gives
-  `(3, 16, 3, 18)` and `(3, 20, 4, 2)`, and a whole chapter (`John 3`) runs from verse 1 to its
-  last verse (`(3, 1, 3, 36)`)
 - `Completion(label, kind, start, end, text)`, where `kind` is a `CompletionKind`
   (`BOOK`, `CHAPTER`, or `VERSE`)
 - **Offsets:** pass `OffsetUnit.CHAR` so offsets match Python string indices (`BYTE` and
   `UTF16` are also available)
+
+### Segments
+
+`passage.segments` lists each part of the reference as written. Each is either a
+`PassageSegmentVerses(start, end)` with `ChapterVerse` ends, or a
+`PassageSegmentChapters(start, end)` with chapter numbers; `end` is `None` for a single verse
+or chapter:
+
+```python
+from topos_bible import PassageSegmentChapters, PassageSegmentVerses
+
+passage = topos.parse("John 3:16-18,20-4:2; 5", BookStyle.NAME)
+for segment in passage.segments:
+    match segment:
+        case PassageSegmentVerses(start=start, end=end):
+            print("verses", start.chapter, start.verse, end)
+        case PassageSegmentChapters(start=start, end=end):
+            print("chapters", start, end)
+
+topos.verse_ranges(passage)  # whole chapters with real verse numbers: John 5 is 5:1 to 5:47
+len(topos.verses(passage))   # every verse, one by one
+```
+
+### Errors
 
 ```python
 from topos_bible import ToposErrorException

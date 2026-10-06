@@ -6,13 +6,19 @@
 
 use boltffi::*;
 use topos_lib::{
-    data::bible_data::{BibleData, BibleDataInput},
+    data::{
+        bible_data::{BibleData, BibleDataInput},
+        books::BookId,
+        chapter_verses::ChapterVerses,
+    },
     filter::bible_filter::BibleFilter,
     matcher::BibleMatcher,
     segments::{
-        Passage as CorePassage,
+        Passage as CorePassage, Segment, Segments,
         autocomplete::{CompleteOptions, CompletionKind as CoreKind},
         formatter::{BookStyle as CoreBookStyle, FormatOptions},
+        units::chapter_verse::ChapterVerse as CoreChapterVerse,
+        verse_bounds::VerseBounds,
     },
 };
 
@@ -38,16 +44,34 @@ pub enum BookStyle {
     Osis,
 }
 
-/// An inclusive range of verses with every field filled in, so `3:16-18` is 3:16 to 3:18
+#[data]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ChapterVerse {
+    pub chapter: u8,
+    pub verse: u8,
+}
+
+/// One part of a reference, as written
+#[data]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PassageSegment {
+    /// `3:16` (no `end`), `3:16-18`, or `3:16-4:2`
+    Verses {
+        start: ChapterVerse,
+        end: Option<ChapterVerse>,
+    },
+    /// `3` (no `end`) or `3-4`
+    Chapters { start: u8, end: Option<u8> },
+}
+
+/// An inclusive range of verses with both ends written out (see [`Topos::verse_ranges`])
 #[data]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VerseRange {
-    pub start_chapter: u8,
-    pub start_verse: u8,
-    pub end_chapter: u8,
-    /// A whole chapter ends at its last verse (`John 3` is 3:1 to 3:36); `0` only when a custom
-    /// config has no verse counts for the book
-    pub end_verse: u8,
+    pub start: ChapterVerse,
+    /// A whole chapter ends at its last verse; verse `0` only when a custom config has no verse
+    /// counts for the book
+    pub end: ChapterVerse,
 }
 
 #[data]
@@ -58,8 +82,9 @@ pub struct Passage {
     pub book: String,
     /// `John 3:16-18,20-4:2`
     pub reference: String,
-    /// One range per segment: `[3:16-3:18, 3:20-4:2]`
-    pub segments: Vec<VerseRange>,
+    /// Each part of the reference as written: `John 3:16-18; 5` is verses 3:16 to 3:18 and
+    /// chapter 5
+    pub segments: Vec<PassageSegment>,
     /// `John.3.16-John.3.18 John.3.20-John.4.2`
     pub osis: String,
 }
@@ -157,6 +182,41 @@ impl Topos {
         self.passage(&passage, style.into())
     }
 
+    /// Each segment as an explicit verse range: whole chapters run from verse 1 to their last verse
+    pub fn verse_ranges(&self, passage: Passage) -> Vec<VerseRange> {
+        let passage = CorePassage::from(&passage);
+        passage
+            .ranges(self.versification(&passage))
+            .into_iter()
+            .map(|r| VerseRange {
+                start: r.start.into(),
+                end: r.end.into(),
+            })
+            .collect()
+    }
+
+    /// Every verse in the passage, in order (`John 3:16-18` is 3:16, 3:17, and 3:18)
+    pub fn verses(&self, passage: Passage) -> Vec<ChapterVerse> {
+        let passage = CorePassage::from(&passage);
+        passage
+            .verses(self.versification(&passage))
+            .into_iter()
+            .map(ChapterVerse::from)
+            .collect()
+    }
+
+    /// Whether every verse of `inner` is in `outer`
+    pub fn contains(&self, outer: Passage, inner: Passage) -> bool {
+        let (outer, inner) = (CorePassage::from(&outer), CorePassage::from(&inner));
+        outer.contains_passage(&inner, self.versification(&outer))
+    }
+
+    /// Whether the passages share any verse
+    pub fn overlaps(&self, a: Passage, b: Passage) -> bool {
+        let (a, b) = (CorePassage::from(&a), CorePassage::from(&b));
+        a.overlaps_passage(&b, self.versification(&a))
+    }
+
     /// Completions for the reference that ends at `cursor`
     pub fn complete(
         &self,
@@ -202,23 +262,20 @@ impl Default for Topos {
 }
 
 impl Topos {
+    fn versification(&self, passage: &CorePassage) -> Option<&ChapterVerses> {
+        self.matcher
+            .data()
+            .chapter_verses()
+            .get_chapter_verses(&passage.book)
+    }
+
     fn passage(&self, passage: &CorePassage, style: CoreBookStyle) -> Option<Passage> {
         let data = self.matcher.data();
         let options = FormatOptions {
             book: style,
             ..FormatOptions::default()
         };
-        let versification = data.chapter_verses().get_chapter_verses(&passage.book);
-        let segments = passage
-            .ranges(versification)
-            .into_iter()
-            .map(|r| VerseRange {
-                start_chapter: r.start_chapter,
-                start_verse: r.start_verse,
-                end_chapter: r.end_chapter,
-                end_verse: r.end_verse,
-            })
-            .collect();
+        let segments = passage.segments.iter().map(PassageSegment::from).collect();
         Some(Passage {
             book_id: passage.book.0,
             book: data.books().get_name(passage.book)?.clone(),
@@ -226,6 +283,70 @@ impl Topos {
             segments,
             osis: passage.to_osis(data.books()).unwrap_or_default(),
         })
+    }
+}
+
+impl From<CoreChapterVerse> for ChapterVerse {
+    fn from(cv: CoreChapterVerse) -> Self {
+        Self {
+            chapter: cv.chapter,
+            verse: cv.verse,
+        }
+    }
+}
+
+impl From<&Segment> for PassageSegment {
+    fn from(segment: &Segment) -> Self {
+        let cv = |chapter, verse| ChapterVerse { chapter, verse };
+        let (sc, sv, ec) = (
+            segment.starting_chapter(),
+            segment.starting_verse(),
+            segment.ending_chapter(),
+        );
+        match (segment, segment.ending_verse()) {
+            (Segment::ChapterVerse(_), _) => Self::Verses {
+                start: cv(sc, sv),
+                end: None,
+            },
+            (Segment::FullChapter(_), _) => Self::Chapters {
+                start: sc,
+                end: None,
+            },
+            (Segment::FullChapterRange(_), _) => Self::Chapters {
+                start: sc,
+                end: Some(ec),
+            },
+            // Verse ranges, including `1-2:3` (from 1:1)
+            (_, end_verse) => Self::Verses {
+                start: cv(sc, sv),
+                end: Some(cv(ec, end_verse.unwrap_or_default())),
+            },
+        }
+    }
+}
+
+/// Back to the core types, for the helpers that take a passage
+impl From<&Passage> for CorePassage {
+    fn from(passage: &Passage) -> Self {
+        let segments = passage
+            .segments
+            .iter()
+            .map(|segment| match *segment {
+                PassageSegment::Verses { start, end: None } => {
+                    Segment::chapter_verse(start.chapter, start.verse)
+                }
+                PassageSegment::Verses {
+                    start,
+                    end: Some(end),
+                } => Segment::chapter_range(start.chapter, start.verse, end.chapter, end.verse),
+                PassageSegment::Chapters { start, end: None } => Segment::full_chapter(start),
+                PassageSegment::Chapters {
+                    start,
+                    end: Some(end),
+                } => Segment::full_chapter_range(start, end),
+            })
+            .collect();
+        Segments(segments).with_book(BookId(passage.book_id))
     }
 }
 
@@ -325,25 +446,75 @@ mod tests {
         assert_eq!(completions[0].text, "Genesis 1:1");
     }
 
-    #[test]
-    fn passages_list_explicit_ranges() {
-        let topos = Topos::new();
-        let passage =
-            &topos.search("Read John 3:16-18,20-4:2".into(), OffsetUnit::Utf16)[0].passage;
-        assert_eq!(passage.reference, "John 3:16-18,20-4:2");
-        let range = |sc, sv, ec, ev| VerseRange {
-            start_chapter: sc,
-            start_verse: sv,
-            end_chapter: ec,
-            end_verse: ev,
-        };
-        assert_eq!(passage.segments, [range(3, 16, 3, 18), range(3, 20, 4, 2)]);
-        assert_eq!(passage.osis, "John.3.16-John.3.18 John.3.20-John.4.2");
+    fn cv(chapter: u8, verse: u8) -> ChapterVerse {
+        ChapterVerse { chapter, verse }
+    }
 
-        let whole = topos.parse("Jude 1".into(), BookStyle::Name);
-        assert_eq!(whole.unwrap().segments, [range(1, 1, 1, 25)]);
-        let chapter = topos.parse("John 3".into(), BookStyle::Name).unwrap();
-        assert_eq!(chapter.segments, [range(3, 1, 3, 36)]);
+    #[test]
+    fn passages_list_segments_as_written() {
+        let topos = Topos::new();
+        let found = topos.search(
+            "Read John 3:16-18,20-4:2; 5-6; 7; 8:1".into(),
+            OffsetUnit::Utf16,
+        );
+        let passage = &found[0].passage;
+        assert_eq!(passage.reference, "John 3:16-18,20-4:2; 5-6,7; 8:1");
+        assert_eq!(
+            passage.segments,
+            [
+                PassageSegment::Verses {
+                    start: cv(3, 16),
+                    end: Some(cv(3, 18))
+                },
+                PassageSegment::Verses {
+                    start: cv(3, 20),
+                    end: Some(cv(4, 2))
+                },
+                PassageSegment::Chapters {
+                    start: 5,
+                    end: Some(6)
+                },
+                PassageSegment::Chapters {
+                    start: 7,
+                    end: None
+                },
+                PassageSegment::Verses {
+                    start: cv(8, 1),
+                    end: None
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn helpers() {
+        let topos = Topos::new();
+        let parse = |reference: &str| topos.parse(reference.into(), BookStyle::Name).unwrap();
+
+        let ranges = topos.verse_ranges(parse("John 3; 4:1-2"));
+        assert_eq!(
+            ranges,
+            [
+                VerseRange {
+                    start: cv(3, 1),
+                    end: cv(3, 36)
+                },
+                VerseRange {
+                    start: cv(4, 1),
+                    end: cv(4, 2)
+                },
+            ]
+        );
+        assert_eq!(
+            topos.verses(parse("John 3:35-4:1")),
+            [cv(3, 35), cv(3, 36), cv(4, 1)]
+        );
+        assert_eq!(topos.verses(parse("Jude 1")).len(), 25);
+
+        assert!(topos.contains(parse("John 3"), parse("John 3:16-18")));
+        assert!(!topos.contains(parse("John 3:16"), parse("John 3:16-17")));
+        assert!(topos.overlaps(parse("John 3:16-17"), parse("John 3:17-4:1")));
+        assert!(!topos.overlaps(parse("John 3"), parse("Romans 3")));
     }
 
     #[test]

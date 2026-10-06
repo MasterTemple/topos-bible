@@ -50,18 +50,42 @@ const topos = Topos.new();
 | `search(text, unit)` | Every reference in `text`, as `Match { passage, start, end, line, column }` |
 | `parse(reference, style)` | One reference (`Jn 3:16` or OSIS `John.3.16`) as a `Passage`, or `null` |
 | `complete(text, cursor, unit, style, limit)` | Completions for the reference ending at `cursor` (`limit` 0 means no limit) |
+| `verseRanges(passage)` | Each segment as a `VerseRange { start, end }`, with whole chapters expanded to their verses |
+| `verses(passage)` | Every verse in the passage, in order, as `ChapterVerse { chapter, verse }` |
+| `contains(outer, inner)` / `overlaps(a, b)` | Whether one passage contains, or shares any verse with, another |
 | `dispose()` | Frees the Rust object now instead of waiting for garbage collection |
 
 - `Passage { bookId, book, reference, segments, osis }`, with `reference` written in the
   requested `BookStyle` (`Name`, `Abbreviation`, or `Osis`)
-- `segments` lists each part of the reference as a `VerseRange { startChapter, startVerse,
-  endChapter, endVerse }`, always fully filled in: `John 3:16-18,20-4:2` is
-  `[{3, 16, 3, 18}, {3, 20, 4, 2}]`, and a whole chapter (`John 3`) runs from verse 1 to its
-  last verse (`{3, 1, 3, 36}`)
 - `Completion { label, kind, start, end, text }`, where `kind` is a `CompletionKind`
   (`Book`, `Chapter`, or `Verse`)
 - **Offsets:** pass `OffsetUnit.Utf16` so offsets match JavaScript string indices (`Byte` and
   `Char` are also available)
+
+### Segments
+
+`passage.segments` lists each part of the reference as written. Each is either verses or whole
+chapters, and `end` is `null` for a single verse or chapter:
+
+```ts
+// John 3:16-18,20-4:2; 5
+[
+  { tag: "Verses", start: { chapter: 3, verse: 16 }, end: { chapter: 3, verse: 18 } },
+  { tag: "Verses", start: { chapter: 3, verse: 20 }, end: { chapter: 4, verse: 2 } },
+  { tag: "Chapters", start: 5, end: null },
+]
+
+for (const segment of passage.segments) {
+  if (segment.tag === "Verses") {
+    const last = segment.end ?? segment.start; // ChapterVerse
+  } else {
+    const lastChapter = segment.end ?? segment.start; // number
+  }
+}
+
+topos.verseRanges(passage); // whole chapters with real verse numbers: John 3 is 3:1 to 3:36
+topos.verses(passage).length; // every verse, one by one
+```
 
 `search` finds abbreviations (`Jn`, `1 Co`), ranges and lists (`5:1-3,5; 6:6`), `ff`, Roman
 numerals (`Matth. x, 8`), and words split across lines, while skipping false positives like

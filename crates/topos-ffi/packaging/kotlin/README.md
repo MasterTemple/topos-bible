@@ -28,6 +28,14 @@ Topos().use { topos ->  // AutoCloseable: frees the Rust object at the end
 
     val passage = topos.parse("1 Cor 13:4-7", BookStyle.NAME)  // Passage?
 
+    for (segment in passage?.segments.orEmpty()) {
+        when (segment) {
+            is PassageSegment.Verses -> println("${segment.start} ${segment.end}")  // end null: one verse
+            is PassageSegment.Chapters -> println("${segment.start} ${segment.end}")  // end null: one chapter
+        }
+    }
+    val verses = passage?.let { topos.verses(it) }  // every verse, one by one
+
     // Completions replace input.substring(start, end) with completion.text
     val input = "see Gen 1:"
     val completions = topos.complete(input, input.length.toUInt(), OffsetUnit.UTF16, BookStyle.NAME, 10u)
@@ -40,8 +48,10 @@ try {
 }
 ```
 
-- `passage.segments` is a `List<VerseRange>`, each with `startChapter`, `startVerse`,
-  `endChapter`, and `endVerse` always filled in (a whole chapter runs to its last verse)
+- `passage.segments` is a `List<PassageSegment>`: `Verses(start, end)` with `ChapterVerse`
+  ends, or `Chapters(start, end)`
+- Helpers: `verseRanges(passage)`, `verses(passage)`, `contains(outer, inner)`, and
+  `overlaps(a, b)`
 - Offsets and counts are `UInt` (chapters and verses are `UByte`)
 - **Offsets:** pass `OffsetUnit.UTF16`, which matches Kotlin and Java string indices
   (`BYTE` and `CHAR` also exist)

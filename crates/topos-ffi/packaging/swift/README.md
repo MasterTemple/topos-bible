@@ -32,6 +32,17 @@ let input = "see Gen 1:"
 let completions = topos.complete(text: input, cursor: UInt32(input.utf16.count),
                                  unit: .utf16, style: .name, limit: 10)
 
+for segment in passage?.segments ?? [] {
+    switch segment {
+    case let .verses(start, end):     // end is nil for a single verse
+        print(start.chapter, start.verse, end as Any)
+    case let .chapters(start, end):   // end is nil for a single chapter
+        print(start, end as Any)
+    }
+}
+let ranges = topos.verseRanges(passage: passage!)   // whole chapters expanded to verses
+let verses = topos.verses(passage: passage!)        // every verse, one by one
+
 do {
     let custom = try Topos(withConfig: json)
 } catch ToposError.invalidConfig(let message) {
@@ -41,8 +52,10 @@ do {
 
 - `Passage { bookId, book, reference, segments, osis }`, `Match { passage, start, end, line,
   column }`, and `Completion { label, kind, start, end, text }` are value types
-- `segments` is `[VerseRange]`, each with `startChapter`, `startVerse`, `endChapter`, and
-  `endVerse` always filled in (a whole chapter runs to its last verse)
+- `segments` is `[PassageSegment]`: `.verses(start:end:)` with `ChapterVerse` ends, or
+  `.chapters(start:end:)`
+- Helpers: `verseRanges(passage:)`, `verses(passage:)`, `contains(outer:inner:)`, and
+  `overlaps(a:b:)`
 - **Offsets:** pass `.utf16` and use `String.utf16` indices (`.byte` and `.char` also exist)
 
 This snippet follows the generated bindings but has not been compiled in CI. See the

@@ -23,13 +23,17 @@ Every language gets the same object and types:
 | `search(text, unit) -> [Match]` | Every reference in `text` |
 | `parse(reference, style) -> Passage?` | One reference (`Jn 3:16` or OSIS `John.3.16`) |
 | `complete(text, cursor, unit, style, limit) -> [Completion]` | Completions for the reference ending at `cursor` (`limit` 0 means no limit) |
+| `verse_ranges(passage) -> [VerseRange]` | Each segment with both ends written out; whole chapters run from verse 1 to their last verse |
+| `verses(passage) -> [ChapterVerse]` | Every verse in the passage, in order |
+| `contains(outer, inner)` / `overlaps(a, b) -> bool` | Verse-by-verse containment and overlap |
 
 - `Passage { book_id, book, reference, segments, osis }`, written in the requested `BookStyle` (`Name`, `Abbreviation`, `Osis`)
-- `segments: [VerseRange]`, one per part of the reference, each with `start_chapter`,
-  `start_verse`, `end_chapter`, and `end_verse` always filled in. A whole chapter runs from
-  verse 1 to its last verse (`John 3` is 3:1-3:36); `end_verse` is `0` only when a custom config
-  has no verse counts for the book. Field names follow each language (`startChapter` in
-  TypeScript, Swift, and Kotlin)
+- `segments: [PassageSegment]`, each part of the reference as written: `Verses { start, end }`
+  with `ChapterVerse { chapter, verse }` ends, or `Chapters { start, end }` with chapter numbers.
+  `end` is empty for a single verse or chapter, so `John 3:16-18; 5` is verses 3:16 to 3:18
+  and chapter 5. Use `verse_ranges` or `verses` for explicit verse numbers
+- `VerseRange { start, end }` always has both ends; `end.verse` is `0` only when a custom config
+  has no verse counts for the book
 - `Match { passage, start, end, line, column }`
 - `Completion { label, kind, start, end, text }`: accept it by replacing `start..end` with `text`
 
