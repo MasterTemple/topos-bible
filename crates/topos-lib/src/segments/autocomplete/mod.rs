@@ -120,9 +120,12 @@ fn last_number(text: &str) -> &str {
     let end = text
         .rfind(|c: char| c.is_ascii_digit())
         .map_or(0, |i| i + 1);
+    // Past the whole character before the digits, which may be wider than a byte (`–`)
     let start = text[..end]
-        .rfind(|c: char| !c.is_ascii_digit())
-        .map_or(0, |i| i + 1);
+        .char_indices()
+        .rev()
+        .find(|(_, c)| !c.is_ascii_digit())
+        .map_or(0, |(i, c)| i + c.len_utf8());
     &text[start..end]
 }
 
@@ -191,6 +194,27 @@ fn book_completions(data: &BibleData, before: &str, format: &FormatOptions) -> V
 
 #[cfg(test)]
 mod tests {
+    /// Separators can be any text, like an en dash (3 bytes), which used to split a character
+    #[test]
+    fn multibyte_separators() {
+        let matcher = BibleMatcher::default();
+        let options = CompleteOptions {
+            format: FormatOptions {
+                range: String::from("\u{2013}"),
+                chapter_verse: String::from("."),
+                ..FormatOptions::default()
+            },
+            limit: Some(2),
+        };
+        let text = "jn 3:16-";
+        let labels: Vec<_> = matcher
+            .complete(text, text.len(), &options)
+            .into_iter()
+            .map(|c| c.label)
+            .collect();
+        assert_eq!(labels, ["John 3.16\u{2013}17", "John 3.16\u{2013}18"]);
+    }
+
     use super::*;
 
     fn labels(input: &str) -> Vec<String> {
