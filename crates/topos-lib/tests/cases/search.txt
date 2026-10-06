@@ -99,3 +99,14 @@ Gn5 =>
 
 # Older abbreviations
 Psal. 10:3 => Psalms 10:3
+
+# Quantities: numbers with units or symbols are not chapters or verses
+is 2.5% => 
+is 2.39pt => 
+is 2.5 times => 
+John 3:16% => 
+John 3:16 % => 
+Gen 1.5° => 
+John 3:16, 5% of people => John 3:16
+Ps 23 at 50% => Psalms 23
+Is. 53.5 => Isaiah 53:5

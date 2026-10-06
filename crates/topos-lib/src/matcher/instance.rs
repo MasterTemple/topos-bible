@@ -6,7 +6,10 @@ use crate::{
     data::{bible_data::BibleData, books::BookId},
     matcher::line_col::LineColLocation,
     segments::{
-        grammar::{NumberKind, SegmentList},
+        grammar::{
+            NumberKind, SegmentList,
+            lexer::{SPACES, is_unit_symbol},
+        },
         passage::{Passage, Segments},
         resolve::Resolver,
     },
@@ -74,6 +77,23 @@ pub struct FoundPassage {
     pub psg: Passage,
 }
 
+/// Whether `rest` starts with a number that has a unit or symbol (`5%`, `39pt`, `1 %`)
+fn runs_into_quantity(rest: &str) -> bool {
+    let rest = rest.trim_start();
+    let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+    if digits == 0 {
+        return false;
+    }
+    let after = &rest[digits..];
+    let glued_letter = after.chars().next().is_some_and(char::is_alphabetic);
+    let symbol = after
+        .trim_start_matches(SPACES)
+        .chars()
+        .next()
+        .is_some_and(is_unit_symbol);
+    glued_letter || symbol
+}
+
 /// Text without whitespace this long is encoded data or code (like base64 in an SVG), not prose
 const LONG_TOKEN: usize = 64;
 
@@ -122,9 +142,16 @@ impl FoundPassage {
         }
         let window = &text[cur.end()..next_start.unwrap_or(text.len())];
         let list = SegmentList::parse(window);
-        let (found, has_verse) = Self::resolve(data, book, cur.end(), &list)?;
-        // Abbreviations that are also words (`is`) need an explicit verse (`Is 1:1`)
-        if !has_verse && data.books().is_ambiguous(cur.as_str()) {
+        let (found, verse) = Self::resolve(data, book, cur.end(), window, &list)?;
+        let has_verse = verse.is_some();
+        // Abbreviations that are also words need a `:` verse (`Is 1:1`), since `is 2.5` is a
+        // decimal; a `.` verse only counts after an abbreviation with a period (`Is. 53.5`)
+        let ambiguous_ok = match verse {
+            Some(':') => true,
+            Some(_) => cur.as_str().ends_with('.'),
+            None => false,
+        };
+        if !ambiguous_ok && data.books().is_ambiguous(cur.as_str()) {
             return None;
         }
         // A book glued to its chapter (`Jn3:16`) needs a verse, and never a Roman numeral, since
@@ -152,29 +179,44 @@ impl FoundPassage {
         if first.start_verse.is_none_or(|p| p.delimiter.actual != ':') {
             return None;
         }
-        Self::resolve(data, book, window.start, &list).map(|(found, _)| found)
+        Self::resolve(data, book, window.start, &text[window], &list).map(|(found, _)| found)
     }
 
-    /// Resolves segments parsed at byte `start`, and whether they have an explicit verse
+    /**
+    Resolves `list`, parsed from `window` (which starts at byte `start`), and returns the
+    delimiter of its explicit verse, if any (`:` is preferred over `.`)
+    */
     fn resolve(
         data: &BibleData,
         book: BookId,
         start: usize,
+        window: &str,
         list: &SegmentList,
-    ) -> Option<(Self, bool)> {
+    ) -> Option<(Self, Option<char>)> {
+        // `3:16%` or `2.5%`: the reference runs into a quantity, so it is not a reference
+        if list.nodes.last().is_some_and(|n| !n.is_complete())
+            && runs_into_quantity(&window[list.end()..])
+        {
+            return None;
+        }
         let versification = data.chapter_verses().get_chapter_verses(&book);
         let resolved = Resolver::for_book(versification).resolve(&list.nodes);
         if resolved.used == 0 {
             return None;
         }
-        let has_verse = list.nodes[..resolved.used]
+        let verses = list.nodes[..resolved.used]
             .iter()
-            .any(|node| node.start_verse.is_some());
+            .filter_map(|node| node.start_verse.filter(|p| p.number.is_some()))
+            .map(|p| p.delimiter.actual);
+        let verse = verses.fold(None, |best, d| match best {
+            Some(':') => best,
+            _ => Some(d),
+        });
         let found = Self {
             // Only the text that resolved is part of the match
             bytes: start..start + resolved.end,
             psg: resolved.segments.with_book(book),
         };
-        Some((found, has_verse))
+        Some((found, verse))
     }
 }

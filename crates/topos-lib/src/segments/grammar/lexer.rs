@@ -6,6 +6,17 @@ use crate::segments::grammar::{
 /// Characters that can follow a verse number to mark part of a verse (`Matthew 28:18b`)
 const SUBVERSE: &str = "abcd";
 
+/// Spaces allowed between a number and its unit (`5 %`), including non-breaking ones
+pub const SPACES: [char; 3] = [' ', '\u{a0}', '\u{202f}'];
+
+/// Symbols that make a number a quantity rather than a chapter or verse (`5%`, `1.5°`)
+pub fn is_unit_symbol(c: char) -> bool {
+    matches!(
+        c,
+        '%' | '‰' | '‱' | '°' | '℃' | '℉' | '′' | '″' | '€' | '£' | '¥' | '¢'
+    )
+}
+
 /// - Decimal numbers are at most 3 digits
 /// - Roman numerals are at most 9 characters, just to keep the lexer from getting trolled
 const MAX_DIGITS: usize = 3;
@@ -106,6 +117,15 @@ fn lex_decimal(s: &str, start: usize) -> Option<(Number, usize)> {
 
     // Otherwise a number must end the word, so `GA9hNK` is not Galatians 9
     if !at_boundary(&s[len..]) {
+        return None;
+    }
+    // A number with a unit symbol is a quantity (`5%`, `5 %`)
+    if s[len..]
+        .trim_start_matches(SPACES)
+        .chars()
+        .next()
+        .is_some_and(is_unit_symbol)
+    {
         return None;
     }
 
