@@ -1,7 +1,9 @@
 use std::time::Instant;
 
 use clap::ValueEnum;
-use topos_lib::{error::AnyResult, matcher::matcher::BibleMatcher, segments::segments::Passage};
+use topos_lib::{
+    error::AnyResult, matcher::bible_matcher::BibleMatcher, segments::passage::Passage,
+};
 
 use crate::matches::PathMatches;
 
@@ -16,13 +18,6 @@ pub enum OutputMode {
     Table,
     #[value(alias = "qf", help = "Output matches for the Neovim Quickfix List")]
     Quickfix,
-}
-
-/// But what about static methods, for things like column headers
-trait OutputEntryFormat {
-    fn json(self) -> String;
-    fn table(self) -> String;
-    fn quickfix(self) -> String;
 }
 
 impl OutputMode {
@@ -85,10 +80,7 @@ fn print_json(matcher: &BibleMatcher, results: impl Iterator<Item = AnyResult<Pa
     }
 }
 
-fn print_qf_list<'a>(
-    matcher: &BibleMatcher,
-    results: impl Iterator<Item = AnyResult<PathMatches>>,
-) {
+fn print_qf_list(matcher: &BibleMatcher, results: impl Iterator<Item = AnyResult<PathMatches>>) {
     for PathMatches { path, matches } in results.filter_map(Result::ok) {
         let path = path
             .map(|p| p.to_string_lossy().into_owned())
@@ -108,7 +100,7 @@ fn print_qf_list<'a>(
     }
 }
 
-fn print_table<'a>(matcher: &BibleMatcher, results: impl Iterator<Item = AnyResult<PathMatches>>) {
+fn print_table(matcher: &BibleMatcher, results: impl Iterator<Item = AnyResult<PathMatches>>) {
     println!("| File | Line | Col | Verse |");
     println!("| ---- | ---- | --- | ----- |");
     for PathMatches { path, matches } in results.filter_map(Result::ok) {

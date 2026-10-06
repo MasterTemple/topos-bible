@@ -1,6 +1,6 @@
 use topos_lib::{
     error::AnyResult,
-    matcher::{location::srt::SRTLocation, matcher::BibleMatcher},
+    matcher::{bible_matcher::BibleMatcher, location::srt::SRTLocation},
 };
 
 #[test]

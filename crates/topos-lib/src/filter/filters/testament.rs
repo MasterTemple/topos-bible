@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use itertools::Itertools;
 
-use crate::{data::books::BookId, filter::filter::IsFilter};
+use crate::{data::books::BookId, filter::bible_filter::IsFilter};
 
 #[derive(Copy, Clone, Debug)]
 pub enum TestamentFilter {
@@ -20,7 +20,10 @@ impl TestamentFilter {
 }
 
 impl IsFilter for TestamentFilter {
-    fn get_ids(&self, _data: &crate::data::data::BibleData) -> std::collections::BTreeSet<BookId> {
+    fn get_ids(
+        &self,
+        _data: &crate::data::bible_data::BibleData,
+    ) -> std::collections::BTreeSet<BookId> {
         match self {
             TestamentFilter::Old => 1..=39,
             TestamentFilter::New => 40..=66,
@@ -44,14 +47,14 @@ impl FromStr for TestamentFilter {
 
 #[cfg(test)]
 mod tests {
-    use crate::filter::{filter::Operation, filters::testament::TestamentFilter};
+    use crate::filter::{bible_filter::Operation, filters::testament::TestamentFilter};
 
     macro_rules! mk_test {
         ($fn_name: ident, [$($filter:expr),+ $(,)?], $count:literal) => {
             #[test]
             fn $fn_name() {
-                let data = crate::data::data::BibleData::default();
-                let mut filter = crate::filter::filter::BibleFilter::new(data);
+                let data = crate::data::bible_data::BibleData::default();
+                let mut filter = crate::filter::bible_filter::BibleFilter::new(data);
                 $(
                     filter.push($filter);
                 )*

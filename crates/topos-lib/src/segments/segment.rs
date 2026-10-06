@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 
 use crate::segments::{
-    segments::Segments,
+    passage::Segments,
     units::{
         chapter_range::ChapterRange, chapter_verse::ChapterVerse,
         chapter_verse_range::ChapterVerseRange, full_chapter::FullChapter,
@@ -242,7 +242,7 @@ impl std::str::FromStr for Segment {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let segments =
-            Segments::parse(s).ok_or_else(|| format!("Could not parse any segments."))?;
+            Segments::parse(s).ok_or_else(|| "Could not parse any segments.".to_string())?;
         if segments.is_empty() {
             Err(String::from("No segments found"))?
         }

@@ -2,9 +2,9 @@ use htmloc::{FragmentEngine, GenerateOptions, Selection, TextFragment};
 use itertools::Itertools;
 
 use crate::matcher::{
+    bible_matcher::{BibleMatcher, MatchResult, Matcher},
     instance::BibleMatch,
     location::line_col::{ByteIndex, LineColLocation, Position},
-    matcher::{BibleMatcher, MatchResult, Matcher},
 };
 
 impl From<Selection> for LineColLocation {
@@ -23,20 +23,20 @@ impl From<Selection> for LineColLocation {
     }
 }
 
-impl Into<Selection> for LineColLocation {
-    fn into(self) -> Selection {
+impl From<LineColLocation> for Selection {
+    fn from(val: LineColLocation) -> Self {
         Selection {
             start: htmloc::Position {
-                line: self.start.line,
-                column: self.start.column,
+                line: val.start.line,
+                column: val.start.column,
             },
             end: htmloc::Position {
-                line: self.end.line,
-                column: self.end.column,
+                line: val.end.line,
+                column: val.end.column,
             },
             bytes: htmloc::ByteIndex {
-                start: self.bytes.start,
-                end: self.bytes.end,
+                start: val.bytes.start,
+                end: val.bytes.end,
             },
         }
     }
@@ -63,7 +63,7 @@ impl Matcher for HTMLLocation {
     ) -> MatchResult<Vec<BibleMatch<Self>>> {
         let doc = FragmentEngine::from_html(input);
 
-        let results = matcher.search::<LineColLocation>(&doc.plain_text())?;
+        let results = matcher.search::<LineColLocation>(doc.plain_text())?;
 
         results
             .into_iter()

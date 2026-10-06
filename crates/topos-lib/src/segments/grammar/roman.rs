@@ -18,7 +18,7 @@ pub fn is_numeral(b: u8) -> bool {
 /**
 - Parses a case-insensitive Roman numeral up to 255
 - Only the canonical form is accepted (`IV`, not `IIII`), so ordinary words made of numeral
-letters (like `civil`) are rejected
+  letters (like `civil`) are rejected
 */
 pub fn parse(s: &str) -> Option<u8> {
     let upper = s.to_ascii_uppercase();

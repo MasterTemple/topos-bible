@@ -2,10 +2,10 @@ use clap::Parser;
 use std::path::PathBuf;
 use topos_lib::{
     filter::{
-        filter::BibleFilter,
+        bible_filter::BibleFilter,
         filters::{book::BookFilter, genre::GenreFilter, testament::TestamentFilter},
     },
-    matcher::matcher::BibleMatcher,
+    matcher::bible_matcher::BibleMatcher,
 };
 
 use crate::outputs::OutputMode;

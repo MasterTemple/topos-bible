@@ -4,8 +4,8 @@ use itertools::Itertools;
 use regex::Regex;
 
 use crate::{
-    data::{books::BookId, data::BibleData},
-    matcher::{matcher::BibleMatcher, matches::ComplexFilter},
+    data::{bible_data::BibleData, books::BookId},
+    matcher::{bible_matcher::BibleMatcher, matches::ComplexFilter},
 };
 
 pub trait IsFilter {
@@ -72,12 +72,12 @@ impl BibleFilter {
                 }
             }
             Operation::Exclude(_) => {
-                self.ids.retain(|id| !ids.contains(&id));
+                self.ids.retain(|id| !ids.contains(id));
             }
         };
     }
 
-    pub fn add<T: IsFilter>(mut self, op: Operation<T>) -> BibleFilter {
+    pub fn with<T: IsFilter>(mut self, op: Operation<T>) -> BibleFilter {
         self.push(op);
         self
     }
@@ -115,7 +115,7 @@ impl BibleFilter {
             .data
             .books()
             .iter_keys_and_ids()
-            .filter_map(|(key, id)| self.ids.contains(&id).then_some(key) )
+            .filter_map(|(key, id)| self.ids.contains(id).then_some(key))
             .join("|");
 
         // let book_regex = Regex::new(format!(r"\b(((?:)(?i){books_pattern})[A-z]*)\.?").as_str())
@@ -160,14 +160,11 @@ impl Default for BibleFilter {
 
 #[cfg(test)]
 mod tests {
-    use crate::filter::filter::BibleFilter;
+    use crate::filter::bible_filter::BibleFilter;
 
     #[test]
     fn make_regex() {
-        let re = BibleFilter::default()
-            // .add(Operation::Include(GenreFilter::new("Pauline")))
-            .create_regex()
-            .unwrap();
+        let re = BibleFilter::default().create_regex().unwrap();
         println!(r#"rg "{}""#, re.as_str());
     }
 }

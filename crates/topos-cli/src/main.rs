@@ -1,5 +1,5 @@
 use clap::Parser;
-use topos_lib::matcher::matcher::BibleMatcher;
+use topos_lib::matcher::bible_matcher::BibleMatcher;
 
 use crate::{args::Args, inputs::InputType};
 

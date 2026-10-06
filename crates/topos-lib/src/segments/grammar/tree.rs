@@ -70,7 +70,7 @@ pub struct Delimiter {
 /**
 - A delimiter and the number after it, such as `:3` or `-4`
 - `number` is [`None`] when the input ends (or stops being a reference) right after the delimiter,
-like the `-` in `1:1-`
+  like the `-` in `1:1-`
 */
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Part {
@@ -104,7 +104,7 @@ One segment as written: `start(:start_verse)?(-end(:end_verse)?)?`
 ```
 
 - Whether a number is a chapter or a verse depends on context, which is decided when resolving into
-[`Segments`](crate::segments::segments::Segments), not here
+  [`Segments`](crate::segments::passage::Segments), not here
 - Only the last part of the last node can be dangling, because parsing stops there
 */
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

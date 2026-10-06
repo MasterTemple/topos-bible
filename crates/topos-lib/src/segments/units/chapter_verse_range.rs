@@ -137,9 +137,9 @@ impl ChapterVerseRange {
     }
 }
 
-impl Into<Segment> for ChapterVerseRange {
-    fn into(self) -> Segment {
-        Segment::ChapterVerseRange(self)
+impl From<ChapterVerseRange> for Segment {
+    fn from(val: ChapterVerseRange) -> Self {
+        Segment::ChapterVerseRange(val)
     }
 }
 
@@ -155,17 +155,17 @@ impl TryFrom<Segment> for ChapterVerseRange {
             ),
             Segment::ChapterVerseRange(chapter_verse_range) => chapter_verse_range,
             Segment::ChapterRange(_) => {
-                Err(format!("Cannot coerce ChapterRange into ChapterVerseRange"))?
+                Err("Cannot coerce ChapterRange into ChapterVerseRange".to_string())?
             }
             Segment::FullChapter(_) => {
-                Err(format!("Cannot coerce FullChapter into ChapterVerseRange"))?
+                Err("Cannot coerce FullChapter into ChapterVerseRange".to_string())?
             }
-            Segment::FullChapterRange(_) => Err(format!(
-                "Cannot coerce FullChapterRange into ChapterVerseRange"
-            ))?,
-            Segment::FullChapterVerseRange(_) => Err(format!(
-                "Cannot coerce FullChapterVerseRange into ChapterVerseRange"
-            ))?,
+            Segment::FullChapterRange(_) => {
+                Err("Cannot coerce FullChapterRange into ChapterVerseRange".to_string())?
+            }
+            Segment::FullChapterVerseRange(_) => {
+                Err("Cannot coerce FullChapterVerseRange into ChapterVerseRange".to_string())?
+            }
         })
     }
 }

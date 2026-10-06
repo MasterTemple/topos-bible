@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::{data::books::BookId, filter::filter::IsFilter};
+use crate::{data::books::BookId, filter::bible_filter::IsFilter};
 
 pub struct BookFilter {
     input: String,
@@ -15,7 +15,10 @@ impl BookFilter {
 }
 
 impl IsFilter for BookFilter {
-    fn get_ids(&self, data: &crate::data::data::BibleData) -> std::collections::BTreeSet<BookId> {
+    fn get_ids(
+        &self,
+        data: &crate::data::bible_data::BibleData,
+    ) -> std::collections::BTreeSet<BookId> {
         let mut ids = BTreeSet::new();
         if let Some(value) = data.books().search(&self.input) {
             ids.insert(value);
@@ -27,7 +30,7 @@ impl IsFilter for BookFilter {
 #[cfg(test)]
 mod tests {
     use crate::filter::{
-        filter::Operation,
+        bible_filter::Operation,
         filters::{book::BookFilter, genre::GenreFilter},
     };
 
@@ -35,8 +38,8 @@ mod tests {
         ($fn_name: ident, [$($filter:expr),+ $(,)?], $count:literal) => {
             #[test]
             fn $fn_name() {
-                let data = crate::data::data::BibleData::default();
-                let mut filter = crate::filter::filter::BibleFilter::new(data);
+                let data = crate::data::bible_data::BibleData::default();
+                let mut filter = crate::filter::bible_filter::BibleFilter::new(data);
                 $(
                     filter.push($filter);
                 )*

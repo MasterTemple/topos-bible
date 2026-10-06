@@ -5,7 +5,7 @@ use crate::data::chapter_verses::BookChapterVerses;
 
 use super::{books::Books, genres::Genres};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct BibleData {
     books: Books,
     genres: Genres,
@@ -29,7 +29,7 @@ impl BibleData {
         let books_pattern: String = self
             .books()
             .iter_keys_and_ids()
-            .map(|(key, _id)| key )
+            .map(|(key, _id)| key)
             .join("|");
 
         let book_regex = Regex::new(format!(r"\b(((?:)(?i){books_pattern})\b\.?)").as_str())
@@ -41,16 +41,6 @@ impl BibleData {
     // pub fn parse(&self, input: &str) -> Option<BookSegments> {
     //
     // }
-}
-
-impl Default for BibleData {
-    fn default() -> Self {
-        Self {
-            books: Default::default(),
-            genres: Default::default(),
-            chapter_verses: Default::default(),
-        }
-    }
 }
 
 // impl BibleData {

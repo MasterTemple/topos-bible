@@ -3,7 +3,7 @@
 //!
 //! - [`lexer`] turns text into numbers and delimiters with byte spans
 //! - [`tree`] parses those into a lossless [`SegmentList`], keeping partial input like `1:1-`
-//! - [`Segments`](crate::segments::segments::Segments) resolves a list into chapters and verses
+//! - [`Segments`](crate::segments::passage::Segments) resolves a list into chapters and verses
 
 pub mod lexer;
 pub mod roman;

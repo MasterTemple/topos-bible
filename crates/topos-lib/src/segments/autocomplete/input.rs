@@ -1,11 +1,11 @@
 use regex::Regex;
 
 use crate::{
-    matcher::matcher::BibleMatcher,
+    matcher::bible_matcher::BibleMatcher,
     segments::{
         autocomplete::{incomplete::IncompleteSegment, output::CompletionOutput},
         grammar::SegmentList,
-        segments::Segments,
+        passage::Segments,
     },
 };
 
@@ -60,15 +60,14 @@ impl<'a> InputAutoCompleter<'a> {
 
 #[cfg(test)]
 mod tests {
-    
 
     use crate::{
-        matcher::matcher::BibleMatcher, segments::autocomplete::input::InputAutoCompleter,
+        matcher::bible_matcher::BibleMatcher, segments::autocomplete::input::InputAutoCompleter,
     };
 
     // use crate::{
     //     data::chapter_verses::BookChapterVerses,
-    //     matcher::matcher::BibleMatcher,
+    //     matcher::bible_matcher::BibleMatcher,
     //     segments::{
     //         autocomplete::{
     //             completer::SegmentAutoCompleter,
@@ -213,7 +212,7 @@ mod tests {
             if let Some(result) = completer.suggest(input) {
                 println!("{input}");
                 let _total = result.suggestions.len();
-                for (_idx, sug) in result.suggestions.into_iter().enumerate() {
+                for sug in result.suggestions.into_iter() {
                     let segs = result.segments.with_suggestion(sug);
                     println!("{}{}", " ".repeat(bk.len()), segs);
                     // if idx > 5 {

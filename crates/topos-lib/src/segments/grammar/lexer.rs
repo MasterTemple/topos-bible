@@ -20,7 +20,7 @@ pub enum Token {
 /**
 - Lazily splits segment input into [`Token`]s, skipping whitespace
 - It stops at the first character that cannot start a token, because the segment window can be
-the rest of an entire document
+  the rest of an entire document
 - Whitespace is not emitted: it is always the gap between two token spans, so the tree stays lossless
 */
 pub struct Lexer<'a> {

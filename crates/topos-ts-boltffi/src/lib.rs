@@ -1,8 +1,4 @@
 use boltffi::*;
-use once_cell::sync::Lazy;
-use topos_lib::matcher::matcher::BibleMatcher;
-
-static BIBLE: Lazy<BibleMatcher> = Lazy::new(|| BibleMatcher::default());
 
 #[data]
 #[derive(Clone, Copy)]

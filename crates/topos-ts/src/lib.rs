@@ -1,8 +1,8 @@
 use once_cell::sync::Lazy;
-use topos_lib::matcher::{location::line_col::LineColLocation, matcher::BibleMatcher};
+use topos_lib::matcher::{bible_matcher::BibleMatcher, location::line_col::LineColLocation};
 use wasm_bindgen::prelude::*;
 
-static BIBLE: Lazy<BibleMatcher> = Lazy::new(|| BibleMatcher::default());
+static BIBLE: Lazy<BibleMatcher> = Lazy::new(BibleMatcher::default);
 
 #[wasm_bindgen]
 pub fn search(input: &str) -> Vec<String> {
@@ -28,7 +28,7 @@ pub fn autocomplete(input: &str) -> Option<Vec<String>> {
         comp.suggestions
             .iter()
             .map(|sug| {
-                let segs = comp.segments.with_suggestion(sug.clone());
+                let segs = comp.segments.with_suggestion(*sug);
                 format!("{} {}", book, segs)
             })
             .collect(),

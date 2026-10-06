@@ -52,8 +52,8 @@ pub enum IncompleteSegment {
 impl IncompleteSegment {
     /**
     - Maps the segment that is still being typed (from
-    [`SegmentList::split_incomplete`](crate::segments::grammar::SegmentList::split_incomplete)) to what
-    should be suggested next
+      [`SegmentList::split_incomplete`](crate::segments::grammar::SegmentList::split_incomplete)) to what
+      should be suggested next
     - [`None`] (no segment started yet) suggests from scratch
     */
     pub fn from_node(node: Option<&SegmentNode>) -> Option<Self> {
@@ -127,14 +127,12 @@ impl IncompleteSegment {
                     };
                     let current_chapter = prev.ending_chapter();
                     let _next_chapter = current_chapter + 1;
-                    let verses = (next_verse..=chapter_verses.get_last_verse(current_chapter)?)
+
+                    (next_verse..=chapter_verses.get_last_verse(current_chapter)?)
                         .map(|v| Segment::chapter_verse(current_chapter, v))
-                        .collect_vec();
-                    verses
+                        .collect_vec()
                 } else {
-                    (1..=last_chapter)
-                        .map(|ch| Segment::full_chapter(ch))
-                        .collect()
+                    (1..=last_chapter).map(Segment::full_chapter).collect()
                 }
             }
 
@@ -143,39 +141,33 @@ impl IncompleteSegment {
                 if let Some(prev) = prev {
                     let is_chapter = prev.ending_verse().is_some();
                     if is_chapter {
-                        let chapters = (start + 1..=last_chapter)
+                        (start + 1..=last_chapter)
                             .map(|c| Segment::full_chapter_range(start, c))
-                            .collect_vec();
-                        chapters
+                            .collect_vec()
                     } else {
                         let next_verse = match prev.ending_verse() {
                             Some(cur) => cur + 1,
                             None => 1,
                         };
                         let current_chapter = prev.ending_chapter();
-                        let verses = (next_verse
-                            ..=chapter_verses.get_last_verse(current_chapter)?)
+
+                        (next_verse..=chapter_verses.get_last_verse(current_chapter)?)
                             .map(|v| Segment::chapter_verse(current_chapter, v))
-                            .collect_vec();
-                        verses
+                            .collect_vec()
                     }
                 } else {
-                    let chapters = (start + 1..=last_chapter)
+                    (start + 1..=last_chapter)
                         .map(|c| Segment::full_chapter_range(start, c))
-                        .collect_vec();
-                    chapters
+                        .collect_vec()
                 }
             }
 
             Self::ChapterVerse {
                 start_chapter,
                 start_verse: _,
-            } => {
-                let verses = (1..=chapter_verses.get_last_verse(start_chapter)?)
-                    .map(|v| Segment::chapter_verse(start_chapter, v))
-                    .collect_vec();
-                verses
-            }
+            } => (1..=chapter_verses.get_last_verse(start_chapter)?)
+                .map(|v| Segment::chapter_verse(start_chapter, v))
+                .collect_vec(),
 
             Self::ChapterVerseTo {
                 start_chapter,
@@ -195,24 +187,18 @@ impl IncompleteSegment {
                 start_chapter,
                 end_chapter,
                 end_verse: _,
-            } => {
-                let verses = (1..=chapter_verses.get_last_verse(end_chapter)?)
-                    .map(|v| Segment::chapter_range(start_chapter, 1, end_chapter, v))
-                    .collect_vec();
-                verses
-            }
+            } => (1..=chapter_verses.get_last_verse(end_chapter)?)
+                .map(|v| Segment::chapter_range(start_chapter, 1, end_chapter, v))
+                .collect_vec(),
 
             Self::ChapterVerseRangeTo {
                 start_chapter,
                 start_verse,
                 end_chapter,
                 end_verse: _,
-            } => {
-                let verses = (1..=chapter_verses.get_last_verse(end_chapter)?)
-                    .map(|v| Segment::chapter_range(start_chapter, start_verse, end_chapter, v))
-                    .collect_vec();
-                verses
-            }
+            } => (1..=chapter_verses.get_last_verse(end_chapter)?)
+                .map(|v| Segment::chapter_range(start_chapter, start_verse, end_chapter, v))
+                .collect_vec(),
         })
     }
 }

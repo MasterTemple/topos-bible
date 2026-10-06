@@ -1,9 +1,6 @@
 use topos_lib::{
     error::AnyResult,
-    matcher::{
-        location::html::HTMLLocation,
-        matcher::BibleMatcher,
-    },
+    matcher::{bible_matcher::BibleMatcher, location::html::HTMLLocation},
 };
 
 /**

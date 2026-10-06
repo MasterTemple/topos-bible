@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use topos_lib::matcher::{
-    instance::BibleMatch, location::line_col::LineColLocation, matcher::BibleMatcher,
+    bible_matcher::BibleMatcher, instance::BibleMatch, location::line_col::LineColLocation,
 };
 
 #[derive(Clone, Debug)]

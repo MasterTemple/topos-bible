@@ -55,11 +55,10 @@ impl Genres {
 
             // search for book ids now so i only have to do it once
             let ids = if let Some(books_in_genre) = &genre.books {
-                let ids = books_in_genre
+                books_in_genre
                     .iter()
                     .filter_map(|b| books.search(b))
-                    .collect();
-                ids
+                    .collect()
             } else {
                 BTreeSet::default()
             };
@@ -104,7 +103,7 @@ impl Genres {
 
     pub fn get<'a>(&'a self, input: &'_ str) -> Option<&'a Genre> {
         let key = self.search(input)?;
-        self.genres.get(&key)
+        self.genres.get(key)
     }
 
     fn get_mut<'a>(&'a mut self, input: &'_ str) -> Option<&'a mut Genre> {
@@ -130,7 +129,7 @@ impl Genres {
     }
 }
 
-static DEFAULT_GENRES: Lazy<Genres> = Lazy::new(|| Genres::default());
+static DEFAULT_GENRES: Lazy<Genres> = Lazy::new(Genres::default);
 
 impl Default for Genres {
     fn default() -> Self {
@@ -186,15 +185,15 @@ pub struct GenreInput {
 //     "/src/data/default_genres.json"
 // ));
 
-static DEFAULT_GENRES_JSON: &'static str = include_str!("./default_genres.json");
+static DEFAULT_GENRES_JSON: &str = include_str!("./default_genres.json");
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GenresInput(Vec<GenreInput>);
 
 impl Default for GenresInput {
     fn default() -> Self {
-        serde_json::from_str(&DEFAULT_GENRES_JSON)
-            .map_err(|_| format!("Could not parse default genre file"))
+        serde_json::from_str(DEFAULT_GENRES_JSON)
+            .map_err(|_| "Could not parse default genre file".to_string())
             .unwrap()
     }
 }

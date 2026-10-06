@@ -63,12 +63,12 @@ Example:
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BookChapterVersesInput(BTreeMap<String, ChapterVerses>);
 
-static DEFAULT_CHAPTER_VERSES_JSON: &'static str = include_str!("./default_chapter_verses.json");
+static DEFAULT_CHAPTER_VERSES_JSON: &str = include_str!("./default_chapter_verses.json");
 
 impl Default for BookChapterVersesInput {
     fn default() -> Self {
-        serde_json::from_str(&DEFAULT_CHAPTER_VERSES_JSON)
-            .map_err(|_| format!("Could not parse default chapter verses file"))
+        serde_json::from_str(DEFAULT_CHAPTER_VERSES_JSON)
+            .map_err(|_| "Could not parse default chapter verses file".to_string())
             .unwrap()
     }
 }

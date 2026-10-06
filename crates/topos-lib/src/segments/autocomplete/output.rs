@@ -1,6 +1,6 @@
 use crate::{
     data::books::BookId,
-    segments::{segment::Segment, segments::Segments},
+    segments::{passage::Segments, segment::Segment},
 };
 
 /// TODO: I want to be able to suggest incomplete segments, for example `1:1-` and then suggest

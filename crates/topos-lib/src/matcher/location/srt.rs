@@ -6,10 +6,7 @@ use chumsky::{
     text::{Char, digits, inline_whitespace, newline},
 };
 
-use crate::matcher::{
-    location::line_col::LineColLocation,
-    matcher::Matcher,
-};
+use crate::matcher::{bible_matcher::Matcher, location::line_col::LineColLocation};
 
 // TODO: Make this more general
 #[derive(Clone, Copy, Debug)]
@@ -142,9 +139,10 @@ impl Matcher for SRTLocation {
     type Input<'a> = &'a str;
 
     fn search<'a>(
-        matcher: &crate::matcher::matcher::BibleMatcher,
+        matcher: &crate::matcher::bible_matcher::BibleMatcher,
         input: Self::Input<'a>,
-    ) -> crate::matcher::matcher::MatchResult<Vec<crate::matcher::instance::BibleMatch<Self>>> {
+    ) -> crate::matcher::bible_matcher::MatchResult<Vec<crate::matcher::instance::BibleMatch<Self>>>
+    {
         let results = matcher.search::<LineColLocation>(input)?;
 
         let doc = SRTDocument::parser()

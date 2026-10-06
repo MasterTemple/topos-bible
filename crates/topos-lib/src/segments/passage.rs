@@ -35,6 +35,12 @@ impl Passage {
 #[derive(Clone, Debug, Deref, DerefMut, Serialize, Deserialize, IntoIterator)]
 pub struct Segments(pub Vec<Segment>);
 
+impl Default for Segments {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Segments {
     pub fn new() -> Self {
         Self(vec![])
@@ -54,7 +60,7 @@ impl Segments {
     /**
     Whether every segment of `other` lies inside one of these segments
     - A segment covered only by the union of several segments (`1:1-5,6-10` covering `1:3-8`) is not
-    detected yet, since open-ended chapters need versification data to merge
+      detected yet, since open-ended chapters need versification data to merge
     */
     pub fn fully_contains(&self, other: &Segments) -> bool {
         other

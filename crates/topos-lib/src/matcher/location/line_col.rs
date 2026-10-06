@@ -2,8 +2,8 @@ use line_col::LineColLookup;
 use regex::Match;
 
 use crate::matcher::{
+    bible_matcher::{BibleMatcher, MatchResult, Matcher},
     instance::BibleMatch,
-    matcher::{BibleMatcher, MatchResult, Matcher},
 };
 
 #[derive(Copy, Clone, Debug)]
@@ -67,30 +67,30 @@ impl Matcher for LineColLocation {
         for cur in matcher.filtered_books.captures_iter(input) {
             // this is just the book name
             let cur = cur.get(1).unwrap();
-            if let Some(prev) = prev {
-                if let Some(m) = BibleMatch::try_match(
+            if let Some(prev) = prev
+                && let Some(m) = BibleMatch::try_match(
                     &lookup,
                     // self.data.as_ref(),
                     matcher.data(),
                     input,
                     prev,
                     Some(cur.start()),
-                ) {
-                    filtered.try_add(m);
-                }
+                )
+            {
+                filtered.try_add(m);
             }
             prev = Some(cur);
         }
 
         // handle last one
-        if let Some(prev) = prev {
-            if let Some(m) = BibleMatch::try_match(&lookup, matcher.data(), input, prev, None) {
-                filtered.try_add(m);
-            }
+        if let Some(prev) = prev
+            && let Some(m) = BibleMatch::try_match(&lookup, matcher.data(), input, prev, None)
+        {
+            filtered.try_add(m);
         }
 
         let matches = filtered.matches();
-        return Ok(matches);
+        Ok(matches)
     }
 
     fn find<'a>(matcher: &BibleMatcher, input: Self::Input<'a>) -> Option<BibleMatch<Self>> {
@@ -107,6 +107,6 @@ impl Matcher for LineColLocation {
             None,
         )?);
 
-        return filtered.matches().into_iter().next();
+        filtered.matches().into_iter().next()
     }
 }

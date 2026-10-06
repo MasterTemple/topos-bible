@@ -166,17 +166,17 @@ mod tests {
     fn fully_contains() -> AnyResult<()> {
         let psg = |s: &str| Segment::parse(s);
 
-        assert_eq!(psg("2:2")?.fully_contains(&psg("2:2")?), true);
-        assert_eq!(psg("2:1-2")?.fully_contains(&psg("2:2")?), true);
-        assert_eq!(psg("2:2-3")?.fully_contains(&psg("2:2")?), true);
-        assert_eq!(psg("2:1-3")?.fully_contains(&psg("2:2")?), true);
+        assert!(psg("2:2")?.fully_contains(&psg("2:2")?));
+        assert!(psg("2:1-2")?.fully_contains(&psg("2:2")?));
+        assert!(psg("2:2-3")?.fully_contains(&psg("2:2")?));
+        assert!(psg("2:1-3")?.fully_contains(&psg("2:2")?));
 
-        assert_eq!(psg("2:1-2")?.fully_contains(&psg("2:1-2")?), true);
-        assert_eq!(psg("2:2-3")?.fully_contains(&psg("2:1-2")?), false);
-        assert_eq!(psg("2:1-3")?.fully_contains(&psg("2:1-2")?), true);
+        assert!(psg("2:1-2")?.fully_contains(&psg("2:1-2")?));
+        assert!(!psg("2:2-3")?.fully_contains(&psg("2:1-2")?));
+        assert!(psg("2:1-3")?.fully_contains(&psg("2:1-2")?));
 
-        assert_eq!(psg("2:1-2")?.fully_contains(&psg("2")?), false);
-        assert_eq!(psg("2")?.fully_contains(&psg("2:1-2")?), true);
+        assert!(!psg("2:1-2")?.fully_contains(&psg("2")?));
+        assert!(psg("2")?.fully_contains(&psg("2:1-2")?));
 
         Ok(())
     }

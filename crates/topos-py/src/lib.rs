@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use topos_lib::matcher::{location::line_col::LineColLocation, matcher::BibleMatcher};
+use topos_lib::matcher::{bible_matcher::BibleMatcher, location::line_col::LineColLocation};
 
 #[pyfunction]
 fn search(input: &str) -> PyResult<String> {

@@ -2,11 +2,11 @@ use line_col::LineColLookup;
 use regex::Match;
 
 use crate::{
-    data::{books::BookId, data::BibleData},
+    data::{bible_data::BibleData, books::BookId},
     matcher::location::line_col::LineColLocation,
     segments::{
         grammar::SegmentList,
-        segments::{Passage, Segments},
+        passage::{Passage, Segments},
     },
 };
 

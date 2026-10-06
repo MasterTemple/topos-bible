@@ -5,7 +5,7 @@ use crossbeam_channel::{Receiver, unbounded};
 use ignore::{WalkBuilder, WalkState};
 use itertools::Either;
 use topos_lib::error::AnyResult;
-use topos_lib::matcher::matcher::BibleMatcher;
+use topos_lib::matcher::bible_matcher::BibleMatcher;
 
 use crate::matches::PathMatches;
 
@@ -77,9 +77,9 @@ fn handle_dir(
     receiver.into_iter().map(|r| Ok(r?))
 }
 
-fn run_multi_threaded_streaming<'scope>(
+fn run_multi_threaded_streaming(
     walk: WalkBuilder,
-    matcher: &'scope BibleMatcher,
+    matcher: &BibleMatcher,
 ) -> Receiver<Result<PathMatches, std::io::Error>> {
     let (sender, receiver) = unbounded();
     let walk = walk.build_parallel();

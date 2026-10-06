@@ -1,7 +1,7 @@
 use crate::matcher::{
+    bible_matcher::{BibleMatcher, MatchResult},
     instance::BibleMatch,
     location::line_col::LineColLocation,
-    matcher::{BibleMatcher, MatchResult},
 };
 
 #[derive(thiserror::Error, Debug)]

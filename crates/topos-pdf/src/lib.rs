@@ -1,8 +1,8 @@
 use mupdf::{Document, Page, Rect};
 use topos_lib::{
     error::AnyResult,
-    matcher::{matcher::BibleMatcher, matches::ComplexFilter},
-    segments::segments::Passage,
+    matcher::{bible_matcher::BibleMatcher, matches::ComplexFilter},
+    segments::passage::Passage,
 };
 
 #[derive(Clone, Debug)]
@@ -107,7 +107,7 @@ Page: 3
 #[cfg(test)]
 mod tests {
     use mupdf::{Document, TextPageOptions};
-    use topos_lib::matcher::{location::line_col::LineColLocation, matcher::BibleMatcher};
+    use topos_lib::matcher::{bible_matcher::BibleMatcher, location::line_col::LineColLocation};
 
     use super::*;
 

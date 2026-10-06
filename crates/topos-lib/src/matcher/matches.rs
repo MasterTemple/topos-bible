@@ -1,4 +1,4 @@
-use crate::{matcher::instance::BibleMatch, segments::segments::Passage};
+use crate::{matcher::instance::BibleMatch, segments::passage::Passage};
 
 #[derive(Clone, Debug, Default)]
 pub struct ComplexFilter {
@@ -29,16 +29,13 @@ impl ComplexFilter {
                 .iter()
                 .any(|inside| inside.overlaps_with(psg));
 
-        if is_inside == false {
+        if !is_inside {
             return false;
         }
 
-        let is_outside = self
-            .outside_of
+        self.outside_of
             .iter()
-            .all(|outside| !outside.overlaps_with(psg));
-
-        is_outside
+            .all(|outside| !outside.overlaps_with(psg))
     }
 
     pub fn as_filter<'a>(&'a self) -> FilteredBibleMatches<'a> {

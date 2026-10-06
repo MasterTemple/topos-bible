@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::segments::segments::{Passage, Segments};
+use crate::segments::passage::{Passage, Segments};
 
 /// This is not guaranteed to be a valid key, I just am using a unique type
 #[derive(
@@ -129,7 +129,7 @@ impl Books {
     }
 
     /// - This is a global reference to the default book data. If you want to clone it, just use
-    /// [`Default::default`]
+    ///   [`Default::default`]
     /// - This lets me reference it in other defaults without having to clone it
     pub fn base() -> &'static Self {
         &DEFAULT_BOOKS
@@ -180,7 +180,7 @@ pub struct Book {
     /// - case is kept
     /// - does not need to be repeated in abbreviations
     /// - TODO: if not provided, the first abbreviations as title case; do that by changing this to
-    /// a BookInput struct
+    ///   a BookInput struct
     #[serde(alias = "abbr")]
     #[serde(alias = "abbrv")]
     #[serde(alias = "abbrev")]
@@ -200,7 +200,7 @@ pub struct Book {
 //     "/src/data/default_books.json"
 // ));
 
-static DEFAULT_BOOKS_JSON: &'static str = include_str!("./default_books.json");
+static DEFAULT_BOOKS_JSON: &str = include_str!("./default_books.json");
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 // #[derive(Deref, DerefMut, IntoIterator)]
@@ -208,8 +208,8 @@ pub struct BooksInput(Vec<Book>);
 
 impl Default for BooksInput {
     fn default() -> Self {
-        serde_json::from_str(&DEFAULT_BOOKS_JSON)
-            .map_err(|_| format!("Could not parse default book file"))
+        serde_json::from_str(DEFAULT_BOOKS_JSON)
+            .map_err(|_| "Could not parse default book file".to_string())
             .unwrap()
     }
 }
