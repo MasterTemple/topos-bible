@@ -1,20 +1,26 @@
 import {
   Editor,
+  FileSystemAdapter,
   MarkdownView,
   Notice,
+  Platform,
   Plugin,
   TFile,
   type Menu,
   type TAbstractFile,
 } from "obsidian";
 import type { Passage, Topos } from "topos-bible";
+import { OutdatedCliError } from "./core/cli.ts";
 import { NO_FILTERS } from "./core/filters.ts";
 import { literalWordUrl } from "./core/literalWord.ts";
 import { applyReplacements, normalizeReferences, referenceAt } from "./core/references.ts";
-import { ReferenceIndex, type Hit } from "./core/search.ts";
+import { ReferenceIndex, searchText, type Hit } from "./core/search.ts";
 import { referenceDecorations } from "./editor/decorations.ts";
 import { ReferenceSuggest } from "./editor/suggest.ts";
-import { loadTopos } from "./engine.ts";
+import { engineWasm, loadTopos } from "./engine.ts";
+import { BackgroundSearcher } from "./indexers/background.ts";
+import { defaultCliPath, runCli, type CliRun } from "./indexers/cli.ts";
+import workerSource from "topos-worker-source";
 import { GoToReferenceModal, InsertReferenceModal } from "./modals.ts";
 import { linkReferences } from "./reading.ts";
 import { bookStyle, DEFAULT_SETTINGS, ToposSettingTab, type ToposSettings } from "./settings.ts";
@@ -30,6 +36,13 @@ export default class ToposPlugin extends Plugin {
   indexVersion = 0;
   indexing = false;
   private readonly indexListeners = new Set<() => void>();
+  /** The background indexer; null if workers are unavailable (then searches run on this thread) */
+  private worker: BackgroundSearcher | null | undefined;
+  /** Bumped by each reindex, so a superseded run stops */
+  private generation = 0;
+  private cliRun: CliRun | null = null;
+  /** Files indexed from an edit during the current reindex, which it must not overwrite */
+  private readonly edited = new Set<string>();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -67,6 +80,10 @@ export default class ToposPlugin extends Plugin {
   }
 
   onunload(): void {
+    this.generation++;
+    clearTimeout(this.notifyTimer);
+    this.cliRun?.stop();
+    this.worker?.terminate();
     this.topos?.dispose();
   }
 
@@ -88,8 +105,21 @@ export default class ToposPlugin extends Plugin {
   };
 
   private notifyIndex(): void {
+    clearTimeout(this.notifyTimer);
+    this.notifyTimer = undefined;
+    this.lastNotify = performance.now();
     this.indexVersion++;
     for (const listener of this.indexListeners) listener();
+  }
+
+  private notifyTimer: ReturnType<typeof setTimeout> | undefined;
+  private lastNotify = 0;
+
+  /** Notifies at most twice a second, since the sidebar re-sorts every hit (for indexing in batches) */
+  private notifyIndexSoon(): void {
+    if (this.notifyTimer !== undefined) return;
+    const wait = Math.max(0, 500 - (performance.now() - this.lastNotify));
+    this.notifyTimer = setTimeout(() => this.notifyIndex(), wait);
   }
 
   isSearchable(file: TAbstractFile): file is TFile {
@@ -107,22 +137,135 @@ export default class ToposPlugin extends Plugin {
 
   private async indexFile(file: TAbstractFile): Promise<void> {
     if (!this.isSearchable(file)) return;
-    this.index.update(file.path, await this.app.vault.cachedRead(file));
+    if (this.indexing) this.edited.add(file.path);
+    const text = await this.app.vault.cachedRead(file);
+    const [result] = await this.searchFiles([{ path: file.path, text }]);
+    if (!result) return;
+    this.index.set(result.path, result.hits);
     this.notifyIndex();
   }
 
-  /** Searches every file again, in batches so Obsidian stays responsive */
+  /** The background indexer, started on first use */
+  private background(): BackgroundSearcher | null {
+    if (this.worker === undefined) {
+      try {
+        this.worker = new BackgroundSearcher(workerSource, engineWasm);
+      } catch (error) {
+        console.warn("topos: no Web Worker, indexing on the main thread", error);
+        this.worker = null;
+      }
+    }
+    return this.worker;
+  }
+
+  /** Searches files in the background, or on this thread if the worker fails */
+  private async searchFiles(files: { path: string; text: string }[]): Promise<{ path: string; hits: Hit[] }[]> {
+    const worker = this.background();
+    if (worker) {
+      try {
+        return await worker.search(files);
+      } catch (error) {
+        if (this.worker !== worker) return []; // stopped
+        console.warn("topos: the background indexer failed, indexing on the main thread", error);
+        worker.terminate();
+        this.worker = null;
+      }
+    }
+    const results = [];
+    for (const file of files) {
+      results.push({ path: file.path, hits: searchText(this.topos, file.path, file.text) });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    return results;
+  }
+
+  /** Searches every file again, without blocking Obsidian */
   async reindex(): Promise<void> {
+    const generation = ++this.generation;
+    this.cliRun?.stop();
+    this.cliRun = null;
     this.indexing = true;
+    this.edited.clear();
     this.index = new ReferenceIndex(this.topos);
     this.notifyIndex();
-    const files = this.app.vault.getFiles().filter((file) => this.isSearchable(file));
-    for (let i = 0; i < files.length; i++) {
-      this.index.update(files[i].path, await this.app.vault.cachedRead(files[i]));
-      if (i % 50 === 49) await new Promise((resolve) => setTimeout(resolve, 0));
+    const start = performance.now();
+    let engine = "built in";
+    if (this.settings.engine === "cli" && Platform.isDesktopApp) {
+      try {
+        await this.reindexWithCli(generation);
+        engine = "CLI";
+      } catch (error) {
+        if (generation !== this.generation) return;
+        const reason = error instanceof OutdatedCliError ? error.message : `topos failed: ${String(error)}`;
+        new Notice(`Verse search: ${reason}. Using the built-in engine.`);
+        this.index = new ReferenceIndex(this.topos);
+        await this.reindexBuiltin(generation);
+      }
+    } else {
+      await this.reindexBuiltin(generation);
     }
+    if (generation !== this.generation) return;
+    console.debug(`topos: indexed ${this.index.fileCount} files with references (${engine}) in ${Math.round(performance.now() - start)} ms`);
     this.indexing = false;
+    this.edited.clear();
     this.notifyIndex();
+  }
+
+  /** Reads and searches files in batches, so memory stays bounded and results appear as they come */
+  private async reindexBuiltin(generation: number): Promise<void> {
+    const files = this.app.vault.getFiles().filter((file) => this.isSearchable(file));
+    const maxFiles = 200;
+    const maxChars = 4_000_000;
+    for (let i = 0; i < files.length; ) {
+      const batch: { path: string; text: string }[] = [];
+      let chars = 0;
+      while (i < files.length && batch.length < maxFiles && chars < maxChars) {
+        const file = files[i++];
+        const text = await this.app.vault.cachedRead(file);
+        batch.push({ path: file.path, text });
+        chars += text.length;
+      }
+      const results = await this.searchFiles(batch);
+      if (generation !== this.generation) return;
+      for (const { path, hits } of results) if (!this.edited.has(path)) this.index.set(path, hits);
+      this.notifyIndexSoon();
+    }
+  }
+
+  /** Runs the topos CLI over the vault folder, streaming its results into the index */
+  private async reindexWithCli(generation: number): Promise<void> {
+    const adapter = this.app.vault.adapter;
+    if (!(adapter instanceof FileSystemAdapter)) throw new Error("the vault is not a folder on disk");
+    const run = runCli(this.cliPath(), adapter.getBasePath(), { cache: this.settings.cliCache }, (path, hits) => {
+      if (generation !== this.generation || this.edited.has(path)) return;
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!file || !this.isSearchable(file)) return;
+      this.index.set(path, hits);
+      this.notifyIndexSoon();
+    });
+    this.cliRun = run;
+    try {
+      await run.done;
+    } finally {
+      if (this.cliRun === run) this.cliRun = null;
+    }
+  }
+
+  /** The topos command to run */
+  cliPath(): string {
+    return this.settings.cliPath || defaultCliPath();
+  }
+
+  /** Checks that the topos command runs, for the settings tab */
+  async testCli(): Promise<string> {
+    const { execFile } = require("node:child_process") as typeof import("node:child_process");
+    const path = this.cliPath();
+    return new Promise((resolve) => {
+      execFile(path, ["--version"], { timeout: 10_000 }, (error, stdout) => {
+        if (error) resolve(`Could not run ${path}: ${error.message}`);
+        else resolve(`Found ${stdout.trim() || path}`);
+      });
+    });
   }
 
   // Navigation

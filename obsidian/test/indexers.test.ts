@@ -1,0 +1,91 @@
+import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { test } from "node:test";
+import { Topos } from "topos-bible";
+import { CliOutputParser, OutdatedCliError, parseCliLine } from "../src/core/cli.ts";
+import { searchText, type Hit } from "../src/core/search.ts";
+import { runCli } from "../src/indexers/cli.ts";
+import { handle } from "../src/indexers/worker.ts";
+
+const topos = Topos.new();
+// The plugin loads Node's modules with require (desktop only), as Obsidian's CommonJS bundle allows
+(globalThis as { require?: NodeJS.Require }).require ??= createRequire(import.meta.url);
+
+const line = (path: string, reference: string, start: number) =>
+  JSON.stringify({
+    path,
+    reference,
+    osis: "John.3.16",
+    book_id: 43,
+    book: "John",
+    segments: [{ type: "verse", chapter: 3, verse: 16 }],
+    line: 1,
+    utf16_column: start + 1,
+    start_utf16: start,
+    end_utf16: start + 7,
+    line_text: "Jn 3:16",
+  });
+
+test("CLI JSON lines become hits with vault paths", () => {
+  const hit = parseCliLine(line("./notes\\a.md", "John 3:16", 0))!;
+  assert.equal(hit.path, "notes/a.md");
+  assert.equal(hit.passage.bookId, 43);
+  assert.equal(hit.passage.osis, "John.3.16");
+  assert.deepEqual([hit.start, hit.end, hit.column, hit.lineText], [0, 7, 1, "Jn 3:16"]);
+  assert.equal(parseCliLine("  "), null);
+  assert.throws(() => parseCliLine(JSON.stringify({ path: "a.md", reference: "John 3:16" })), OutdatedCliError);
+});
+
+test("streamed CLI output is grouped by file, across chunk boundaries", () => {
+  const files: [string, number][] = [];
+  const parser = new CliOutputParser((path, hits) => files.push([path, hits.length]));
+  const output = [line("a.md", "John 3:16", 0), line("a.md", "John 3:16", 9), line("b.md", "John 3:16", 0)].join("\n") + "\n";
+  for (let i = 0; i < output.length; i += 17) parser.push(output.slice(i, i + 17));
+  parser.finish();
+  assert.deepEqual(files, [
+    ["a.md", 2],
+    ["b.md", 1],
+  ]);
+});
+
+test("the worker searches files like the main thread", async () => {
+  const files = [
+    { path: "a.md", text: "Read Jn 3:16 and Rom 8:28" },
+    { path: "b.md", text: "nothing here" },
+  ];
+  const response = await handle({ type: "search", id: 7, files }, topos);
+  assert.equal(response.type, "results");
+  if (response.type !== "results") return;
+  assert.equal(response.id, 7);
+  assert.deepEqual(response.results[0].hits, searchText(topos, "a.md", files[0].text));
+  assert.deepEqual(response.results[1].hits, []);
+  // Results cross to the main thread by structured clone
+  assert.deepEqual(structuredClone(response), response);
+});
+
+const cli = join(import.meta.dirname, "../../target/debug/topos");
+
+test("the CLI and the built-in engine find the same references", { skip: !existsSync(cli) && "build topos-cli first" }, async () => {
+  const vault = mkdtempSync(join(tmpdir(), "topos-vault-"));
+  mkdirSync(join(vault, "sub"));
+  const notes: Record<string, string> = {
+    "a.md": "é 📖 Jn 3:16-18; 5\nnext Rom 8:28",
+    "sub/b.md": "# Psalms\nPs 23 and 1 Cor 13:4-7, 13",
+    "c.md": "no references",
+  };
+  for (const [path, text] of Object.entries(notes)) writeFileSync(join(vault, path), text);
+
+  const found = new Map<string, Hit[]>();
+  const run = runCli(cli, vault, { cache: false }, (path, hits) => found.set(path, hits));
+  await run.done;
+
+  assert.deepEqual([...found.keys()].sort(), ["a.md", "sub/b.md"]);
+  for (const [path, hits] of found) {
+    const expected = searchText(topos, path, notes[path]);
+    const simplify = (h: Hit) => [h.start, h.end, h.line, h.column, h.lineText, h.passage.reference, h.passage.osis, h.passage.segments];
+    assert.deepEqual(hits.map(simplify), expected.map(simplify), path);
+  }
+});

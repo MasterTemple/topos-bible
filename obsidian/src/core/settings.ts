@@ -27,6 +27,12 @@ export interface ToposSettings {
   excludeFolders: string;
   sort: SortOrder;
   groupBy: "file" | "book";
+  /** Index the vault in a background thread, or with the topos CLI (desktop only) */
+  engine: "builtin" | "cli";
+  /** Path to the topos command ("" finds it in ~/.cargo/bin or PATH) */
+  cliPath: string;
+  /** Let the CLI reuse results for unchanged files between runs */
+  cliCache: boolean;
 }
 
 export const DEFAULT_SETTINGS: ToposSettings = {
@@ -42,6 +48,9 @@ export const DEFAULT_SETTINGS: ToposSettings = {
   excludeFolders: "",
   sort: "file",
   groupBy: "file",
+  engine: "builtin",
+  cliPath: "",
+  cliCache: true,
 };
 
 export function bookStyle(name: StyleName): BookStyle {

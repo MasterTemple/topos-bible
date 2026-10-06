@@ -1,7 +1,9 @@
 // Loads the built main.js with a stand-in for Obsidian's API (Obsidian itself can't run here)
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import Module, { createRequire } from "node:module";
 import { test } from "node:test";
 
@@ -59,7 +61,18 @@ class EditorSuggest {
   }
   setInstructions() {}
 }
+class FileSystemAdapter {
+  base: string;
+  constructor(base: string) {
+    this.base = base;
+  }
+  getBasePath() {
+    return this.base;
+  }
+}
 const obsidian = {
+  Platform: { isDesktopApp: true },
+  FileSystemAdapter,
   Plugin,
   TFile,
   EditorSuggest,
@@ -122,6 +135,12 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   copyFileSync(new URL("../main.js", import.meta.url), bundle);
   const ToposPlugin = require(bundle.pathname).default;
 
+  // The vault on disk too, for the CLI engine
+  const vaultPath = mkdtempSync(join(tmpdir(), "topos-plugin-vault-"));
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(vaultPath, path)), { recursive: true });
+    writeFileSync(join(vaultPath, path), text);
+  }
   const app = {
     workspace: Object.assign(new Events(), {
       onLayoutReady: (callback: () => void) => callback(),
@@ -131,6 +150,8 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
     vault: Object.assign(new Events(), {
       getFiles: () => Object.keys(files).map((path) => new TFile(path)),
       cachedRead: async (file: TFile) => files[file.path],
+      getAbstractFileByPath: (path: string) => (path in files ? new TFile(path) : null),
+      adapter: new FileSystemAdapter(vaultPath),
     }),
   };
   const plugin = new ToposPlugin(app, {});
@@ -151,6 +172,24 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   plugin.settings.excludeFolders = "Archive";
   await plugin.reindex();
   assert.equal(plugin.index.all().length, 3);
+  const builtin = plugin.index.all();
+
+  // The CLI engine finds the same hits (still honoring the plugin's own exclusions)
+  const cli = new URL("../../target/debug/topos", import.meta.url).pathname;
+  if (existsSync(cli)) {
+    plugin.settings.engine = "cli";
+    plugin.settings.cliPath = cli;
+    plugin.settings.cliCache = false;
+    await plugin.reindex();
+    assert.deepEqual(plugin.index.all(), builtin);
+
+    // A missing CLI falls back to the built-in engine with a notice
+    plugin.settings.cliPath = join(vaultPath, "no-such-topos");
+    await plugin.reindex();
+    assert.deepEqual(plugin.index.all(), builtin);
+    assert.match(obsidian.Notice.messages.at(-1)!, /Using the built-in engine/);
+    plugin.settings.engine = "builtin";
+  }
 
   // Commands that need a reference under the cursor are only available on one
   const copy = plugin.commands.find((c: any) => c.id === "copy-osis");

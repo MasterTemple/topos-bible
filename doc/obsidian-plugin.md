@@ -71,6 +71,15 @@ references in the editor and reading view; autocomplete on/off, book-name comple
 - **Pure logic is separate from Obsidian** (`src/core/`: filters, Literal Word links, search
   results, sorting), so it is unit tested with Node; the Obsidian glue stays thin.
 - **Editor decorations** only search the visible lines and update as you scroll or type.
+- **Indexing never blocks the editor**: the vault is searched in a Web Worker with its own copy of
+  the engine (the worker's code is bundled separately and embedded in `main.js`; the WebAssembly
+  is sent to it at startup rather than embedded twice), in batches of up to 200 files or 4M
+  characters. If workers are unavailable it falls back to the main thread, yielding between
+  files. The sidebar re-renders at most twice a second while results arrive.
+- **Optional CLI engine (desktop)**: runs `topos . --no-config -m json [--cache]` in the vault
+  folder and streams the results into the index. The CLI's JSON includes UTF-16 offsets, the
+  book id, segments, and the line text, so its hits are identical to the built-in engine's
+  (tested). Edits during a reindex win over the reindex's older results.
 
 ## Library additions
 

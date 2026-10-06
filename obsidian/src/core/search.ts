@@ -39,8 +39,14 @@ export class ReferenceIndex {
     this.topos = topos;
   }
 
+  /** Searches a file's text on this thread (the background indexer uses `set` instead) */
   update(path: string, text: string): void {
-    this.files.set(path, searchText(this.topos, path, text));
+    this.set(path, searchText(this.topos, path, text));
+  }
+
+  set(path: string, hits: Hit[]): void {
+    if (hits.length === 0) this.files.delete(path);
+    else this.files.set(path, hits);
   }
 
   remove(path: string): void {

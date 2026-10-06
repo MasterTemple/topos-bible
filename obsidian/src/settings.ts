@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, Platform, PluginSettingTab, Setting } from "obsidian";
 import type { BookCompletion } from "./core/completions.ts";
 import { TRANSLATIONS, type Translation } from "./core/literalWord.ts";
 import type { StyleName } from "./core/settings.ts";
@@ -120,6 +120,54 @@ export class ToposSettingTab extends PluginSettingTab {
           void save().then(() => this.plugin.reindex());
         }),
       );
+    if (Platform.isDesktopApp) {
+      new Setting(containerEl)
+        .setName("Search engine")
+        .setDesc(
+          "Built in: indexes in a background thread, everywhere. topos CLI: runs the native command-line tool, which is faster for very large vaults (install it with cargo install --git https://github.com/MasterTemple/topos-bible topos-cli). Edits are always indexed by the built-in engine.",
+        )
+        .addDropdown((d) =>
+          d
+            .addOptions({ builtin: "Built in", cli: "topos CLI" })
+            .setValue(settings.engine)
+            .onChange((value) => {
+              settings.engine = value as "builtin" | "cli";
+              void save().then(() => {
+                this.display();
+                void this.plugin.reindex();
+              });
+            }),
+        );
+      if (settings.engine === "cli") {
+        new Setting(containerEl)
+          .setName("topos command")
+          .setDesc("Leave empty to use ~/.cargo/bin/topos, or topos from PATH.")
+          .addText((t) =>
+            t
+              .setPlaceholder(this.plugin.cliPath())
+              .setValue(settings.cliPath)
+              .onChange((value) => {
+                settings.cliPath = value.trim();
+                void save();
+              }),
+          )
+          .addButton((b) =>
+            b.setButtonText("Test").onClick(() => {
+              void this.plugin.testCli().then((message) => new Notice(message));
+            }),
+          );
+        new Setting(containerEl)
+          .setName("Cache CLI results")
+          .setDesc("Reuse results for files that have not changed since the last run (topos --cache).")
+          .addToggle((t) =>
+            t.setValue(settings.cliCache).onChange((value) => {
+              settings.cliCache = value;
+              void save();
+            }),
+          );
+      }
+    }
+
     new Setting(containerEl)
       .setName("Excluded folders")
       .setDesc("One folder per line.")

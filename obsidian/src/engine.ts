@@ -10,3 +10,6 @@ export async function loadTopos(): Promise<Topos> {
   await init(wasm);
   return Topos.new();
 }
+
+/** The engine's WebAssembly, to start background workers with */
+export const engineWasm: Uint8Array = wasm;

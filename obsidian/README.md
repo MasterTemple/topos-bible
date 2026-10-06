@@ -45,7 +45,24 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
 **Settings**: reference style (`John 3:16`, `Jn 3:16`, or `John.3.16`), Literal Word translation
 (NASB, LSB, ESV, NKJV, KJV, or its default), editor and reading-view links, whether editor clicks
 need Ctrl/Cmd, autocomplete and book-name completion, number of suggestions, file extensions to
-search, and excluded folders.
+search, excluded folders, and the search engine (below).
+
+### Large vaults
+
+The vault is indexed in a background thread (a Web Worker), so Obsidian stays responsive while it
+runs; results appear in the sidebar as batches finish. On desktop, **Search engine → topos CLI**
+runs the native [`topos`](../crates/topos-cli) command over the vault folder instead, which is
+faster for very large vaults and can cache results between runs (`--cache`):
+
+```sh
+cargo install --git https://github.com/MasterTemple/topos-bible topos-cli
+```
+
+The plugin looks for `~/.cargo/bin/topos`, then `topos` on your PATH; set the path in the settings
+otherwise (the **Test** button checks it). It needs a `topos` new enough to report UTF-16
+positions in its JSON output; with an older one, or if it fails, the plugin says so and uses the
+built-in engine. Notes you edit are always indexed by the built-in engine. Like ripgrep, the CLI
+skips files ignored by a `.gitignore`.
 
 Literal Word links open one verse or chapter (it doesn't support ranges), so a reference opens
 at its first verse.
@@ -70,9 +87,12 @@ includes these bindings, the dependency can point at the npm version instead.
 
 - `npm run dev` rebuilds `main.js` on every change
 - `npm test` runs the tests with Node: the core logic, the bundled WebAssembly loading, the
-  built plugin against a stand-in for Obsidian's API (loading, indexing, commands, and
-  autocomplete), and the sidebar rendered to HTML
+  bundled worker (in a Node worker thread), the built plugin against a stand-in for Obsidian's
+  API (loading, indexing with both engines, commands, and autocomplete), and the sidebar rendered
+  to HTML. The CLI tests use `../target/debug/topos` (`cargo build -p topos-cli`) and are skipped
+  without it
 - `npm run typecheck`
 
-`src/core/` has no Obsidian imports (filters, search index, sorting, completions, Literal Word
+`src/indexers/` has the Web Worker (`worker.ts`, bundled separately and embedded in `main.js` by
+`esbuild.config.mjs`) and the CLI runner. `src/core/` has no Obsidian imports (filters, search index, sorting, completions, Literal Word
 links, settings data), so it is tested directly; the rest connects it to Obsidian.
