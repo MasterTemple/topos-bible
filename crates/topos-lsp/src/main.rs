@@ -4,9 +4,10 @@ use std::error::Error;
 
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::{
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, Uri,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument,
-        Notification as LspNotification,
+        Notification as LspNotification, PublishDiagnostics,
     },
     request::{Completion, DocumentSymbolRequest, HoverRequest, Request as LspRequest},
 };
@@ -38,7 +39,16 @@ fn run(connection: &Connection) -> Result<(), AnyError> {
                     .sender
                     .send(Message::Response(respond(&server, request)))?;
             }
-            Message::Notification(notification) => notify(&mut server, notification),
+            Message::Notification(notification) => {
+                if let Some(uri) = notify(&mut server, notification) {
+                    let diagnostics = server.diagnostics(&uri);
+                    let notification =
+                        Notification::new(PublishDiagnostics::METHOD.into(), diagnostics);
+                    connection
+                        .sender
+                        .send(Message::Notification(notification))?;
+                }
+            }
             Message::Response(_) => {}
         }
     }
@@ -62,26 +72,30 @@ fn respond(server: &Server, request: Request) -> Response {
     }
 }
 
-fn notify(server: &mut Server, notification: Notification) {
-    let method = notification.method.as_str();
+/// Applies a document notification, returning the document whose diagnostics changed
+fn notify(server: &mut Server, notification: Notification) -> Option<Uri> {
     let params = notification.params;
-    match method {
+    match notification.method.as_str() {
         DidOpenTextDocument::METHOD => {
-            if let Ok(p) = serde_json::from_value(params) {
-                server.did_open(p);
-            }
+            let p: DidOpenTextDocumentParams = serde_json::from_value(params).ok()?;
+            let uri = p.text_document.uri.clone();
+            server.did_open(p);
+            Some(uri)
         }
         DidChangeTextDocument::METHOD => {
-            if let Ok(p) = serde_json::from_value(params) {
-                server.did_change(p);
-            }
+            let p: DidChangeTextDocumentParams = serde_json::from_value(params).ok()?;
+            let uri = p.text_document.uri.clone();
+            server.did_change(p);
+            Some(uri)
         }
         DidCloseTextDocument::METHOD => {
-            if let Ok(p) = serde_json::from_value(params) {
-                server.did_close(p);
-            }
+            let p: DidCloseTextDocumentParams = serde_json::from_value(params).ok()?;
+            let uri = p.text_document.uri.clone();
+            // Clears the document's diagnostics, since it is no longer open
+            server.did_close(p);
+            Some(uri)
         }
-        _ => {}
+        _ => None,
     }
 }
 
@@ -123,6 +137,11 @@ mod tests {
             "textDocument/didOpen".into(),
             json!({ "textDocument": { "uri": uri, "languageId": "markdown", "version": 1, "text": "Read Phil 4:1" } }),
         )));
+        // Opening a document publishes its diagnostics
+        let Message::Notification(diagnostics) = client.receiver.recv().unwrap() else {
+            panic!("expected diagnostics")
+        };
+        assert_eq!(diagnostics.method, "textDocument/publishDiagnostics");
         send(request(
             2,
             "textDocument/hover",

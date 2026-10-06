@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, Hover, HoverContents,
-    HoverParams, HoverProviderCapability, MarkupContent, MarkupKind, OneOf, Position, Range,
-    ServerCapabilities, SymbolKind, TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit,
-    Uri,
+    Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, Hover,
+    HoverContents, HoverParams, HoverProviderCapability, MarkupContent, MarkupKind, OneOf,
+    Position, PublishDiagnosticsParams, Range, ServerCapabilities, SymbolKind,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Uri,
 };
 use topos_lib::{
     matcher::{BibleMatch, BibleMatcher, LineIndex},
@@ -95,6 +95,25 @@ impl Server {
             })
             .collect();
         Some(CompletionResponse::Array(items))
+    }
+
+    /// Warnings for references that do not exist, like `John 3:99`
+    pub fn diagnostics(&self, uri: &Uri) -> PublishDiagnosticsParams {
+        let diagnostics = self.documents.get(uri).map_or_else(Vec::new, |text| {
+            let index = LineIndex::new(text);
+            self.matcher
+                .problems(text)
+                .into_iter()
+                .map(|problem| Diagnostic {
+                    range: lsp_range(&index, problem.bytes.start, problem.bytes.end),
+                    severity: Some(DiagnosticSeverity::WARNING),
+                    source: Some(String::from("topos")),
+                    message: problem.message,
+                    ..Diagnostic::default()
+                })
+                .collect()
+        });
+        PublishDiagnosticsParams::new(uri.clone(), diagnostics, None)
     }
 
     /// The reference under the cursor, normalized, with its OSIS id
@@ -219,6 +238,19 @@ mod tests {
         assert_eq!(
             edit.range,
             Range::new(Position::new(1, 3), Position::new(1, 9))
+        );
+    }
+
+    #[test]
+    fn warns_about_references_that_do_not_exist() {
+        let (server, uri) = server("Fine: John 3:16\nBad: John 3:99");
+        let params = server.diagnostics(&uri);
+        assert_eq!(params.diagnostics.len(), 1);
+        let diagnostic = &params.diagnostics[0];
+        assert_eq!(diagnostic.message, "John 3:99 does not exist");
+        assert_eq!(
+            diagnostic.range,
+            Range::new(Position::new(1, 10), Position::new(1, 14))
         );
     }
 

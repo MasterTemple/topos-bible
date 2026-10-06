@@ -66,6 +66,6 @@ The phases are in order, and each one leaves the repo working.
 - [ ] Remove the old `topos-py`, `topos-ts`, and `topos-ts-boltffi` test crates
 - [x] Python through BoltFFI (`boltffi pack python` builds a working wheel)
 - [x] An LSP server (`topos-lsp`): completion, hover with the normalized reference, and document symbols
-- [ ] LSP diagnostics for references that do not exist (needs search to report rejected references)
+- [x] LSP diagnostics for references that do not exist (`BibleMatcher::problems`)
 - [ ] Incremental parsing (re-scan only the edited lines). Deferred: search runs at about 30 MiB/s, so re-searching a document on each LSP request is fast enough for now
 - [x] Criterion benchmarks (`cargo bench -p topos-lib`)

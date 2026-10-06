@@ -6,6 +6,7 @@
   book's versification; each completion rewrites the whole reference (`jn 3:1` → `John 3:16`)
 - **Hover**: the reference under the cursor, normalized, with its OSIS id
 - **Document symbols**: every reference in the file, for outlines and pickers
+- **Diagnostics**: warnings for references that do not exist, like `John 3:99`
 
 Install with `cargo install --path crates/topos-lsp`.
 

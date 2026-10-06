@@ -2,7 +2,7 @@
 name = "topos-lsp"
 version = "0.1.0"
 edition = "2024"
-description = "A language server for Bible references: completion, hover, and document symbols"
+description = "A language server for Bible references: completion, hover, symbols, and diagnostics"
 
 [[bin]]
 name = "topos-lsp"
