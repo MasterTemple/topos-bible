@@ -42,11 +42,17 @@ impl<'a> LineIndex<'a> {
     pub fn position(&self, offset: usize) -> Position {
         let line = self.line_starts.partition_point(|&start| start <= offset) - 1;
         let before = &self.text[self.line_starts[line]..offset];
+        // For ASCII, every kind of column is the byte column
+        let (chars, utf16) = if before.is_ascii() {
+            (before.len(), before.len())
+        } else {
+            (before.chars().count(), before.encode_utf16().count())
+        };
         Position {
             line: line + 1,
             column: before.len() + 1,
-            char_column: before.chars().count() + 1,
-            utf16_column: before.encode_utf16().count() + 1,
+            char_column: chars + 1,
+            utf16_column: utf16 + 1,
         }
     }
 }

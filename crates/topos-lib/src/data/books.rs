@@ -135,10 +135,10 @@ impl Books {
     - The chapter is not consumed, so in `AM 1 Samuel` the `1` can still start `1 Samuel`
     */
     pub fn candidates<'h>(&self, text: &'h str) -> impl Iterator<Item = regex::Match<'h>> {
+        // The whole match is the book name, so `find_iter` avoids the slower capture engine
         self.regexes
             .candidate
-            .captures_iter(text)
-            .filter_map(|c| c.get(1))
+            .find_iter(text)
             .filter(move |m| {
                 text[m.end()..]
                     .trim_start()
