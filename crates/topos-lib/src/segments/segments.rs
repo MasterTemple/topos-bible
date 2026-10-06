@@ -24,13 +24,9 @@ impl Passage {
         self.segments.contains_overlap(&other.segments)
     }
 
-    /// TODO: check if passage entirely contains the other passage
+    /// Whether every verse of `other` is inside this passage
     pub fn contains(&self, other: &Passage) -> bool {
-        if self.book != other.book {
-            return false;
-        }
-        // todo!()
-        self.segments.contains_overlap(&other.segments)
+        self.book == other.book && self.segments.fully_contains(&other.segments)
     }
 }
 
@@ -55,9 +51,15 @@ impl Segments {
         self.iter().any(|this| other.overlaps_with(this))
     }
 
+    /**
+    Whether every segment of `other` lies inside one of these segments
+    - A segment covered only by the union of several segments (`1:1-5,6-10` covering `1:3-8`) is not
+    detected yet, since open-ended chapters need versification data to merge
+    */
     pub fn fully_contains(&self, other: &Segments) -> bool {
-        self.iter()
-            .any(|this| other.iter().any(|o| o.fully_contains(this)))
+        other
+            .iter()
+            .all(|o| self.iter().any(|this| this.fully_contains(o)))
     }
 
     pub fn with_book(self, book_id: BookId) -> Passage {
@@ -211,6 +213,40 @@ mod tests {
                 Segment::chapter_range(7, 7, 8, 8),
             ]
         );
+    }
+
+    #[test]
+    fn containment() {
+        let segs = |s: &str| Segments::parse(s).unwrap();
+        assert!(segs("3").fully_contains(&segs("3:16-18")));
+        assert!(segs("3, 1:1-5").fully_contains(&segs("3:16, 1:2")));
+        assert!(!segs("3:16-18").fully_contains(&segs("3")));
+        assert!(!segs("3:16").fully_contains(&segs("3:16-17")));
+
+        let john = |s: &str| segs(s).with_book(BookId(43));
+        assert!(john("3").contains(&john("3:16")));
+        assert!(!john("3:16").contains(&john("3:16-18")));
+        assert!(!john("3").contains(&segs("3:16").with_book(BookId(1))));
+    }
+
+    #[test]
+    fn sorts_by_position() {
+        let mut segs = segs_vec("5:1, 1:1-3, 1, 1:1");
+        segs.sort();
+        assert_eq!(
+            segs,
+            [
+                Segment::chapter_verse(1, 1),
+                Segment::chapter_verse_range(1, 1, 3),
+                Segment::full_chapter(1),
+                Segment::chapter_verse(5, 1),
+            ]
+        );
+    }
+
+    fn segs_vec(input: &str) -> Vec<Segment> {
+        // Resolve each comma-separated part on its own so bare numbers stay chapters
+        input.split(", ").map(|s| parse(s)[0]).collect()
     }
 
     #[test]

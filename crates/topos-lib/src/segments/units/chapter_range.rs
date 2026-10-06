@@ -15,7 +15,7 @@ use std::{
 
 /// - This is a range of verse references across a multiple chapters
 /// - Ex: `1:2-3:4` in `John 1:2-3:4`
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ChapterRange(RangePair<ChapterVerse>);
 
 impl ChapterRange {
@@ -133,19 +133,6 @@ impl VerseBounds for ChapterRange {
 
     fn ending_verse(&self) -> Option<u8> {
         Some(self.end.verse)
-    }
-}
-
-impl PartialOrd for ChapterRange {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(
-            self.start
-                .chapter
-                .cmp(&other.start.chapter)
-                .then(self.start.verse.cmp(&other.start.verse))
-                .then(self.end.chapter.cmp(&other.end.chapter))
-                .then(self.end.verse.cmp(&other.end.verse)),
-        )
     }
 }
 

@@ -9,7 +9,7 @@ use std::{fmt::Display, str::FromStr};
 
 /// - This is a range of verse references within a single chapter
 /// - Ex: `1:2-3` `John 1:2-3`
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FullChapterVerseRange {
     pub start: u8,
     pub end: ChapterVerse,
@@ -99,17 +99,6 @@ impl VerseBounds for FullChapterVerseRange {
 
     fn ending_verse(&self) -> Option<u8> {
         Some(self.end.verse)
-    }
-}
-
-impl PartialOrd for FullChapterVerseRange {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(
-            self.start
-                .cmp(&other.start)
-                .then(self.end.chapter.cmp(&other.end.chapter))
-                .then(self.end.verse.cmp(&other.end.verse)),
-        )
     }
 }
 

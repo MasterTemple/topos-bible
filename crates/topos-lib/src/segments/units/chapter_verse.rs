@@ -11,7 +11,7 @@ use std::{
 
 /// - This is a single chapter/verse reference
 /// - Ex: `1:2` in `John 1:2`
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ChapterVerse {
     pub chapter: u8,
     pub verse: u8,
@@ -99,16 +99,6 @@ impl VerseBounds for ChapterVerse {
 
     fn ending_verse(&self) -> Option<u8> {
         Some(self.verse)
-    }
-}
-
-impl PartialOrd for ChapterVerse {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(
-            self.chapter
-                .cmp(&other.chapter)
-                .then(self.verse.cmp(&other.verse)),
-        )
     }
 }
 

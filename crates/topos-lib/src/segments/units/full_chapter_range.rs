@@ -15,7 +15,7 @@ use std::{
 
 /// - This is a chapter range reference
 /// - Ex: `1-2` in `John 1-2`
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FullChapterRange(RangePair<FullChapter>);
 
 impl Display for FullChapterRange {
@@ -100,17 +100,6 @@ impl VerseBounds for FullChapterRange {
 
     fn ending_verse(&self) -> Option<u8> {
         None
-    }
-}
-
-impl PartialOrd for FullChapterRange {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(
-            self.start
-                .chapter
-                .cmp(&other.start.chapter)
-                .then(self.end.chapter.cmp(&other.end.chapter)),
-        )
     }
 }
 

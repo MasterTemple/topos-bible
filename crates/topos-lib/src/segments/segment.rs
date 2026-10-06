@@ -31,7 +31,7 @@ use crate::segments::{
 /// Chapter Range:       `7:7-8:8`                          |
 /// --------------------------------------------------------+
 /// ```
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Segment {
     /// - This is a single chapter/verse reference
@@ -56,15 +56,41 @@ pub enum Segment {
     FullChapterVerseRange(FullChapterVerseRange),
 }
 
+/// Orders by where the segment starts, then where it ends (an open end sorts after any verse)
+impl Ord for Segment {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let key = |s: &Self| {
+            (
+                s.starting_chapter(),
+                s.starting_verse(),
+                s.ending_chapter(),
+                s.ending_verse().map_or(u16::MAX, u16::from),
+            )
+        };
+        // Different variants can share bounds (`1-2:3` and `1:1-2:3` cover the same verses), so
+        // fall back to the variant to stay consistent with `Eq`
+        key(self)
+            .cmp(&key(other))
+            .then_with(|| self.variant_index().cmp(&other.variant_index()))
+    }
+}
+
 impl PartialOrd for Segment {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(
-            self.starting_chapter()
-                .cmp(&other.starting_chapter())
-                .then(self.starting_verse().cmp(&other.starting_verse()))
-                .then(self.ending_chapter().cmp(&other.ending_chapter()))
-                .then(self.ending_verse().cmp(&other.ending_verse())),
-        )
+        Some(self.cmp(other))
+    }
+}
+
+impl Segment {
+    fn variant_index(&self) -> u8 {
+        match self {
+            Segment::ChapterVerse(_) => 0,
+            Segment::ChapterVerseRange(_) => 1,
+            Segment::ChapterRange(_) => 2,
+            Segment::FullChapter(_) => 3,
+            Segment::FullChapterRange(_) => 4,
+            Segment::FullChapterVerseRange(_) => 5,
+        }
     }
 }
 
