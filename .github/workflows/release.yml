@@ -5,10 +5,9 @@ name: Release
 on:
   push:
     tags: ["v*"]
-  workflow_dispatch:
-  # TEMPORARY: build-only test runs from this branch (removed before merging)
-  push:
+    # TEMPORARY: build-only test runs from this branch (removed before merging)
     branches: [release]
+  workflow_dispatch:
 
 permissions:
   contents: read
