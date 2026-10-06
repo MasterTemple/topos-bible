@@ -25,11 +25,19 @@ export function defaultCliPath(): string {
 export function runCli(
   cliPath: string,
   vaultPath: string,
-  { cache }: { cache: boolean },
+  { cache, extensions }: { cache: boolean; extensions: string[] },
   onFile: (path: string, hits: Hit[]) => void,
 ): CliRun {
   const { spawn } = require("node:child_process") as typeof import("node:child_process");
-  const args = [".", "--no-config", "-m", "json", ...(cache ? ["--cache"] : [])];
+  // --ext keeps the CLI from searching (and printing) what the plugin would throw away, like EPUBs
+  const args = [
+    ".",
+    "--no-config",
+    "-m",
+    "json",
+    ...(cache ? ["--cache"] : []),
+    ...(extensions.length > 0 ? ["--ext", extensions.join(",")] : []),
+  ];
   const child = spawn(cliPath, args, { cwd: vaultPath, stdio: ["ignore", "pipe", "pipe"] });
   const parser = new CliOutputParser(onFile);
   let stderr = "";
@@ -43,7 +51,9 @@ export function runCli(
         reject(error);
       }
     });
-    child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
+    child.stderr.on("data", (chunk: Buffer) => {
+      if (stderr.length < 10_000) stderr += chunk.toString();
+    });
     child.on("error", reject);
     child.on("close", (code) => {
       try {
@@ -51,8 +61,10 @@ export function runCli(
       } catch (error) {
         return reject(error);
       }
-      // 1 means nothing matched; 2 can still mean results with some unreadable files
-      if (code === 0 || code === 1 || code === 2) resolve();
+      // 1 means nothing matched; 2 can still mean results with some unreadable files, unless the
+      // arguments were rejected (an older topos without --ext)
+      const badArguments = code === 2 && /^error:/m.test(stderr);
+      if (code === 0 || code === 1 || (code === 2 && !badArguments)) resolve();
       else reject(new Error(stderr.trim() || `topos exited with code ${code}`));
     });
   });

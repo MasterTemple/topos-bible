@@ -312,6 +312,10 @@ Options:
       --cache
           Reuse results for files that have not changed since the last search with the same options
 
+      --ext <EXT>
+          Only search files with these extensions when walking directories (e.g. md,txt); files
+          named on the command line are always searched
+
   -h, --help
           Print help (see a summary with '-h')
 

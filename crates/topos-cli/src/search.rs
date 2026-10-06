@@ -88,6 +88,8 @@ pub struct Searcher {
     pub cache: Option<Cache>,
     /// Keep the text of cached files (for context lines)
     pub needs_text: bool,
+    /// Lowercase extensions to search when walking directories (empty searches every file)
+    pub extensions: Vec<String>,
 }
 
 /// Searches the input, sending each file's result as soon as it is ready
@@ -117,6 +119,10 @@ fn walk(searcher: Arc<Searcher>, paths: Vec<PathBuf>, sender: mpsc::Sender<FileR
                 Ok(entry) if entry.file_type().is_some_and(|t| t.is_dir()) => {
                     return WalkState::Continue;
                 }
+                // Files named on the command line (depth 0) are always searched
+                Ok(entry) if entry.depth() > 0 && !searcher.wants(entry.path()) => {
+                    return WalkState::Continue;
+                }
                 Ok(entry) => match searcher.search_file(entry.path()) {
                     Ok(Some(hits)) => Ok(hits),
                     Ok(None) => return WalkState::Continue,
@@ -133,6 +139,16 @@ fn walk(searcher: Arc<Searcher>, paths: Vec<PathBuf>, sender: mpsc::Sender<FileR
 }
 
 impl Searcher {
+    /// Whether `--ext` allows this file
+    fn wants(&self, path: &Path) -> bool {
+        self.extensions.is_empty()
+            || path.extension().and_then(|e| e.to_str()).is_some_and(|e| {
+                self.extensions
+                    .iter()
+                    .any(|ext| ext.eq_ignore_ascii_case(e))
+            })
+    }
+
     /// Uses the cache when the file has not changed
     fn search_file(&self, path: &Path) -> Result<Option<FileHits>, String> {
         let Some(cache) = &self.cache else {

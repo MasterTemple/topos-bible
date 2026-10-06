@@ -122,9 +122,17 @@ export default class ToposPlugin extends Plugin {
     this.notifyTimer = setTimeout(() => this.notifyIndex(), wait);
   }
 
+  /** The file extensions to search, from the settings */
+  extensions(): string[] {
+    return this.settings.extensions
+      .split(",")
+      .map((e) => e.trim().replace(/^\./, ""))
+      .filter(Boolean);
+  }
+
   isSearchable(file: TAbstractFile): file is TFile {
     if (!(file instanceof TFile)) return false;
-    const extensions = this.settings.extensions.split(",").map((e) => e.trim().replace(/^\./, ""));
+    const extensions = this.extensions();
     const excluded = this.settings.excludeFolders
       .split("\n")
       .map((f) => f.trim().replace(/\/+$/, ""))
@@ -236,7 +244,7 @@ export default class ToposPlugin extends Plugin {
   private async reindexWithCli(generation: number): Promise<void> {
     const adapter = this.app.vault.adapter;
     if (!(adapter instanceof FileSystemAdapter)) throw new Error("the vault is not a folder on disk");
-    const run = runCli(this.cliPath(), adapter.getBasePath(), { cache: this.settings.cliCache }, (path, hits) => {
+    const run = runCli(this.cliPath(), adapter.getBasePath(), { cache: this.settings.cliCache, extensions: this.extensions() }, (path, hits) => {
       if (generation !== this.generation || this.edited.has(path)) return;
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!file || !this.isSearchable(file)) return;

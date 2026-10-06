@@ -138,6 +138,11 @@ pub struct Args {
     /// Reuse results for files that have not changed since the last search with the same options
     #[arg(long)]
     pub cache: bool,
+
+    /// Only search files with these extensions when walking directories (e.g. md,txt); files
+    /// named on the command line are always searched
+    #[arg(long = "ext", value_name = "EXT", value_delimiter = ',')]
+    pub extensions: Vec<String>,
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, ValueEnum)]

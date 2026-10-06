@@ -50,7 +50,7 @@ export function parseCliLine(line: string): Hit | null {
  * hits together, so a file is done when the next one starts
  */
 export class CliOutputParser {
-  private buffer = "";
+  private pending: string[] = [];
   private path: string | null = null;
   private hits: Hit[] = [];
   private readonly onFile: (path: string, hits: Hit[]) => void;
@@ -59,16 +59,21 @@ export class CliOutputParser {
     this.onFile = onFile;
   }
 
+  /** Only the new chunk is scanned for line breaks, so long lines arriving in pieces stay linear */
   push(chunk: string): void {
-    this.buffer += chunk;
-    const lines = this.buffer.split("\n");
-    this.buffer = lines.pop() ?? "";
-    for (const line of lines) this.line(line);
+    let start = 0;
+    for (let end = chunk.indexOf("\n"); end !== -1; end = chunk.indexOf("\n", start)) {
+      this.pending.push(chunk.slice(start, end));
+      this.line(this.pending.join(""));
+      this.pending = [];
+      start = end + 1;
+    }
+    if (start < chunk.length) this.pending.push(chunk.slice(start));
   }
 
   finish(): void {
-    if (this.buffer) this.line(this.buffer);
-    this.buffer = "";
+    if (this.pending.length > 0) this.line(this.pending.join(""));
+    this.pending = [];
     this.flush();
   }
 

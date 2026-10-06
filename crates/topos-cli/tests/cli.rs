@@ -252,3 +252,38 @@ fn explicit_config_file() {
     let both = topos(&["--config", config, "--no-config", "--text", "x"], None);
     assert_eq!(both.status.code(), Some(2));
 }
+
+#[test]
+fn ext_limits_walked_files() {
+    let dir = scratch("ext");
+    std::fs::create_dir_all(dir.join("notes")).unwrap();
+    std::fs::write(dir.join("notes/a.md"), "John 3:16\n").unwrap();
+    std::fs::write(dir.join("notes/b.TXT"), "Romans 8:28\n").unwrap();
+    std::fs::write(dir.join("notes/c.html"), "<p>Genesis 1:1</p>\n").unwrap();
+    let run = |args: &[&str]| {
+        let mut args = args.to_vec();
+        args.extend(["--no-config", "-m", "quickfix", "--sort"]);
+        let output = Command::new(env!("CARGO_BIN_EXE_topos"))
+            .args(&args)
+            .current_dir(&dir)
+            .stdin(Stdio::null())
+            .output()
+            .unwrap();
+        let text = String::from_utf8(output.stdout).unwrap();
+        text.lines()
+            .map(|line| line.rsplit(": ").next().unwrap().to_string())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(run(&["."]), ["John 3:16", "Romans 8:28", "Genesis 1:1"]);
+    assert_eq!(
+        run(&[".", "--ext", "md,.txt"]),
+        ["John 3:16", "Romans 8:28"]
+    );
+    assert_eq!(
+        run(&[".", "--ext", "md", "--ext", "txt"]),
+        ["John 3:16", "Romans 8:28"]
+    );
+    // A file named on the command line is searched whatever its extension
+    assert_eq!(run(&["notes/c.html", "--ext", "md"]), ["Genesis 1:1"]);
+    let _ = std::fs::remove_dir_all(&dir);
+}

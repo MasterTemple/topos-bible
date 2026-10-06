@@ -77,9 +77,10 @@ test("the CLI and the built-in engine find the same references", { skip: !exists
     "c.md": "no references",
   };
   for (const [path, text] of Object.entries(notes)) writeFileSync(join(vault, path), text);
+  writeFileSync(join(vault, "skipped.html"), "<p>Gen 1:1</p>");
 
   const found = new Map<string, Hit[]>();
-  const run = runCli(cli, vault, { cache: false }, (path, hits) => found.set(path, hits));
+  const run = runCli(cli, vault, { cache: false, extensions: ["md"] }, (path, hits) => found.set(path, hits));
   await run.done;
 
   assert.deepEqual([...found.keys()].sort(), ["a.md", "sub/b.md"]);
@@ -88,4 +89,12 @@ test("the CLI and the built-in engine find the same references", { skip: !exists
     const simplify = (h: Hit) => [h.start, h.end, h.line, h.column, h.lineText, h.passage.reference, h.passage.osis, h.passage.segments];
     assert.deepEqual(hits.map(simplify), expected.map(simplify), path);
   }
+});
+
+test("a topos that rejects the arguments is an error, not an empty vault", { skip: process.platform === "win32" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "topos-old-"));
+  const old = join(dir, "topos");
+  writeFileSync(old, "#!/bin/sh\necho \"error: unexpected argument '--ext' found\" >&2\nexit 2\n", { mode: 0o755 });
+  const run = runCli(old, dir, { cache: false, extensions: ["md"] }, () => {});
+  await assert.rejects(run.done, /unexpected argument/);
 });

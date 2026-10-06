@@ -59,8 +59,9 @@ cargo install --git https://github.com/MasterTemple/topos-bible topos-cli
 ```
 
 The plugin looks for `~/.cargo/bin/topos`, then `topos` on your PATH; set the path in the settings
-otherwise (the **Test** button checks it). It needs a `topos` new enough to report UTF-16
-positions in its JSON output; with an older one, or if it fails, the plugin says so and uses the
+otherwise (the **Test** button checks it). It runs `topos --ext` with the plugin's file
+extensions, so EPUBs, PDFs, and other files in the vault aren't searched. It needs a `topos` new
+enough to have `--ext` and to report UTF-16 positions in its JSON output; with an older one, or if it fails, the plugin says so and uses the
 built-in engine. Notes you edit are always indexed by the built-in engine. Like ripgrep, the CLI
 skips files ignored by a `.gitignore`.
 

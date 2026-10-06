@@ -49,6 +49,12 @@ fn main() -> ExitCode {
             .then(|| Cache::open(&args.fingerprint()))
             .flatten(),
         needs_text: before + after > 0 || printer.needs_text(),
+        extensions: args
+            .extensions
+            .iter()
+            .map(|ext| ext.trim().trim_start_matches('.').to_ascii_lowercase())
+            .filter(|ext| !ext.is_empty())
+            .collect(),
     });
     let results = search(searcher.clone(), input);
     let mut files: Vec<_> = vec![];
