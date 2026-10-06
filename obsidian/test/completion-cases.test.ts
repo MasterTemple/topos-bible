@@ -35,7 +35,7 @@ test("completing mid-line doesn't double the space after a book (`apply:` cases)
   const topos = Topos.new();
   const failures: string[] = [];
   for (const line of applyCases) {
-    const [input, expected] = line.split(" => ");
+    const [input, expected] = line.split(" => ").map((part) => part.replaceAll("\\n", "\n"));
     const cursor = input.indexOf("|");
     const text = input.replace("|", "");
     const [first] = completionsBefore(topos, text.slice(0, cursor), BookStyle.Name, 0, "always", {

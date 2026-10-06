@@ -208,14 +208,21 @@ impl Server {
             .map(|(idx, completion)| {
                 let range = completion.edit.range;
                 CompletionItem {
-                    label: completion.label,
+                    label: completion.label.clone(),
                     kind: Some(match completion.kind {
                         CompletionKind::Book => CompletionItemKind::MODULE,
                         CompletionKind::Chapter => CompletionItemKind::FOLDER,
                         CompletionKind::Verse => CompletionItemKind::REFERENCE,
                     }),
-                    // Filter by what was typed, so `jn 3:` still shows `John 3:16`
-                    filter_text: Some(text[range.clone()].to_string()),
+                    /*
+                    What was typed, then the label (`jn 3:1 John 3:16`):
+                    - Editors that match from the start (Neovim's own completion) see what was
+                      typed, so `jn 3:1` still shows `John 3:16`
+                    - Editors that match the word before the cursor (blink.cmp) find it in the
+                      label, even against a list made a keystroke ago: with only what was
+                      typed, `1 C`'s list filtered `Co` to nothing, so `1 Co` showed none
+                    */
+                    filter_text: Some(format!("{} {}", &text[range.clone()], completion.label)),
                     // Keep the order: chapters and verses are in reading order
                     sort_text: Some(format!("{idx:05}")),
                     text_edit: Some(lsp_types::CompletionTextEdit::Edit(TextEdit {
@@ -701,6 +708,8 @@ mod tests {
         let mut failures = vec![];
         for case in cases.lines().filter_map(|l| l.strip_prefix("apply: ")) {
             let (input, expected) = case.split_once(" => ").unwrap();
+            let (input, expected) = (input.replace("\\n", "\n"), expected.replace("\\n", "\n"));
+            let (input, expected) = (input.as_str(), expected.as_str());
             let character = input[..input.find('|').unwrap()].encode_utf16().count() as u32;
             let text = input.replacen('|', "", 1);
             let (server, uri) = server(&text);
@@ -749,7 +758,7 @@ mod tests {
         };
         let first = &items[0];
         assert_eq!(first.label, "John 3:1");
-        assert_eq!(first.filter_text.as_deref(), Some("jn 3:1"));
+        assert_eq!(first.filter_text.as_deref(), Some("jn 3:1 John 3:1"));
         let Some(lsp_types::CompletionTextEdit::Edit(edit)) = &first.text_edit else {
             panic!("no edit");
         };

@@ -78,6 +78,8 @@ fn applied_completion_cases() {
             continue;
         };
         let (input, expected) = case.split_once(" => ").expect("a case has `=>`");
+        let (input, expected) = (input.replace("\\n", "\n"), expected.replace("\\n", "\n"));
+        let (input, expected) = (input.as_str(), expected.as_str());
         let cursor = input.find('|').expect("an apply case has a cursor");
         let text = input.replacen('|', "", 1);
         let completion = matcher

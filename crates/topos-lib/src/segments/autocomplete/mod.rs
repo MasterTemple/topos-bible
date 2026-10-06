@@ -85,7 +85,8 @@ impl BibleMatcher {
         let separator = &options.format.book_separator;
         let has_separator = !separator.is_empty()
             && (after.starts_with(separator.as_str())
-                || (separator.trim().is_empty() && after.starts_with(char::is_whitespace)));
+                // A space or tab on the same line, not the line break
+                || (separator.trim().is_empty() && after.starts_with([' ', '\t'])));
         if has_separator {
             for completion in &mut completions {
                 if let Some(name) = completion.edit.text.strip_suffix(separator.as_str()) {

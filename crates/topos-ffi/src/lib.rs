@@ -970,6 +970,8 @@ mod tests {
         let mut failures = vec![];
         for case in cases.lines().filter_map(|l| l.strip_prefix("apply: ")) {
             let (input, expected) = case.split_once(" => ").unwrap();
+            let (input, expected) = (input.replace("\\n", "\n"), expected.replace("\\n", "\n"));
+            let (input, expected) = (input.as_str(), expected.as_str());
             let cursor = input[..input.find('|').unwrap()].encode_utf16().count() as u32;
             let text = input.replacen('|', "", 1);
             let format = ToposFormat::create();

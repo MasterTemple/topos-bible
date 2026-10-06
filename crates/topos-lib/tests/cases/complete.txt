@@ -40,3 +40,4 @@ apply: 1 Ti| 3:16 => 1 Timothy 3:16
 apply: see 1 Ti|  => see 1 Timothy 
 apply: 1 Ti| => 1 Timothy 
 apply: jn 3:1| here => John 3:1 here
+apply: 1 Ti|\n2 Peter => 1 Timothy \n2 Peter
