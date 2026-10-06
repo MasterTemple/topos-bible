@@ -63,7 +63,7 @@ The phases are in order, and each one leaves the repo working.
 ## Phase 6: Bindings and tooling
 
 - [x] A `topos-ffi` façade (BoltFFI 0.31) with owned data types and offsets in the caller's unit
-- [ ] Remove the old `topos-py`, `topos-ts`, and `topos-ts-boltffi` test crates
+- [x] Remove the old `topos-py`, `topos-ts`, and `topos-ts-boltffi` test crates
 - [x] Python through BoltFFI (`boltffi pack python` builds a working wheel)
 - [x] An LSP server (`topos-lsp`): completion, hover with the normalized reference, and document symbols
 - [x] LSP diagnostics for references that do not exist (`BibleMatcher::problems`)

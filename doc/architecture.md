@@ -15,7 +15,7 @@ crates/
   topos-lsp/       a language server: completion, hover, document symbols
 ```
 
-`topos-parser` and `topos-pdf` are gone. The PyO3, wasm-bindgen and BoltFFI test crates get replaced by `topos-ffi`.
+`topos-parser`, `topos-pdf`, and the old PyO3, wasm-bindgen, and BoltFFI test crates are gone; `topos-ffi` replaces the bindings.
 
 ## Pipeline
 
