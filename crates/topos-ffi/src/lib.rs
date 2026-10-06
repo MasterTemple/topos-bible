@@ -197,9 +197,11 @@ impl Topos {
     /// The first reference in `text`, read as one reference (`Jn 3:16` or `John.3.16`)
     pub fn parse(&self, reference: String, style: BookStyle) -> Option<Passage> {
         let books = self.matcher.data().books();
+        // OSIS first: as plain text, `John.3.16-John.3.18` would read as just John 3:16
         let passage = books
-            .parse(&reference)
-            .or_else(|| books.parse_osis(&reference).ok())?;
+            .parse_osis(&reference)
+            .ok()
+            .or_else(|| books.parse(&reference))?;
         self.passage(&passage, style.into())
     }
 
@@ -609,6 +611,15 @@ mod tests {
         let prophets = genres.iter().find(|g| g.name == "Prophets").unwrap();
         assert_eq!(prophets.book_ids.len(), 17);
         assert_eq!(topos.find_genre("gospels".into()).unwrap().name, "Gospels");
+    }
+
+    #[test]
+    fn parses_osis_ranges() {
+        let topos = Topos::new();
+        let range = topos.parse("John.3.16-John.3.18 John.4".into(), BookStyle::Name);
+        assert_eq!(range.unwrap().reference, "John 3:16-18; 4");
+        let plain = topos.parse("Jn 3:16-18".into(), BookStyle::Name);
+        assert_eq!(plain.unwrap().reference, "John 3:16-18");
     }
 
     #[test]
