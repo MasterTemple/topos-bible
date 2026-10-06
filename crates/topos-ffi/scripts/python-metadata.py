@@ -23,10 +23,10 @@ long_description = file: README.md
 long_description_content_type = text/markdown
 license_expression = CC0-1.0
 license_files = LICENSE
-url = https://github.com/MasterTemple/topos
+url = https://github.com/MasterTemple/topos-bible
 project_urls =
-    Source = https://github.com/MasterTemple/topos
-    Issues = https://github.com/MasterTemple/topos/issues
+    Source = https://github.com/MasterTemple/topos-bible
+    Issues = https://github.com/MasterTemple/topos-bible/issues
 keywords = bible, scripture, verse, reference, parser, osis
 classifiers =
     Development Status :: 3 - Alpha

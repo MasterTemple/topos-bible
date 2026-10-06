@@ -87,7 +87,7 @@ runtime_version = "^0.31.0"
 [targets.wasm.npm]
 package_name = "topos-bible"
 license = "CC0-1.0"
-repository = "https://github.com/MasterTemple/topos"
+repository = "https://github.com/MasterTemple/topos-bible"
 
 [targets.java.jvm]
 enabled = false

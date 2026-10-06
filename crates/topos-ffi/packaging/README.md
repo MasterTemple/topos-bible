@@ -1,7 +1,7 @@
 # topos-bible
 
 Find, parse, and complete Bible references in text, from Python, JavaScript, Swift, and
-Kotlin. Built on the Rust [topos](https://github.com/MasterTemple/topos) library.
+Kotlin. Built on the Rust [topos](https://github.com/MasterTemple/topos-bible) library.
 
 ```python
 from topos_bible import BookStyle, OffsetUnit, Topos
@@ -32,6 +32,6 @@ topos.search("Read Jn 3:16-18", OffsetUnit.Utf16); // offsets are UTF-16, like J
 - `Topos.with_config(json)` uses custom book names, genres, or versification
 
 Offsets use the unit you pass: `Char` for Python, `Utf16` for JavaScript. See the
-[documentation](https://github.com/MasterTemple/topos/tree/main/crates/topos-ffi) for details.
+[documentation](https://github.com/MasterTemple/topos-bible/tree/main/crates/topos-ffi) for details.
 
 Released under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).

@@ -20,7 +20,7 @@ The phases are in order, and each one leaves the repo working.
 - [x] Fix the `5:12-6:6` resolution bug
 - [x] Restore the "chapters until a verse is seen" rule (and `;` starts chapters again)
 - [x] Handle single-chapter books (`Jude 5`, `3 John 5`)
-- [x] Always match all books and filter by `BookId` afterward: Searching `John` only matches `1 John` [#8](https://github.com/MasterTemple/topos/issues/8)
+- [x] Always match all books and filter by `BookId` afterward: Searching `John` only matches `1 John` [#8](https://github.com/MasterTemple/topos-bible/issues/8)
 - [x] Escape regex keys, sort them longest-first, and drop the hard-coded `1..=66` (plus ASCII word boundaries: search is 31x faster)
 - [x] Implement `Ord` for `Segment` by hand, and fix `Passage::contains` / `Segments::fully_contains`
 - [x] Restrict Roman numerals to chapter position, whole words, and canonical forms; use `is_ascii_digit`
@@ -31,22 +31,22 @@ The phases are in order, and each one leaves the repo working.
 
 - [x] One lexer/parser that produces a lossless syntax tree with spans, replacing minimal, verbose and the autocomplete regexes (`segments/grammar`)
 - [x] A resolver stage (`segments::resolve`) and document context (`matcher::context`)
-  - [x] Parse older formats / Roman numerals / sub-verses: `Matth. x, 8` [#5](https://github.com/MasterTemple/topos/issues/5)
-  - [x] `cf` and `ff` [#10](https://github.com/MasterTemple/topos/issues/10)
-  - [x] Support dashes in book names for justified text [#11](https://github.com/MasterTemple/topos/issues/11)
-  - [x] Contextual parsing: verse headings in a document about one book [#6](https://github.com/MasterTemple/topos/issues/6)
-- [x] Rules plus `ambiguous` abbreviations in the book data (instead of a numeric confidence score): Reduce false positives (`"is"` for Isaiah) [#3](https://github.com/MasterTemple/topos/issues/3)
+  - [x] Parse older formats / Roman numerals / sub-verses: `Matth. x, 8` [#5](https://github.com/MasterTemple/topos-bible/issues/5)
+  - [x] `cf` and `ff` [#10](https://github.com/MasterTemple/topos-bible/issues/10)
+  - [x] Support dashes in book names for justified text [#11](https://github.com/MasterTemple/topos-bible/issues/11)
+  - [x] Contextual parsing: verse headings in a document about one book [#6](https://github.com/MasterTemple/topos-bible/issues/6)
+- [x] Rules plus `ambiguous` abbreviations in the book data (instead of a numeric confidence score): Reduce false positives (`"is"` for Isaiah) [#3](https://github.com/MasterTemple/topos-bible/issues/3)
 - [x] One `ToposError` enum, and no `unwrap` in library code (except the PDF module, rewritten in Phase 3)
 - [x] Byte spans as the source of truth, with a `LineIndex` that gives byte, char and UTF-16 columns
 
 ## Phase 3: Crate split and formats
 
 - [x] Split the core (`topos-lib`) from `topos-formats` (feature-gated adapters behind a `Format` trait)
-- [x] Generalize match location [#9](https://github.com/MasterTemple/topos/issues/9): plain text, HTML, SRT (multi-line cues), WebVTT, SBV, PDF (MuPDF 0.8; `topos-pdf` removed), EPUB, JSON, XML
+- [x] Generalize match location [#9](https://github.com/MasterTemple/topos-bible/issues/9): plain text, HTML, SRT (multi-line cues), WebVTT, SBV, PDF (MuPDF 0.8; `topos-pdf` removed), EPUB, JSON, XML
 
 ## Phase 4: Formatting, interop, autocomplete
 
-- [x] Formatter (`FormatOptions`, on resolved passages): Provide user-specified formatting options [#4](https://github.com/MasterTemple/topos/issues/4)
+- [x] Formatter (`FormatOptions`, on resolved passages): Provide user-specified formatting options [#4](https://github.com/MasterTemple/topos-bible/issues/4)
 - [x] OSIS parse and format, plus a BCV integer key: Create a standard format for specifying segment ranges
 - [x] Autocomplete `BibleMatcher::complete(text, cursor, opts)` that returns `TextEdit`s: books, chapters, and verses, written with `FormatOptions`
 
@@ -58,7 +58,7 @@ The phases are in order, and each one leaves the repo working.
 - [x] Choose a format by file extension through `topos-formats`, skip binary files, and report unreadable files on stderr (exit codes like ripgrep)
 - [x] Clarify inputs: `topos [PATH]...` (paths only, like ripgrep), with `--text` or piped stdin for literal text (`-i` already filters by passage)
 - [x] `--config` for custom book, genre and versification data (JSON, via `BibleDataInput`)
-- [x] Cache search results [#2](https://github.com/MasterTemple/topos/issues/2) (`--cache`)
+- [x] Cache search results [#2](https://github.com/MasterTemple/topos-bible/issues/2) (`--cache`)
 
 ## Phase 6: Bindings and tooling
 
