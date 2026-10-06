@@ -8,6 +8,10 @@ members = [
 ]
 resolver = "3"
 
+[workspace.package]
+license = "CC0-1.0"
+repository = "https://github.com/MasterTemple/topos"
+
 [workspace.dependencies]
 itertools = "0.14.0"
 serde = { version = "1.0.219", features = ["derive"] }

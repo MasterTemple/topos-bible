@@ -6,7 +6,9 @@ global_args = []
 [cargo.command_args]
 
 [package]
-name = "topos-ffi"
+# The PyPI distribution name; the Rust crate is topos-ffi
+name = "topos-bible"
+crate_name = "topos-ffi"
 
 [targets.apple]
 enabled = true
@@ -77,10 +79,15 @@ output = "dist/wasm"
 
 [targets.wasm.optimize]
 
+[targets.wasm.typescript]
+runtime_version = "^0.31.0"
+
 [targets.wasm.typescript.type_mappings]
 
 [targets.wasm.npm]
-package_name = "topos"
+package_name = "topos-bible"
+license = "CC0-1.0"
+repository = "https://github.com/MasterTemple/topos"
 
 [targets.java.jvm]
 enabled = false
@@ -105,7 +112,7 @@ enabled = false
 [targets.python]
 output = "dist/python"
 enabled = true
-module_name = "topos"
+module_name = "topos_bible"
 
 [targets.python.wheel]
 

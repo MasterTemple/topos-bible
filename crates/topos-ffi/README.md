@@ -36,8 +36,8 @@ commands from this directory. Outputs go to `dist/` (gitignored).
 
 | Target | Command | Needs | Output |
 |---|---|---|---|
-| Python | `boltffi pack python` | Python 3 | `dist/python/wheelhouse/*.whl` |
-| TypeScript | `npm install && npm run pack:wasm` | `rustup target add wasm32-unknown-unknown`, Node | `dist/wasm/pkg` (an npm package named `topos`) |
+| Python | `boltffi pack python` | Python 3 | `dist/python/wheelhouse/*.whl` (the PyPI package `topos-bible`, imported as `topos_bible`) |
+| TypeScript | `npm install && npm run pack:wasm` | `rustup target add wasm32-unknown-unknown`, Node | `dist/wasm/pkg` (the npm package `topos-bible`) |
 | Swift | `boltffi pack apple` | macOS with Xcode | `dist/apple` (XCFramework and `Package.swift`) |
 | Kotlin | `boltffi pack android` | Android NDK | `dist/android` (`jniLibs` and Kotlin sources) |
 
@@ -49,11 +49,11 @@ Package names and the Kotlin package (`io.github.mastertemple.topos`) are set in
 ## TypeScript / JavaScript
 
 ```sh
-npm install ../path/to/topos/crates/topos-ffi/dist/wasm/pkg   # or publish dist/wasm/pkg
+npm install topos-bible
 ```
 
 ```ts
-import { initialized, Topos, OffsetUnit, BookStyle } from "topos";
+import { initialized, Topos, OffsetUnit, BookStyle } from "topos-bible";
 
 await initialized; // the WASM module loads asynchronously
 const topos = Topos.new();
@@ -77,11 +77,11 @@ topos.dispose(); // free the Rust object (or let the finalizer do it)
 ## Python
 
 ```sh
-pip install dist/python/wheelhouse/*.whl
+pip install topos-bible
 ```
 
 ```python
-from topos import BookStyle, OffsetUnit, Topos, ToposErrorException
+from topos_bible import BookStyle, OffsetUnit, Topos, ToposErrorException
 
 topos = Topos()
 for m in topos.search("Read Jn 3:16-18", OffsetUnit.CHAR):
@@ -95,7 +95,7 @@ except ToposErrorException as error:
     print(error.error.message)
 ```
 
-The wheel is built for the Python that ran `boltffi pack python`. A runnable script is in
+Locally built wheels target the Python that ran `boltffi pack python`; released wheels cover Linux, macOS, and Windows on Python 3.10 and later. A runnable script is in
 [`examples/python`](./examples/python/example.py).
 
 ## Swift

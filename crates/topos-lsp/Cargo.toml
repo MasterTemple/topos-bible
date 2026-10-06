@@ -2,6 +2,8 @@
 name = "topos-lsp"
 version = "0.1.0"
 edition = "2024"
+license.workspace = true
+repository.workspace = true
 description = "A language server for Bible references: completion, hover, symbols, and diagnostics"
 
 [[bin]]

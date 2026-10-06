@@ -3,8 +3,8 @@
   "private": true,
   "description": "Build dependencies for `boltffi pack wasm` (it type-checks the generated bindings)",
   "scripts": {
-    "pack:wasm": "boltffi pack wasm",
-    "pack:python": "boltffi pack python"
+    "pack:wasm": "scripts/pack-wasm.sh",
+    "pack:python": "scripts/pack-python.sh"
   },
   "devDependencies": {
     "@boltffi/runtime": "0.31.0",

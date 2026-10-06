@@ -6,6 +6,6 @@
     "start": "node index.ts"
   },
   "dependencies": {
-    "topos": "file:../../dist/wasm/pkg"
+    "topos-bible": "file:../../dist/wasm/pkg"
   }
 }

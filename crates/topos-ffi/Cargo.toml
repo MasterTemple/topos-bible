@@ -2,9 +2,13 @@
 name = "topos-ffi"
 version = "0.1.0"
 edition = "2024"
+license.workspace = true
+repository.workspace = true
 description = "Bindings for TypeScript/WASM, Python, Swift, and Kotlin (via BoltFFI)"
 
 [lib]
+# Matches the published package name (topos-bible), which BoltFFI uses for artifacts
+name = "topos_bible"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]

@@ -1,6 +1,6 @@
 """Run after `pip install dist/python/wheelhouse/*.whl` (see ../../README.md)."""
 
-from topos import BookStyle, OffsetUnit, Topos, ToposErrorException
+from topos_bible import BookStyle, OffsetUnit, Topos, ToposErrorException
 
 topos = Topos()
 
