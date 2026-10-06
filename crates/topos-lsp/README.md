@@ -13,8 +13,8 @@
 - **Code actions**: on a reference, search the workspace for it: `Search "John 3:16" for
   explicit overlap`, `... for any overlap`, `... for exact overlap`, and `Search inside "John 3"`
 - **Diagnostics**: an information diagnostic on each reference with how it's written in your
-  format and its OSIS id (`John 3:16 (John.3.16)`, code `reference`), and warnings for references
-  that do not exist, like `John 3:99` (code `missing`)
+  format (`John 3:16`, code `reference`), and warnings for references that do not exist, like
+  `John 3:99` (code `missing`)
 
 Workspace searches cover every text file in the workspace folders, skipping hidden, binary, and
 ignored files (`.gitignore`, `.ignore`, `.toposignore`), like the CLI. Open files are searched

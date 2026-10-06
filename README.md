@@ -32,11 +32,21 @@ Telescope pickers. With [lazy.nvim](https://lazy.folke.io):
   ft = { 'markdown', 'text' },
   cmd = { 'ToposSearch', 'ToposQuery', 'ToposExplicitOverlap', 'ToposAnyOverlap',
           'ToposExactOverlap', 'ToposInside', 'ToposExcludeOverlap', 'ToposBuild' },
-  opts = {},
+  opts = {
+    -- topos-lsp's settings: the CLI's config.toml keys, which these override
+    settings = {
+      format = 'abbreviation',                -- Jn 3:16
+      ['psg-fmt'] = { join_adjacent = true }, -- 3:16-18, not 3:16,17,18
+      ['reference-diagnostics'] = 'hint',     -- 'info' (default), 'hint', or 'never'
+      ['inlay-hints'] = 'never',              -- 'changed' (default), 'always', 'osis', 'never'
+      ext = 'md,txt',                         -- what references and searches cover
+    },
+  },
 }
 ```
 
-- **Language server**: completion, hover, inlay hints, symbols, and diagnostics; go to
+- **Language server**: completion, hover, inlay hints, symbols, and diagnostics (each
+  reference as formatted, and warnings for verses that don't exist); go to
   references (`grr`) lists the references that are exactly the one under the cursor, and the
   code actions (`gra`) search for it by explicit overlap, any overlap, exact overlap, or inside it
 - **Commands**: `:ToposSearch` (every reference), `:ToposQuery -g Wisdom` (the CLI's options,

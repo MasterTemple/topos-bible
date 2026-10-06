@@ -25,7 +25,7 @@ With lazy.nvim: >lua
     ft = { 'markdown', 'text' },
     cmd = { 'ToposSearch', 'ToposQuery', 'ToposExplicitOverlap', 'ToposAnyOverlap',
             'ToposExactOverlap', 'ToposInside', 'ToposExcludeOverlap', 'ToposBuild' },
-    opts = {},
+    opts = { settings = { format = 'abbreviation', ['inlay-hints'] = 'never' } },
   }
 <
 Building needs Rust (https://rustup.rs). If the binaries are missing,
@@ -33,16 +33,19 @@ Building needs Rust (https://rustup.rs). If the binaries are missing,
 
 `require('topos').setup(opts)` takes (the defaults): >lua
   {
+    -- topos-lsp's settings, overriding ~/.config/topos/config.toml (the
+    -- CLI's keys), like { format = 'abbreviation',
+    --   ['psg-fmt'] = { join_adjacent = true }, ext = 'md,txt',
+    --   ['inlay-hints'] = 'changed' | 'always' | 'osis' | 'never',
+    --   ['reference-diagnostics'] = 'info' | 'hint' | 'never' }
+    settings = {},
     lsp = {
       enabled = true,
       filetypes = { 'markdown', 'text' },
       -- The folder searched by references, the code actions, and the commands
       root_markers = { '.git', '.obsidian' },
       inlay_hints = true,
-      -- Overrides ~/.config/topos/config.toml, with the CLI's keys:
-      -- { ['psg-fmt'] = { join_adjacent = true }, format = 'abbreviation',
-      --   ['inlay-hints'] = 'changed' | 'always' | 'osis' | 'never',
-      --   ['reference-diagnostics'] = 'info' | 'hint' | 'never', ext = 'md,txt' }
+      -- Older place for the settings above (the top-level ones win)
       settings = {},
     },
     -- Binary paths; nil uses the plugin's build, then your PATH
@@ -110,8 +113,8 @@ Go to references (|grr|, or Telescope's `lsp_references`) lists every
 reference in the workspace that is exactly the one under the cursor. The code
 actions (|gra|) search for it by explicit overlap, any overlap, exact overlap,
 or inside it, and open the results like the commands do. Each reference has an
-information diagnostic with how it's written in your format and its OSIS id
-(`John 3:16 (John.3.16)`); references that don't exist get a warning. Inlay
+information diagnostic with how it's written in your format (`John 3:16`);
+references that don't exist get a warning. Inlay
 hints show the formatted reference where it's written differently.
 
  vim:tw=78:ts=8:ft=help:norl:

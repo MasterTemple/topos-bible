@@ -9,7 +9,9 @@ if vim.env.WITH_TELESCOPE then
   for _, p in ipairs({ "plenary.nvim", "telescope.nvim" }) do vim.opt.rtp:prepend((vim.env.PLUGINS or vim.fn.expand("~/.local/share/nvim/lazy")) .. "/" .. p) end
 end
 vim.cmd("runtime plugin/topos-bible.lua")
-require("topos").setup({ cmd = { lsp = REPO .. "/target/debug/topos-lsp", cli = REPO .. "/target/debug/topos" }, auto_build = false })
+require("topos").setup({ cmd = { lsp = REPO .. "/target/debug/topos-lsp", cli = REPO .. "/target/debug/topos" }, auto_build = false,
+  -- Server settings, as in a lazy.nvim spec's `opts`
+  settings = { ["reference-diagnostics"] = "hint" } })
 vim.cmd("edit " .. WORK .. "/ws/open.txt")
 vim.wait(5000, function() return #vim.lsp.get_clients({ bufnr = 0, name = "topos" }) > 0 end)
 vim.wait(500)

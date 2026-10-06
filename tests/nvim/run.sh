@@ -14,7 +14,7 @@ printf 'John 3, John 2; 3:16, Rom 8:28, Luke 2:1\n' > "$WORK/ws/b.txt"
 printf 'See jn 3:16 here\n' > "$WORK/ws/open.txt"
 
 expected='lsp topos hints true
-diagnostic INFO reference John 3:16 (John.3.16)
+diagnostic HINT reference John 3:16
 search Bible references 7
 query topos -g Gospels --exclude-book Luke 5
 explicit Search "John 3:16" for explicit overlap 4

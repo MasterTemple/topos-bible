@@ -2,6 +2,10 @@
 local M = {}
 
 M.defaults = {
+  -- topos-lsp's settings, overriding ~/.config/topos/config.toml (the CLI's keys), like
+  -- { format = 'abbreviation', ['psg-fmt'] = { join_adjacent = true },
+  --   ['inlay-hints'] = 'never', ['reference-diagnostics'] = 'hint', ext = 'md,txt' }
+  settings = {},
   lsp = {
     enabled = true,
     filetypes = { 'markdown', 'text' },
@@ -9,9 +13,7 @@ M.defaults = {
     root_markers = { '.git', '.obsidian' },
     -- Show how each reference is written in your format (see `settings['inlay-hints']`)
     inlay_hints = true,
-    -- Override ~/.config/topos/config.toml, with the same keys as the CLI:
-    -- { ['psg-fmt'] = { join_adjacent = true }, format = 'abbreviation', ['inlay-hints'] = 'always',
-    --   ['reference-diagnostics'] = 'hint' }
+    -- The same as the top-level `settings` (which win where both set a key)
     settings = {},
   },
   -- Paths to the binaries; nil uses the plugin's own build, then your PATH
@@ -26,6 +28,11 @@ M.options = vim.deepcopy(M.defaults)
 
 function M.set(opts)
   M.options = vim.tbl_deep_extend('force', vim.deepcopy(M.defaults), opts or {})
+end
+
+-- The language server's settings: `lsp.settings`, then the top-level `settings`
+function M.lsp_settings()
+  return vim.tbl_deep_extend('force', M.options.lsp.settings or {}, M.options.settings or {})
 end
 
 return M

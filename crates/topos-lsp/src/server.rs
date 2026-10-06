@@ -219,8 +219,8 @@ impl Server {
     /**
     The document's diagnostics:
     - Warnings for references that do not exist, like `John 3:99` (code `missing`)
-    - An information diagnostic on each reference, `John 3:16 (John.3.16)` (code `reference`;
-      a hint, or none, with the `reference-diagnostics` setting)
+    - An information diagnostic on each reference: how it is written in the configured format,
+      like `John 3:16` (code `reference`; a hint, or none, with `reference-diagnostics`)
     */
     pub fn diagnostics(&self, uri: &Uri) -> PublishDiagnosticsParams {
         let diagnostics = self.documents.get(uri).map_or_else(Vec::new, |text| {
@@ -256,12 +256,7 @@ impl Server {
                 for m in self.matcher.search(text) {
                     let bytes = m.location.bytes;
                     let range = lsp_range(&index, bytes.start, bytes.end);
-                    let reference = self.reference(&m);
-                    let message = match m.psg.to_osis(self.matcher.data().books()) {
-                        Some(osis) if osis != reference => format!("{reference} ({osis})"),
-                        _ => reference,
-                    };
-                    diagnostics.push(diagnostic(range, severity, "reference", message));
+                    diagnostics.push(diagnostic(range, severity, "reference", self.reference(&m)));
                 }
                 // In document order, so they read top to bottom
                 diagnostics.sort_by_key(|d| (d.range.start.line, d.range.start.character));
@@ -548,7 +543,7 @@ mod tests {
             [
                 (
                     Some(DiagnosticSeverity::INFORMATION),
-                    String::from("John 3:16 (John.3.16)"),
+                    String::from("John 3:16"),
                     Range::new(Position::new(0, 6), Position::new(0, 13))
                 ),
                 (

@@ -36,7 +36,7 @@ pub enum InlayHints {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ReferenceDiagnostics {
-    /// An information diagnostic: `John 3:16 (John.3.16)`
+    /// An information diagnostic with the reference as formatted: `John 3:16`
     #[default]
     #[serde(alias = "information")]
     Info,

@@ -30,8 +30,8 @@ function M.start_lsp()
     cmd = { path },
     filetypes = lsp.filetypes,
     root_markers = lsp.root_markers,
-    init_options = lsp.settings,
-    settings = { topos = lsp.settings },
+    init_options = config.lsp_settings(),
+    settings = { topos = config.lsp_settings() },
   })
   vim.lsp.enable('topos')
   if lsp.inlay_hints then
