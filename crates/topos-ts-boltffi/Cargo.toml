@@ -7,14 +7,9 @@ edition = "2024"
 crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
-# topos-lib = { path = "../topos-lib", default-features = false }
 topos-lib = { path = "../topos-lib" }
 once_cell = { workspace = true }
 itertools = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 boltffi = "0.1.1"
-# boltffi = "0.1"
-# freetype-sys = { version = "0.21", features = ["bundled"] }
-mupdf = { version = "0.4.4", optional = true }
-unicode-normalization = "0.1.25"

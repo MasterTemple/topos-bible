@@ -1,14 +1,12 @@
 use htmloc::{FragmentEngine, GenerateOptions, Selection, TextFragment};
 use itertools::Itertools;
 
-use crate::matcher::{
-    bible_matcher::{BibleMatcher, MatchResult, Matcher},
-    instance::BibleMatch,
-    location::line_col::LineColLocation,
-};
+use topos_lib::matcher::{BibleMatch, BibleMatcher, LineColLocation};
 
-impl From<LineColLocation> for Selection {
-    fn from(val: LineColLocation) -> Self {
+use crate::{Format, FormatError};
+
+fn selection(val: LineColLocation) -> Selection {
+    {
         Selection {
             start: htmloc::Position {
                 line: val.start.line,
@@ -38,21 +36,21 @@ pub struct HTMLLocation {
     pub text_fragment: TextFragment,
 }
 
-impl Matcher for HTMLLocation {
+impl Format for HTMLLocation {
     type Input<'a> = &'a str;
 
-    fn search<'a>(
+    fn search(
         matcher: &BibleMatcher,
-        input: Self::Input<'a>,
-    ) -> MatchResult<Vec<BibleMatch<Self>>> {
+        input: Self::Input<'_>,
+    ) -> Result<Vec<BibleMatch<Self>>, FormatError> {
         let doc = FragmentEngine::from_html(input);
 
-        let results = matcher.search::<LineColLocation>(doc.plain_text())?;
+        let results = matcher.search(doc.plain_text());
 
         results
             .into_iter()
             .map(|m| {
-                let selection: Selection = m.location.into();
+                let selection = selection(m.location);
                 let text_fragment = doc
                     .generate(selection, Some(GenerateOptions::default()))
                     .ok_or(HTMLMatchError::FailedToGenerate)?;

@@ -1,8 +1,6 @@
 use std::path::PathBuf;
 
-use topos_lib::matcher::{
-    bible_matcher::BibleMatcher, instance::BibleMatch, location::line_col::LineColLocation,
-};
+use topos_lib::matcher::{bible_matcher::BibleMatcher, instance::BibleMatch};
 
 #[derive(Clone, Debug)]
 pub struct PathMatches {
@@ -24,7 +22,7 @@ impl PathMatches {
     }
 
     pub fn from_text(text: String, matcher: &BibleMatcher) -> PathMatches {
-        let matches = matcher.search::<LineColLocation>(&text).unwrap_or_default();
+        let matches = matcher.search(&text);
         PathMatches::new(matches)
     }
 

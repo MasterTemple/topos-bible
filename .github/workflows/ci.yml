@@ -17,8 +17,16 @@ jobs:
         with:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
-      # Default members exclude topos-pdf (MuPDF); it gets its own job once it builds
       - run: cargo fmt --check
       - run: cargo test
       - run: cargo test -p topos-lib --no-default-features
       - run: cargo clippy --all-targets
+
+  pdf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Builds MuPDF from source
+      - run: cargo test -p topos-formats --features pdf

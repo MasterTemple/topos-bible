@@ -1,6 +1,6 @@
 //! Runs every case in `tests/cases/search.txt` and reports all failures at once.
 
-use topos_lib::matcher::{BibleMatcher, location::line_col::LineColLocation};
+use topos_lib::matcher::BibleMatcher;
 
 struct Case<'a> {
     line: usize,
@@ -46,8 +46,7 @@ fn search_cases() {
 
     for case in cases(include_str!("cases/search.txt")) {
         let actual: Vec<String> = matcher
-            .search::<LineColLocation>(&case.input)
-            .unwrap()
+            .search(&case.input)
             .into_iter()
             .map(|m| {
                 let book = matcher.data().books().get_name(m.psg.book).unwrap();

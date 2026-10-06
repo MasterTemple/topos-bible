@@ -140,16 +140,12 @@ impl Default for BibleFilter {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        filter::{bible_filter::BibleFilter, filters::book::BookFilter},
-        matcher::location::line_col::LineColLocation,
-    };
+    use crate::filter::{bible_filter::BibleFilter, filters::book::BookFilter};
 
     fn search(filter: BibleFilter, input: &str) -> Vec<String> {
         let matcher = filter.create_matcher();
         matcher
-            .search::<LineColLocation>(input)
-            .unwrap()
+            .search(input)
             .into_iter()
             .map(|m| {
                 let book = matcher.data().books().get_name(m.psg.book).unwrap();

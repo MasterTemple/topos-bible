@@ -2,10 +2,7 @@
 
 use std::sync::LazyLock;
 
-use crate::{
-    matcher::{BibleMatcher, location::line_col::LineColLocation},
-    segments::grammar::SegmentList,
-};
+use crate::{matcher::BibleMatcher, segments::grammar::SegmentList};
 
 static MATCHER: LazyLock<BibleMatcher> = LazyLock::new(BibleMatcher::default);
 
@@ -46,7 +43,7 @@ fn check_grammar(input: &str) {
 }
 
 fn check_search(input: &str) {
-    for m in MATCHER.search::<LineColLocation>(input).unwrap() {
+    for m in MATCHER.search(input) {
         let bytes = m.location.bytes;
         check_span(input, bytes.start, bytes.end);
         assert!(bytes.start < bytes.end);

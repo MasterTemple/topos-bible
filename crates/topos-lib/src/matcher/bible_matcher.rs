@@ -3,15 +3,13 @@ use crate::{
     filter::bible_filter::BibleFilter,
     matcher::{
         context::BookContext,
-        instance::BibleMatch,
-        location::{epub::EPUBMatchError, html::HTMLMatchError, srt::SRTMatchError},
+        instance::{BibleMatch, FoundPassage},
+        line_col::{LineColLocation, LineIndex},
         matches::{ComplexFilter, FilteredBibleMatches},
+        text::SearchText,
     },
     segments::autocomplete::input::InputAutoCompleter,
 };
-
-#[cfg(feature = "pdf")]
-use crate::matcher::location::pdf::PDFMatchError;
 
 #[derive(Clone, Debug)]
 pub struct BibleMatcher {
@@ -22,7 +20,6 @@ pub struct BibleMatcher {
     context: Option<BookContext>,
 }
 
-// TODO: I should have a search method for each type of Location
 impl BibleMatcher {
     pub fn new(data: BibleData, complex_filter: ComplexFilter) -> Self {
         Self {
@@ -55,54 +52,52 @@ impl BibleMatcher {
     }
 }
 
-pub type MatchResult<T> = core::result::Result<T, MatchError>;
-
-#[derive(thiserror::Error, Debug)]
-pub enum MatchError {
-    #[error("EPUB: {0}")]
-    EPUB(#[from] EPUBMatchError),
-    #[error("SRT: {0}")]
-    SRT(#[from] SRTMatchError),
-    #[error("HTML: {0}")]
-    HTML(#[from] HTMLMatchError),
-    #[cfg(feature = "pdf")]
-    #[error("PDF: {0}")]
-    PDF(#[from] PDFMatchError),
-    #[error("{0}")]
-    Unknown(Box<dyn std::error::Error + Send + Sync>),
-}
-
-/**
-- This is a trait that allows for generic location matching
-- The [`find`](Matcher::find) method will by default use [`search`](Matcher::search) method and take the first result
-*/
-/*
-TODO: I should return a result
-- But line-column searches do not return a result -> `.ok().unwrap_or_default()`
-*/
-/*
-TODO: I should allow parameters?
-- Let user specify text fragment options
-- Let user specify certain page of PDF to read
-*/
-pub trait Matcher: Sized {
-    type Input<'a>;
-    fn search<'a>(
-        matcher: &BibleMatcher,
-        input: Self::Input<'a>,
-    ) -> MatchResult<Vec<BibleMatch<Self>>>;
-    fn find<'a>(matcher: &BibleMatcher, input: Self::Input<'a>) -> Option<BibleMatch<Self>> {
-        Self::search(matcher, input).ok()?.into_iter().next()
-    }
-}
-
 impl BibleMatcher {
-    pub fn search<'a, L: Matcher>(&self, input: L::Input<'a>) -> MatchResult<Vec<BibleMatch<L>>> {
-        L::search(self, input)
+    /**
+    Finds every reference in `text`
+    - Every book name followed by a chapter is a candidate, and its segments end where the next
+      candidate starts (so `John 1:1, 3 John 5` is `John 1:1` and `3 John 5`)
+    - With a [`BookContext`], references without a book name are found too
+    - Matches are then filtered by book and passage
+    */
+    pub fn search(&self, text: &str) -> Vec<BibleMatch> {
+        let mut filtered = self.filter();
+        let original = text;
+        let text = SearchText::new(original);
+        let index = LineIndex::new(original);
+        let data = self.data();
+
+        let starts: Vec<_> = data.books().candidates(text.as_str()).collect();
+        let mut found: Vec<FoundPassage> = starts
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, cur)| {
+                let next_start = starts.get(idx + 1).map(|next| next.start());
+                FoundPassage::find(data, text.as_str(), *cur, next_start)
+            })
+            .collect();
+
+        if let Some(context) = self.context() {
+            let taken: Vec<_> = found.iter().map(|f| f.bytes.clone()).collect();
+            let book_starts: Vec<_> = starts.iter().map(|s| s.start()).collect();
+            found.extend(context.find_bare(data, text.as_str(), &taken, &book_starts));
+            found.sort_by_key(|f| f.bytes.start);
+        }
+
+        for found in found {
+            let bytes = text.original_range(found.bytes);
+            let location = LineColLocation::new(&index, bytes.start, bytes.end);
+            filtered.try_add(BibleMatch {
+                location,
+                psg: found.psg,
+            });
+        }
+        filtered.matches()
     }
 
-    pub fn find<'a, L: Matcher>(&self, input: L::Input<'a>) -> Option<BibleMatch<L>> {
-        L::find(self, input)
+    /// The first reference in `text`
+    pub fn find(&self, text: &str) -> Option<BibleMatch> {
+        self.search(text).into_iter().next()
     }
 }
 

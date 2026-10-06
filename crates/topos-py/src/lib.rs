@@ -1,10 +1,10 @@
 use pyo3::prelude::*;
-use topos_lib::matcher::{bible_matcher::BibleMatcher, location::line_col::LineColLocation};
+use topos_lib::matcher::bible_matcher::BibleMatcher;
 
 #[pyfunction]
 fn search(input: &str) -> PyResult<String> {
     let m = BibleMatcher::default();
-    let result = m.search::<LineColLocation>(input).unwrap_or_default();
+    let result = m.search(input);
     Ok(result
         .iter()
         .map(|r| {

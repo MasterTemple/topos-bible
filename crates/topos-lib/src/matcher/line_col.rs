@@ -1,9 +1,3 @@
-use crate::matcher::{
-    bible_matcher::{BibleMatcher, MatchResult, Matcher},
-    instance::{BibleMatch, FoundPassage},
-    text::SearchText,
-};
-
 #[derive(Copy, Clone, Debug)]
 pub struct ByteIndex {
     pub start: usize,
@@ -72,52 +66,6 @@ impl LineColLocation {
             end: index.position(end),
             bytes: ByteIndex::new(start, end),
         }
-    }
-}
-
-impl Matcher for LineColLocation {
-    type Input<'a> = &'a str;
-
-    /// - This always returns the [`Ok`] variant
-    /// - Using the [`Result::unwrap_or_default()`] method results in an empty [`Vec`], so just do that
-    fn search<'a>(
-        matcher: &BibleMatcher,
-        input: Self::Input<'a>,
-    ) -> MatchResult<Vec<BibleMatch<Self>>> {
-        let mut filtered = matcher.filter();
-        let text = SearchText::new(input);
-        let index = LineIndex::new(input);
-        let data = matcher.data();
-
-        let starts: Vec<_> = data.books().candidates(text.as_str()).collect();
-        let mut found: Vec<FoundPassage> = starts
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, cur)| {
-                let next_start = starts.get(idx + 1).map(|next| next.start());
-                FoundPassage::find(data, text.as_str(), *cur, next_start)
-            })
-            .collect();
-
-        // References without a book name, when the document's book is known
-        if let Some(context) = matcher.context() {
-            let taken: Vec<_> = found.iter().map(|f| f.bytes.clone()).collect();
-            let book_starts: Vec<_> = starts.iter().map(|s| s.start()).collect();
-            found.extend(context.find_bare(data, text.as_str(), &taken, &book_starts));
-            found.sort_by_key(|f| f.bytes.start);
-        }
-
-        for found in found {
-            let bytes = text.original_range(found.bytes);
-            let location = LineColLocation::new(&index, bytes.start, bytes.end);
-            filtered.try_add(BibleMatch {
-                location,
-                psg: found.psg,
-            });
-        }
-
-        let matches = filtered.matches();
-        Ok(matches)
     }
 }
 

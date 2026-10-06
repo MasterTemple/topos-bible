@@ -1,8 +1,8 @@
-use crate::matcher::{
-    bible_matcher::{BibleMatcher, MatchResult},
-    instance::BibleMatch,
-    location::line_col::LineColLocation,
-};
+use std::path::Path;
+
+use topos_lib::matcher::{BibleMatch, BibleMatcher};
+
+use crate::{Format, FormatError};
 
 #[derive(thiserror::Error, Debug)]
 pub enum EPUBMatchError {
@@ -127,10 +127,21 @@ pub struct CfiLocation {
     pub end_cfi: String,
 }
 
-pub fn search_epub(
-    epub_path: &str,
+impl Format for CfiLocation {
+    type Input<'a> = &'a Path;
+
+    fn search(
+        matcher: &BibleMatcher,
+        input: Self::Input<'_>,
+    ) -> Result<Vec<BibleMatch<Self>>, FormatError> {
+        Ok(search_epub(input, matcher)?)
+    }
+}
+
+fn search_epub(
+    epub_path: &Path,
     matcher: &BibleMatcher,
-) -> MatchResult<Vec<BibleMatch<CfiLocation>>> {
+) -> Result<Vec<BibleMatch<CfiLocation>>, EPUBMatchError> {
     let mut all_matches = Vec::new();
 
     let mut doc =
@@ -146,12 +157,10 @@ pub fn search_epub(
         let base_cfi = format!("/6/{}[{}]", spine_step, spine.idref);
 
         // Get the raw XHTML for this chapter/section
-        let (html_bytes, mime) = doc.get_resource(&spine.idref).ok_or_else(|| {
+        let (html_bytes, _mime) = doc.get_resource(&spine.idref).ok_or_else(|| {
             EPUBMatchError::PackageError(format!("Missing resource {}", spine.idref))
         })?;
 
-        dbg!(&spine.idref);
-        dbg!(&mime);
         let html_content = String::from_utf8_lossy(&html_bytes);
 
         // Map the document
@@ -161,7 +170,7 @@ pub fn search_epub(
         };
 
         // Run your existing matcher
-        let local_results = matcher.search::<LineColLocation>(&mapper.plain_text)?;
+        let local_results = matcher.search(&mapper.plain_text);
 
         // Convert the ByteIndexes to CFIs
         for bible_match in local_results {
@@ -180,11 +189,16 @@ pub fn search_epub(
     Ok(all_matches)
 }
 
-#[test]
-#[ignore = "needs a local EPUB; set TOPOS_EPUB to its path"]
-fn epub_tdp() -> MatchResult<()> {
-    let path = std::env::var("TOPOS_EPUB").expect("TOPOS_EPUB is not set");
-    let matcher = BibleMatcher::default();
-    dbg!(search_epub(&path, &matcher)?);
-    Ok(())
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "needs a local EPUB; set TOPOS_EPUB to its path"]
+    fn epub_tdp() -> Result<(), FormatError> {
+        let path = std::env::var("TOPOS_EPUB").expect("TOPOS_EPUB is not set");
+        let matcher = BibleMatcher::default();
+        dbg!(CfiLocation::search(&matcher, Path::new(&path))?);
+        Ok(())
+    }
 }

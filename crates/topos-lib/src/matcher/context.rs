@@ -90,15 +90,14 @@ impl BookContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::matcher::{BibleMatcher, location::line_col::LineColLocation};
+    use crate::matcher::BibleMatcher;
 
     fn search(context: impl FnOnce(&Books) -> BookContext, input: &str) -> Vec<String> {
         let matcher = BibleMatcher::default();
         let context = context(matcher.data().books());
         let matcher = matcher.with_context(context);
         matcher
-            .search::<LineColLocation>(input)
-            .unwrap()
+            .search(input)
             .into_iter()
             .map(|m| {
                 let book = matcher.data().books().get_name(m.psg.book).unwrap();

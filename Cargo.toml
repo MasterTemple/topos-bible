@@ -1,15 +1,7 @@
 [workspace]
 members = [
     "crates/topos-cli",
-    "crates/topos-lib",
-    "crates/topos-pdf",
-    "crates/topos-py",
-    "crates/topos-ts",
-    "crates/topos-ts-boltffi",
-]
-# topos-pdf needs MuPDF, which does not build everywhere; build it explicitly with `-p topos-pdf`
-default-members = [
-    "crates/topos-cli",
+    "crates/topos-formats",
     "crates/topos-lib",
     "crates/topos-py",
     "crates/topos-ts",

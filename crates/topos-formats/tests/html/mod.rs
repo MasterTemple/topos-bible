@@ -1,7 +1,5 @@
-use topos_lib::{
-    error::AnyResult,
-    matcher::{bible_matcher::BibleMatcher, location::html::HTMLLocation},
-};
+use topos_formats::{SearchFormat, html::HTMLLocation};
+use topos_lib::{error::AnyResult, matcher::BibleMatcher};
 
 /**
 ```js
@@ -19,7 +17,7 @@ goToTextFragment("#:~:text=Rom.%2016:23")
 fn tdp_html() -> AnyResult<()> {
     let html = include_str!("./The Dorean Principle.html");
     let matcher = BibleMatcher::default();
-    let results = matcher.search::<HTMLLocation>(html)?;
+    let results = matcher.search_format::<HTMLLocation>(html)?;
     dbg!(results);
     Ok(())
 }

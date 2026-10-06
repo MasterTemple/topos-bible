@@ -6,27 +6,10 @@ edition = "2024"
 [dependencies]
 derive_more = { version = "2.0.1", features = ["deref", "deref_mut", "from", "into_iterator"] }
 
-# topos-parser = { path = "../topos-parser"}
-# chumsky = "0.10.1"
-chumsky = "0.12.0"
-
 # workspace dependencies
 once_cell = { workspace = true }
 regex = { workspace = true }
 itertools = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-htmloc = { workspace = true }
 thiserror = { workspace = true }
-
-# optional dependencies
-mupdf = { version = "0.4.4", optional = true }
-unicode-normalization = "0.1.25"
-epub = "2.1.5"
-roxmltree = "0.21.1"
-
-[features]
-default = []
-pdf = ["dep:mupdf"]
-
-

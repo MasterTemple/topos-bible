@@ -4,7 +4,7 @@ use regex::Match;
 
 use crate::{
     data::{bible_data::BibleData, books::BookId},
-    matcher::location::line_col::LineColLocation,
+    matcher::line_col::LineColLocation,
     segments::{
         grammar::SegmentList,
         passage::{Passage, Segments},
