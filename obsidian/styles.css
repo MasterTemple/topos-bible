@@ -299,3 +299,10 @@
   width: 100%;
   margin-top: var(--size-4-2);
 }
+.topos-dropdown li.is-add {
+  font-weight: var(--font-semibold);
+  color: var(--text-accent);
+}
+.topos-chip {
+  user-select: none;
+}

@@ -81,6 +81,11 @@ test("the sidebar renders filtered, grouped results", async () => {
   assert.match(saved, /<option value="New" title="-t new" selected="">New<\/option>/);
   assert.match(text(saved), /Delete/);
 
+  // Passage filters narrow the results
+  assert.match(text(render({ overlaps: ["John 3"] }, "file")), /1 reference in 1 note/);
+  assert.match(text(render({ inside: ["John 1-3"] }, "file")), /2 references in 2 notes/);
+  assert.match(text(render({ outside: ["John 1-3"] }, "file")), /2 references in 2 notes.*Romans 8:28/);
+
   const bad = text(render({ books: ["Jhon"] }, "file"));
   assert.match(bad, /Unknown book &quot;Jhon&quot;/);
 });

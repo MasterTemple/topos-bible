@@ -163,3 +163,43 @@ test("applying a completion", () => {
   const [first] = completionsBefore(topos, text, BookStyle.Name, 5, "capitalized");
   assert.equal(applyCompletion(text, first), "see Genesis 1:1");
 });
+
+test("reference inputs list every book, then add or complete what is typed", async () => {
+  // inputs.tsx is JSX; its choice logic is plain TypeScript, so load it through esbuild
+  const { referenceChoices } = await loadInputs();
+  const describe = (value: string) =>
+    referenceChoices(topos, BookStyle.Name, value, value.length).map((c: any) =>
+      c.kind === "add" ? `add ${c.reference}` : c.completion.label,
+    );
+  const books = describe("");
+  assert.equal(books.length, topos.books().length);
+  assert.equal(books[0], "Genesis");
+  // A finished reference is added first; completing it to itself is not offered
+  assert.deepEqual(describe("Romans 8"), ["add Romans 8"]);
+  assert.deepEqual(describe("John 3:16").slice(0, 1), ["add John 3:16"]);
+  assert.equal(describe("John 3:16").includes("John 3:16"), false);
+  // After a delimiter, the next numbers come first
+  const range = describe("John 3:16-");
+  assert.equal(range[0], "John 3:16-17");
+  assert.equal(range.at(-1), "add John 3:16");
+  // Every verse of Psalm 119
+  assert.equal(describe("Ps 119:").filter((c: string) => !c.startsWith("add")).length, 176);
+});
+
+async function loadInputs() {
+  const esbuild = await import("esbuild");
+  const { mkdirSync } = await import("node:fs");
+  const out = new URL("../node_modules/.cache/inputs.mjs", import.meta.url).pathname;
+  mkdirSync(new URL("../node_modules/.cache/", import.meta.url), { recursive: true });
+  await esbuild.build({
+    entryPoints: [new URL("../src/view/inputs.tsx", import.meta.url).pathname],
+    bundle: true,
+    format: "esm",
+    platform: "node",
+    jsx: "automatic",
+    external: ["topos-bible", "react", "react-dom"],
+    outfile: out,
+    logLevel: "silent",
+  });
+  return import(out);
+}

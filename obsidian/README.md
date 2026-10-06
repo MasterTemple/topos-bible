@@ -17,12 +17,17 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
   and how many books they leave, and warns when they contradict each other (OT + Pauline
   Epistles)
 - Filter by passage: **Inside** (entirely within, like `-i`), **Overlapping** (shares a verse,
-  like `-o`), and **Outside** (`--outside`); the inputs autocomplete references
+  like `-o`), and **Outside** (`--outside`), each with as many passages as you like
+- Every filter input lists its options as soon as you click it (every book, then every chapter,
+  then every verse, up to 176), narrowing as you type. In passage inputs, Enter adds a finished
+  reference (`Add "John 3:16"` is the first choice) and Tab completes. Remove a chip with × or a
+  middle-click
 - Sort by order in your notes or order in the Bible; group by note or by book (remembered)
 - **Saved searches**: name the current filters (and folder) with *Save*, pick one from the list,
   or open one with the *Open a saved search* command. Each is stored as the CLI's options, like
   `Sermons --nt -g "Pauline Epistles" -o "John 1"`, which you can also write or edit under
-  *Settings → Saved searches*; the filter panel shows the current filters in that form
+  *Settings → Saved searches*; the filter panel shows the current filters in that form. The same
+  text works as a CLI named query (`~/.config/topos/queries.toml`, `topos -q NAME`)
 - Each result shows its line with the reference highlighted; click to jump there, or ↗ to open
   it in Literal Word
 - Results update as notes change
