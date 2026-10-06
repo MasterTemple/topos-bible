@@ -17,6 +17,9 @@
       "ex",
       "exod",
       "exo"
+    ],
+    "ambiguous": [
+      "ex"
     ]
   },
   {
@@ -27,6 +30,9 @@
       "lev",
       "le",
       "lv"
+    ],
+    "ambiguous": [
+      "le"
     ]
   },
   {
@@ -38,6 +44,10 @@
       "nu",
       "nm",
       "nb"
+    ],
+    "ambiguous": [
+      "num",
+      "nu"
     ]
   },
   {
@@ -49,6 +59,9 @@
       "de",
       "dt",
       "deu"
+    ],
+    "ambiguous": [
+      "de"
     ]
   },
   {
@@ -81,6 +94,9 @@
       "rth",
       "ru",
       "rut"
+    ],
+    "ambiguous": [
+      "ru"
     ]
   },
   {
@@ -232,6 +248,9 @@
       "est",
       "esth",
       "es"
+    ],
+    "ambiguous": [
+      "es"
     ]
   },
   {
@@ -266,6 +285,10 @@
       "pro",
       "prv",
       "pr"
+    ],
+    "ambiguous": [
+      "pro",
+      "pr"
     ]
   },
   {
@@ -278,6 +301,9 @@
       "ecc",
       "ec",
       "qoh"
+    ],
+    "ambiguous": [
+      "ec"
     ]
   },
   {
@@ -295,6 +321,10 @@
       "canticles",
       "cant",
       "sng"
+    ],
+    "ambiguous": [
+      "so",
+      "songs"
     ]
   },
   {
@@ -303,6 +333,9 @@
     "abbreviation": "Is",
     "abbreviations": [
       "isa",
+      "is"
+    ],
+    "ambiguous": [
       "is"
     ]
   },
@@ -322,6 +355,9 @@
     "abbreviation": "Lam",
     "abbreviations": [
       "lam",
+      "la"
+    ],
+    "ambiguous": [
       "la"
     ]
   },
@@ -343,6 +379,9 @@
       "dan",
       "da",
       "dn"
+    ],
+    "ambiguous": [
+      "da"
     ]
   },
   {
@@ -351,6 +390,9 @@
     "abbreviation": "Hos",
     "abbreviations": [
       "hos",
+      "ho"
+    ],
+    "ambiguous": [
       "ho"
     ]
   },
@@ -372,6 +414,9 @@
       "amos",
       "am",
       "amo"
+    ],
+    "ambiguous": [
+      "am"
     ]
   },
   {
@@ -382,6 +427,9 @@
       "obad",
       "ob",
       "oba"
+    ],
+    "ambiguous": [
+      "ob"
     ]
   },
   {
@@ -411,6 +459,9 @@
       "nah",
       "na",
       "nam"
+    ],
+    "ambiguous": [
+      "na"
     ]
   },
   {
@@ -439,6 +490,9 @@
     "abbreviations": [
       "hag",
       "hg"
+    ],
+    "ambiguous": [
+      "hag"
     ]
   },
   {
@@ -469,6 +523,9 @@
       "matth",
       "mt",
       "mat"
+    ],
+    "ambiguous": [
+      "mat"
     ]
   },
   {
@@ -482,6 +539,10 @@
       "mk",
       "mr",
       "mrk"
+    ],
+    "ambiguous": [
+      "mar",
+      "mr"
     ]
   },
   {
@@ -512,6 +573,10 @@
     "abbreviation": "Acts",
     "abbreviations": [
       "acts",
+      "act",
+      "ac"
+    ],
+    "ambiguous": [
       "act",
       "ac"
     ]
@@ -567,6 +632,9 @@
     "abbreviations": [
       "gal",
       "ga"
+    ],
+    "ambiguous": [
+      "ga"
     ]
   },
   {
@@ -592,6 +660,10 @@
     "book": "Colossians",
     "abbreviation": "Col",
     "abbreviations": [
+      "col",
+      "co"
+    ],
+    "ambiguous": [
       "col",
       "co"
     ]
@@ -685,6 +757,9 @@
       "titus",
       "tit",
       "ti"
+    ],
+    "ambiguous": [
+      "ti"
     ]
   },
   {
@@ -694,6 +769,9 @@
     "abbreviations": [
       "philem",
       "phm",
+      "pm"
+    ],
+    "ambiguous": [
       "pm"
     ]
   },
@@ -849,6 +927,9 @@
       "rev",
       "re",
       "the revelation"
+    ],
+    "ambiguous": [
+      "re"
     ]
   }
 ]

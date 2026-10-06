@@ -41,6 +41,10 @@ impl Iterator for Lexer<'_> {
         let rest = &self.input[self.pos..];
         let trimmed = rest.trim_start();
         let start = self.pos + (rest.len() - trimmed.len());
+        // A blank line (like between paragraphs or subtitle cues) ends a reference
+        if self.input[self.pos..start].matches('\n').count() >= 2 {
+            return None;
+        }
         let c = trimmed.chars().next()?;
 
         let (token, len) = if let Some(kind) = DelimiterKind::from_char(c) {
@@ -77,13 +81,17 @@ fn lex_decimal(s: &str, start: usize) -> Option<(Number, usize)> {
     }
     let value: u8 = s[..digits].parse().ok()?;
 
-    // Only take a subverse letter when it is not the start of a word (`16a` but not `16and`)
+    // A subverse letter must end the word (`16a`)
     let after = &s[digits..];
     let subverse = after
         .chars()
         .next()
         .filter(|c| SUBVERSE.contains(*c) && at_boundary(&after[1..]));
     let len = digits + subverse.map_or(0, char::len_utf8);
+    // Otherwise a number must end the word, so `GA9hNK` is not Galatians 9
+    if !at_boundary(&s[len..]) {
+        return None;
+    }
 
     let number = Number {
         value,
@@ -134,8 +142,13 @@ mod tests {
     fn stops_at_invalid_input() {
         // more than 3 digits
         assert_eq!(kinds("3, 2025"), ["3", ","]);
-        // not a word boundary after the subverse
-        assert_eq!(kinds("16and"), ["16"]);
+        // numbers must end the word
+        assert_eq!(kinds("16and"), Vec::<String>::new());
+        assert_eq!(kinds("9hNKdqbH"), Vec::<String>::new());
+        assert_eq!(kinds("16a, 17"), ["16", ",", "17"]);
+        // a blank line ends the reference
+        assert_eq!(kinds("6, 24.\n\n143"), ["6", ",", "24", "."]);
+        assert_eq!(kinds("6,\n24"), ["6", ",", "24"]);
         // all Roman numeral letters, but not a canonical numeral
         assert_eq!(kinds("8, civil"), ["8", ","]);
         // Roman numerals must be a whole word

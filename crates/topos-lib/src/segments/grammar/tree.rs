@@ -140,6 +140,16 @@ impl SegmentNode {
         Some((end, end_verse))
     }
 
+    /// This node with only its first `keep` parts (`1:2-3:4` keeping 1 is `1:2`)
+    pub fn truncated(&self, keep: usize) -> Self {
+        let mut node = *self;
+        let parts = [&mut node.start_verse, &mut node.end, &mut node.end_verse];
+        for part in parts.into_iter().filter(|p| p.is_some()).skip(keep) {
+            *part = None;
+        }
+        node
+    }
+
     /// End of the last token, including a dangling delimiter
     pub fn end(&self) -> usize {
         self.parts().last().map_or(self.start.span.end, Part::end)

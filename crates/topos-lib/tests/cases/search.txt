@@ -56,3 +56,18 @@ Song of Songs 2:1 => Song of Solomon 2:1
 # Roman numerals and words
 Romans 8:28, civil => Romans 8:28
 John 3:16, I think => John 3:16
+
+# False positives from issue #3
+is 1 of the reasons => 
+something (Is 1:1) => Isaiah 1:1
+Isa 53 => Isaiah 53
+AM 1 Samuel 3 => 1 Samuel 3
++GA9hNKdqbH => 
+Matthew 10:8 and more => Matthew 10:8
+Matt. 9:37-38; cf. Luke 10:2 => Matthew 9:37-38 | Luke 10:2
+In 2 Corinthians 9, Paul says => 2 Corinthians 9
+Mar. 1995 => 
+the mar 5 sale => 
+Mark 5 => Mark 5
+# Spoken transcripts say "Luke 16, 13" for 16:13; written text means chapters 16 and 13
+?Luke 16, 13. Conclusion => Luke 16:13

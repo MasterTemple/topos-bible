@@ -112,9 +112,18 @@ impl BibleMatch {
         let list = SegmentList::parse(segment_window);
         let versification = data.chapter_verses().get_chapter_verses(&book_id);
         let resolved = Resolver::for_book(versification).resolve(&list.nodes);
-        // Only the segments that resolved are part of the match
-        let last = resolved.used.checked_sub(1)?;
-        let end = cur.end() + list.nodes[last].complete_end();
+        if resolved.used == 0 {
+            return None;
+        }
+        // Abbreviations that are also words (`is`) need an explicit verse (`Is 1:1`)
+        let has_verse = list.nodes[..resolved.used]
+            .iter()
+            .any(|node| node.start_verse.is_some());
+        if !has_verse && data.books().is_ambiguous(cur.as_str()) {
+            return None;
+        }
+        // Only the text that resolved is part of the match
+        let end = cur.end() + resolved.end;
         let location = LineColLocation::new(lookup, cur.start(), end);
         let segments = resolved.segments;
 

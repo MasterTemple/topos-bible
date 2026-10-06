@@ -64,23 +64,10 @@ impl Matcher for LineColLocation {
         let mut prev: Option<Match<'_>> = None;
         let lookup = LineColLookup::new(input);
         // basically execute behind by 1 iteration (so I can see the start of the next match)
-        for cur in matcher
-            .data()
-            .books()
-            .candidate_regex()
-            .captures_iter(input)
-        {
-            // this is just the book name
-            let cur = cur.get(1).unwrap();
+        for cur in matcher.data().books().candidates(input) {
             if let Some(prev) = prev
-                && let Some(m) = BibleMatch::try_match(
-                    &lookup,
-                    // self.data.as_ref(),
-                    matcher.data(),
-                    input,
-                    prev,
-                    Some(cur.start()),
-                )
+                && let Some(m) =
+                    BibleMatch::try_match(&lookup, matcher.data(), input, prev, Some(cur.start()))
             {
                 filtered.try_add(m);
             }
@@ -96,28 +83,5 @@ impl Matcher for LineColLocation {
 
         let matches = filtered.matches();
         Ok(matches)
-    }
-
-    fn find<'a>(matcher: &BibleMatcher, input: Self::Input<'a>) -> Option<BibleMatch<Self>> {
-        let mut filtered = matcher.filter();
-        let lookup = LineColLookup::new(input);
-
-        let first = matcher
-            .data()
-            .books()
-            .candidate_regex()
-            .captures_iter(input)
-            .next()?
-            .get(1)?;
-
-        filtered.try_add(BibleMatch::try_match(
-            &lookup,
-            matcher.data(),
-            input,
-            first,
-            None,
-        )?);
-
-        filtered.matches().into_iter().next()
     }
 }

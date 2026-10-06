@@ -50,6 +50,12 @@ fn check_search(input: &str) {
         let bytes = m.location.bytes;
         check_span(input, bytes.start, bytes.end);
         assert!(bytes.start < bytes.end);
+        // A match ends on its last number, never on whitespace or a delimiter
+        let last = input[..bytes.end].chars().next_back().unwrap();
+        assert!(
+            last.is_alphanumeric(),
+            "match ends with {last:?} in {input:?}"
+        );
         assert!(!m.psg.segments.is_empty());
     }
 }

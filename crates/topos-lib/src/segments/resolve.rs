@@ -25,11 +25,14 @@ pub struct Resolver<'a> {
     versification: Option<&'a ChapterVerses>,
 }
 
-/// The resolved segments, and how many nodes they came from (the rest were rejected)
+/// The resolved segments, and what part of the input they came from
 #[derive(Clone, Debug)]
 pub struct Resolved {
     pub segments: Segments,
+    /// How many nodes were used (the last one possibly shortened)
     pub used: usize,
+    /// Byte offset where the accepted text ends (0 when nothing was accepted)
+    pub end: usize,
 }
 
 impl<'a> Resolver<'a> {
@@ -38,26 +41,48 @@ impl<'a> Resolver<'a> {
         Self { versification }
     }
 
+    /**
+    Resolves nodes until one cannot be resolved
+    - A node that does not exist is retried without a trailing part that starts with `.`, so in
+      `Matthew 6, 24.\n143` the `.143` is dropped and `24` is kept (but `John 3:37` is rejected)
+    - Nothing after a shortened node is used
+    */
     pub fn resolve(&self, nodes: &[SegmentNode]) -> Resolved {
         let mut segments = Segments::new();
-        let mut prev_node: Option<&SegmentNode> = None;
+        let mut prev_node: Option<SegmentNode> = None;
         let mut used = 0;
+        let mut end = 0;
         for node in nodes {
-            let Some(segment) = self.resolve_node(node, prev_node, segments.last()) else {
+            // Only a `.` can be dropped, since it may end a sentence rather than start a verse
+            let parts: Vec<_> = node.parts().collect();
+            let keeps = (0..parts.len())
+                .rev()
+                .filter(|&keep| parts[keep].delimiter.actual == '.');
+            let accepted = std::iter::once(parts.len()).chain(keeps).find_map(|keep| {
+                let node = node.truncated(keep);
+                let segment = self.resolve_node(&node, prev_node.as_ref(), segments.last())?;
+                self.exists(&segment).then_some((node, segment))
+            });
+            let Some((accepted, segment)) = accepted else {
                 break;
             };
-            if !self.exists(&segment) {
-                break;
-            }
             // In `x, 8` the comma separates chapter and verse, so `10:8` replaces `10`
-            if is_old_style(node, prev_node) {
+            if is_old_style(&accepted, prev_node.as_ref()) {
                 segments.pop();
             }
             segments.push(segment);
-            prev_node = Some(node);
             used += 1;
+            end = accepted.complete_end();
+            if accepted != *node {
+                break;
+            }
+            prev_node = Some(accepted);
         }
-        Resolved { segments, used }
+        Resolved {
+            segments,
+            used,
+            end,
+        }
     }
 
     fn single_chapter(&self) -> bool {
@@ -232,6 +257,15 @@ mod tests {
         assert_eq!(resolve(Some(65), "5-8"), "1:5-8");
         assert_eq!(resolve(Some(65), "5, 7"), "1:5, 1:7");
         assert_eq!(resolve(Some(65), "1:5"), "1:5");
+    }
+
+    #[test]
+    fn shortens_nodes_that_do_not_exist() {
+        // Matthew 24 has 51 verses
+        assert_eq!(resolve(Some(40), "6, 24.143"), "6, 24");
+        assert_eq!(resolve(Some(43), "3.16-99"), "3");
+        assert_eq!(resolve(Some(43), "3:16-99"), "");
+        assert_eq!(resolve(Some(43), "3:16, 4.99"), "3:16, 3:4");
     }
 
     #[test]
