@@ -531,14 +531,16 @@ impl Topos {
         Ok(self.filter(query)?.contradiction())
     }
 
-    /// The first reference in `text`, read as one reference (`Jn 3:16` or `John.3.16`)
+    /// The first reference in `text`, read as one reference (`Jn 3:16` or `John.3.16`), the
+    /// way search reads it: `Jude 5` is verse 5, and a reference that doesn't exist is `None`
     pub fn parse(&self, reference: String, style: BookStyle) -> Option<Passage> {
-        let books = self.matcher.data().books();
+        let data = self.matcher.data();
         // OSIS first: as plain text, `John.3.16-John.3.18` would read as just John 3:16
-        let passage = books
+        let passage = data
+            .books()
             .parse_osis(&reference)
             .ok()
-            .or_else(|| books.parse(&reference))?;
+            .or_else(|| data.parse(&reference))?;
         self.passage(&passage, &self.format_with(style))
     }
 
@@ -960,6 +962,19 @@ impl<'a> Offsets<'a> {
 #[cfg(test)]
 mod tests {
 
+    #[test]
+    fn parses_like_search() {
+        let topos = Topos::new();
+        let jude = topos.parse("Jude 5".into(), BookStyle::Name).unwrap();
+        assert_eq!(jude.reference, "Jude 1:5");
+        assert_eq!(topos.parse("John 3:99".into(), BookStyle::Name), None);
+        let chapter = ToposFormat::create().chapter_in_single_chapter_books(false);
+        assert_eq!(
+            topos.format_passage(jude, &chapter).as_deref(),
+            Some("Jude 5")
+        );
+    }
+
     /// The shared completion cases (topos-lib's tests/cases/complete.txt), through the bindings
     /// (UTF-16 offsets, as JavaScript and Kotlin use)
     #[test]
@@ -1256,7 +1271,9 @@ mod tests {
             topos.verses(parse("John 3:35-4:1")),
             [cv(3, 35), cv(3, 36), cv(4, 1)]
         );
-        assert_eq!(topos.verses(parse("Jude 1")).len(), 25);
+        // In a single-chapter book a bare number is a verse, as in search
+        assert_eq!(topos.verses(parse("Jude 1")).len(), 1);
+        assert_eq!(topos.verses(parse("Jude 1:1-25")).len(), 25);
 
         assert!(topos.contains(parse("John 3"), parse("John 3:16-18")));
         assert!(!topos.contains(parse("John 3:16"), parse("John 3:16-17")));

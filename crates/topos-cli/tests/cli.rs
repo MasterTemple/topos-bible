@@ -934,3 +934,21 @@ fn completion_cases() {
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+/// A single-chapter book's number is a verse in filters too (`-o "Jude 5"` is Jude 1:5)
+#[test]
+fn single_chapter_books_in_filters() {
+    let run = |args: &[&str]| {
+        let mut all = vec![
+            "--no-config",
+            "--text",
+            "Jude 5, Jude 1:6",
+            "-m",
+            "quickfix",
+        ];
+        all.extend(args);
+        stdout(&topos(&all, None))
+    };
+    assert_eq!(run(&["-o", "Jude 5"]), ":1:1: Jude 1:5\n");
+    assert_eq!(run(&["--exact-overlap", "Jude 6"]), ":1:9: Jude 1:6\n");
+}

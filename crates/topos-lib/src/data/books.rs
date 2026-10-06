@@ -233,6 +233,18 @@ impl Books {
         })
     }
 
+    /// The book and the text of its chapters and verses in the first reference of `input`
+    pub(crate) fn split_reference<'a>(&self, input: &'a str) -> Option<(BookId, &'a str)> {
+        let m = self.regexes.passage.captures_iter(input).next()?;
+        let book = self.search(m.get(1)?.as_str())?;
+        Some((book, m.get(2)?.as_str()))
+    }
+
+    /**
+    The first reference in `input`, without the book's chapter and verse counts, so a number in
+    a single-chapter book is read as a chapter (`Jude 5` is chapter 5) and references that don't
+    exist are accepted; prefer [`BibleData::parse`](crate::data::bible_data::BibleData::parse)
+    */
     pub fn parse(&self, input: &str) -> Option<Passage> {
         let m = &self.regexes.passage.captures_iter(input).next()?;
         let book = m.get(1)?.as_str();

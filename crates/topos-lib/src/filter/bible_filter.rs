@@ -256,7 +256,6 @@ impl BibleFilter {
 
     fn parse_passage(&self, passage: &str) -> ToposResult<Passage> {
         self.data
-            .books()
             .parse(passage)
             .ok_or_else(|| ToposError::InvalidPassage(passage.to_string()))
     }

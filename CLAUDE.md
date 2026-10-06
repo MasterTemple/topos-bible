@@ -30,6 +30,7 @@ Crates are named by package (folder in parentheses); `topos-bible`, `topos-bible
 - False-positive rules (book candidates, `FoundPassage::find`): candidates don't consume the chapter, ambiguous abbreviations (marked `ambiguous` in `default_books.json`) need an explicit verse, there are no candidates inside runs of 64+ characters without whitespace, a book glued to its chapter needs a verse, and the book name's casing must be plausible. Test new rules against a real corpus (diff old and new output), not only unit tests.
 - Quantities aren't references: a reference that runs into `5%`, `39pt` or `1.5°` is dropped. Ambiguous abbreviations need a `:` verse (or a `.` verse after `Is.`).
 - Performance: keep the candidate regex on `find_iter` with ASCII `(?-u:\b)`. Capture groups or Unicode `\b` made it about 30× slower.
+- Parse a single reference with `BibleData::parse`, which resolves with versification like search (`Jude 5` is verse 5; `John 3:99` is `None`); `Books::parse` doesn't know chapter counts. Filters and the FFI's `parse` use it.
 - Line and column positions are 1-based, with byte, char, and UTF-16 columns (`LineIndex`). Byte offsets are the source of truth.
 - Errors: `ToposError` in the core, `FormatError` in formats. No `unwrap` in library code.
 - `Cargo.lock` is gitignored. Commit messages end with a `Co-Authored-By` line.

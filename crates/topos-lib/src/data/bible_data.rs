@@ -7,6 +7,7 @@ use crate::{
         genres::{Genres, GenresInput},
     },
     error::ToposResult,
+    segments::{Passage, grammar::SegmentList, resolve::Resolver},
 };
 
 #[derive(Clone, Debug, Default)]
@@ -54,6 +55,19 @@ impl BibleData {
         })
     }
 
+    /**
+    One reference, like `jn 3:16-18` or `Jude 5`, resolved with the book's chapters and verses
+    the way search does: `Jude 5` is verse 5 (Jude has one chapter), and a reference that doesn't
+    exist (`John 3:99`) is [`None`]; parts after one that doesn't exist are ignored, like search
+    */
+    pub fn parse(&self, input: &str) -> Option<Passage> {
+        let (book, segments) = self.books.split_reference(input)?;
+        let list = SegmentList::parse(segments);
+        let versification = self.chapter_verses.get_chapter_verses(&book);
+        let resolved = Resolver::for_book(versification).resolve(&list.nodes);
+        (!resolved.segments.is_empty()).then(|| resolved.segments.with_book(book))
+    }
+
     pub fn books(&self) -> &Books {
         &self.books
     }
@@ -69,6 +83,27 @@ impl BibleData {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn parses_like_search() {
+        let data = BibleData::default();
+        let parse = |input: &str| {
+            let passage = data.parse(input)?;
+            Some(format!(
+                "{} {}",
+                data.books().get_name(passage.book)?,
+                passage.segments
+            ))
+        };
+        // A single-chapter book's number is a verse
+        assert_eq!(parse("Jude 5").as_deref(), Some("Jude 1:5"));
+        assert_eq!(parse("jn 3:16-18").as_deref(), Some("John 3:16-18"));
+        assert_eq!(parse("John 3").as_deref(), Some("John 3"));
+        // Like search, references that don't exist aren't references
+        assert_eq!(parse("John 3:99"), None);
+        assert_eq!(parse("John 3:16, 4:99").as_deref(), Some("John 3:16"));
+        assert_eq!(parse("not a reference"), None);
+    }
+
     use super::*;
 
     #[test]
