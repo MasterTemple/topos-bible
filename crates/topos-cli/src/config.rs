@@ -109,6 +109,9 @@ pub fn with_defaults(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
         .collect())
 }
 
+/// Settings only the language server uses (it reads this file too), which the CLI skips
+const LSP_KEYS: [&str; 3] = ["inlay-hints", "reference-diagnostics", "hover"];
+
 /// Turns the TOML table into command line arguments
 fn parse(text: &str) -> Result<Vec<OsString>, String> {
     let table: toml::Table = text.parse().map_err(|e: toml::de::Error| e.to_string())?;
@@ -116,6 +119,9 @@ fn parse(text: &str) -> Result<Vec<OsString>, String> {
     let mut args = vec![];
     for (key, value) in table {
         let given = key.replace('_', "-");
+        if LSP_KEYS.contains(&given.as_str()) {
+            continue;
+        }
         // Old names (aliases like `overlaps` and `outside`) still work
         let name = command
             .get_arguments()
@@ -208,5 +214,11 @@ mod tests {
         assert!(parse("config = \"other.toml\"").is_err());
         assert!(parse("mode = [1.5]").is_err());
         assert!(parse("not toml").is_err());
+    }
+
+    #[test]
+    fn skips_language_server_settings() {
+        let text = "hover = [\"osis\"]\ninlay_hints = \"never\"\nreference-diagnostics = \"hint\"\nmode = \"json\"";
+        assert_eq!(parse(text).unwrap(), ["--mode", "json"]);
     }
 }

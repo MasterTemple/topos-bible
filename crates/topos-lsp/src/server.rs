@@ -14,7 +14,7 @@ use lsp_types::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use topos_bible::{
-    filter::bible_filter::BibleFilter,
+    filter::{bible_filter::BibleFilter, filters::testament::TestamentFilter},
     matcher::{BibleMatch, BibleMatcher, LineIndex},
     segments::{
         Passage,
@@ -24,7 +24,7 @@ use topos_bible::{
 };
 
 use crate::{
-    settings::{self, Configured, InlayHints, ReferenceDiagnostics},
+    settings::{self, Configured, HoverField, InlayHints, ReferenceDiagnostics},
     workspace,
 };
 
@@ -91,6 +91,8 @@ pub struct Server {
     format: FormatOptions,
     inlay_hints: InlayHints,
     reference_diagnostics: ReferenceDiagnostics,
+    /// What the hover shows below the reference
+    hover: Vec<HoverField>,
     /// Extensions searched in the workspace (empty for every text file)
     extensions: Vec<String>,
     documents: HashMap<Uri, String>,
@@ -109,6 +111,7 @@ impl Server {
             format: FormatOptions::default(),
             inlay_hints: InlayHints::default(),
             reference_diagnostics: ReferenceDiagnostics::default(),
+            hover: HoverField::DEFAULT.to_vec(),
             extensions: vec![],
             documents: HashMap::new(),
             roots: vec![],
@@ -134,12 +137,14 @@ impl Server {
             format,
             inlay_hints,
             reference_diagnostics,
+            hover,
             extensions,
         } = settings::settings(config, &editor)?.configure()?;
         self.matcher = matcher;
         self.format = format;
         self.inlay_hints = inlay_hints;
         self.reference_diagnostics = reference_diagnostics;
+        self.hover = hover;
         self.extensions = extensions;
         self.editor = editor;
         // New data can change what every file contains
@@ -322,25 +327,160 @@ impl Server {
         Some((found, index))
     }
 
-    /// The reference under the cursor, normalized, with its OSIS id; or, on a reference that
-    /// doesn't exist, what does (`John 3 has 36 verses`)
+    /// The reference under the cursor, normalized, with what the `hover` setting lists about it
+    /// (its OSIS id, book, genres, ...); or, on a reference that doesn't exist, what does
+    /// (`John 3 has 36 verses`)
     pub fn hover(&self, params: HoverParams) -> Option<Hover> {
         let position = params.text_document_position_params;
-        if let Some(hover) = self.problem_hover(&position.text_document.uri, position.position) {
+        let uri = &position.text_document.uri;
+        if let Some(hover) = self.problem_hover(uri, position.position) {
             return Some(hover);
         }
-        let (found, index) = self.reference_at(&position.text_document.uri, position.position)?;
+        let (found, index) = self.reference_at(uri, position.position)?;
         let bytes = found.location.bytes;
-        let osis = found
-            .psg
-            .to_osis(self.matcher.data().books())
+        let written = self
+            .documents
+            .get(uri)
+            .and_then(|text| text.get(bytes.start..bytes.end))
             .unwrap_or_default();
+        let title = self.reference(&found);
+        let mut value = format!("**{title}**");
+        let lines: Vec<String> = self
+            .hover
+            .iter()
+            .filter_map(|&field| {
+                let (label, detail) = self.hover_line(field, &found, written)?;
+                // The full name or abbreviation is left out when it is the title already
+                let repeats =
+                    matches!(field, HoverField::Name | HoverField::Abbreviation) && detail == title;
+                (!repeats).then(|| format!("- **{label}**: {detail}"))
+            })
+            .collect();
+        if !lines.is_empty() {
+            value.push_str("\n\n");
+            value.push_str(&lines.join("\n"));
+        }
         Some(Hover {
             contents: HoverContents::Markup(MarkupContent {
                 kind: MarkupKind::Markdown,
-                value: format!("**{}**\n\nOSIS: `{osis}`", self.reference(&found)),
+                value,
             }),
             range: Some(lsp_range(&index, bytes.start, bytes.end)),
+        })
+    }
+
+    /// One hover line's label and text, or [`None`] when there is nothing to say
+    fn hover_line(
+        &self,
+        field: HoverField,
+        found: &BibleMatch,
+        written: &str,
+    ) -> Option<(&'static str, String)> {
+        let data = self.matcher.data();
+        let psg = &found.psg;
+        let styled = |book| {
+            FormatOptions {
+                book,
+                ..self.format.clone()
+            }
+            .passage(psg, data)
+        };
+        let versification = data.chapter_verses().get_chapter_verses(&psg.book);
+        Some(match field {
+            HoverField::Written => ("Written", format!("`{written}`")),
+            HoverField::Name => ("Name", styled(BookStyle::Name)?),
+            HoverField::Abbreviation => ("Abbreviation", styled(BookStyle::Abbreviation)?),
+            HoverField::Osis => ("OSIS", format!("`{}`", psg.to_osis(data.books())?)),
+            HoverField::Book => {
+                let name = data.books().get_name(psg.book)?;
+                let books = data.books().ids().count();
+                let mut detail = format!("{name}, book {} of {books}", psg.book.0);
+                if let Some(chapters) = versification.map(|v| v.get_chapter_count()) {
+                    let plural = if chapters == 1 { "" } else { "s" };
+                    detail.push_str(&format!(", {chapters} chapter{plural}"));
+                }
+                ("Book", detail)
+            }
+            HoverField::Testament => {
+                let testament = if TestamentFilter::Old.contains(psg.book) {
+                    "Old Testament"
+                } else if TestamentFilter::New.contains(psg.book) {
+                    "New Testament"
+                } else {
+                    return None;
+                };
+                ("Testament", testament.to_string())
+            }
+            HoverField::Genres => {
+                let genres: Vec<&str> = data
+                    .genres()
+                    .iter()
+                    .filter(|genre| genre.books().contains(&psg.book))
+                    .map(|genre| genre.name())
+                    .collect();
+                let label = if genres.len() == 1 { "Genre" } else { "Genres" };
+                (label, (!genres.is_empty()).then(|| genres.join(", "))?)
+            }
+            HoverField::Verses => {
+                let mut verses = psg.verses(versification);
+                verses.sort();
+                verses.dedup();
+                let ranges: Vec<String> = psg
+                    .ranges(versification)
+                    .iter()
+                    .map(|range| {
+                        let (start, end) = (range.start, range.end);
+                        let cv = &self.format.chapter_verse;
+                        let to = &self.format.range;
+                        if end.verse == 0 {
+                            start.chapter.to_string()
+                        } else if start == end {
+                            format!("{}{cv}{}", start.chapter, start.verse)
+                        } else if start.chapter == end.chapter {
+                            format!("{}{cv}{}{to}{}", start.chapter, start.verse, end.verse)
+                        } else {
+                            format!(
+                                "{}{cv}{}{to}{}{cv}{}",
+                                start.chapter, start.verse, end.chapter, end.verse
+                            )
+                        }
+                    })
+                    .collect();
+                let count = if verses.is_empty() {
+                    String::from("?")
+                } else {
+                    verses.len().to_string()
+                };
+                (
+                    "Verses",
+                    format!("{count} ({})", ranges.join(&self.format.chapter_separator)),
+                )
+            }
+            HoverField::Bcv => {
+                let keys: Vec<String> = psg
+                    .bcv_ranges()
+                    .into_iter()
+                    .map(|range| match range.start() == range.end() {
+                        true => format!("`{}`", range.start()),
+                        false => format!("`{}-{}`", range.start(), range.end()),
+                    })
+                    .collect();
+                ("BCV", keys.join(", "))
+            }
+            HoverField::Location => {
+                let (start, end) = (found.location.start, found.location.end);
+                // Columns are 1-based characters; the end is the last character's
+                let last = end.char_column.saturating_sub(1).max(1);
+                let detail = if start.line == end.line {
+                    format!("line {}, columns {}-{last}", start.line, start.char_column)
+                } else {
+                    format!(
+                        "line {}, column {} to line {}, column {last}",
+                        start.line, start.char_column, end.line
+                    )
+                };
+                ("Location", detail)
+            }
         })
     }
 
@@ -626,6 +766,8 @@ mod tests {
         PartialResultParams, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams,
         WorkDoneProgressParams,
     };
+
+    use serde_json::json;
 
     use super::*;
 
@@ -1091,7 +1233,17 @@ mod tests {
         let HoverContents::Markup(markup) = hover.contents else {
             panic!("no markup");
         };
-        assert_eq!(markup.value, "**Romans 8:28**\n\nOSIS: `Rom.8.28`");
+        assert_eq!(
+            markup.value,
+            "**Romans 8:28**\n\n\
+             - **Abbreviation**: Rom 8:28\n\
+             - **OSIS**: `Rom.8.28`\n\
+             - **Book**: Romans, book 45 of 66, 16 chapters\n\
+             - **Testament**: New Testament\n\
+             - **Genres**: Pauline Epistles, Epistles\n\
+             - **Verses**: 1 (8:28)\n\
+             - **Location**: line 1, columns 5-12"
+        );
         assert_eq!(
             hover.range,
             Some(Range::new(Position::new(0, 4), Position::new(0, 12)))
@@ -1108,5 +1260,41 @@ mod tests {
         };
         let names: Vec<_> = symbols.iter().map(|s| s.name.as_str()).collect();
         assert_eq!(names, ["Romans 8:28", "Jude 1:5"]);
+    }
+
+    /// The `hover` setting picks the lines and their order; a full name that is the title already
+    /// is left out
+    #[test]
+    fn hover_lines_follow_the_setting() {
+        let hover = |text: &str, settings: Value| {
+            let (mut server, uri) = server(text);
+            server.configure(settings).unwrap();
+            let hover = server
+                .hover(HoverParams {
+                    text_document_position_params: at(&uri, 0, 1),
+                    work_done_progress_params: WorkDoneProgressParams::default(),
+                })
+                .unwrap();
+            let HoverContents::Markup(markup) = hover.contents else {
+                panic!("no markup");
+            };
+            markup.value
+        };
+        let settings = json!({ "no-config": true, "hover": "written,name,bcv,verses", "format": "abbreviation" });
+        assert_eq!(
+            hover("jn 3; 4:1-2", settings),
+            "**Jn 3; 4:1-2**\n\n\
+             - **Written**: `jn 3; 4:1-2`\n\
+             - **Name**: John 3; 4:1-2\n\
+             - **BCV**: `43003001-43003999`, `43004001-43004002`\n\
+             - **Verses**: 38 (3:1-36; 4:1-2)"
+        );
+        let settings = json!({ "no-config": true, "hover": ["name", "testament"] });
+        assert_eq!(
+            hover("Gen 1:1", settings),
+            "**Genesis 1:1**\n\n- **Testament**: Old Testament"
+        );
+        let settings = json!({ "no-config": true, "hover": [] });
+        assert_eq!(hover("Gen 1:1", settings), "**Genesis 1:1**");
     }
 }

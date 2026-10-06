@@ -37,7 +37,9 @@ Building needs Rust (https://rustup.rs). If the binaries are missing,
     -- CLI's keys), like { format = 'abbreviation',
     --   ['psg-fmt'] = { join_adjacent = true }, ext = 'md,txt',
     --   ['inlay-hints'] = 'changed' | 'always' | 'osis' | 'never',
-    --   ['reference-diagnostics'] = 'info' | 'hint' | 'never' }
+    --   ['reference-diagnostics'] = 'info' | 'hint' | 'never',
+    --   hover = { 'name', 'abbreviation', 'osis', 'book', 'testament',
+    --             'genres', 'verses', 'location', 'written', 'bcv' } }
     settings = {},
     lsp = {
       enabled = true,
@@ -121,7 +123,10 @@ reference in the workspace that is exactly the one under the cursor. The code
 actions (|gra|) reformat it the way completion writes it (or every reference
 in the file), or search for it by explicit overlap, any overlap, exact
 overlap, or inside it, opening the results like the commands do. Hovering a
-reference that doesn't exist says what does (`John 3 has 36 verses`). Each reference has an
+reference shows its full name, abbreviation, OSIS id, book, testament, genres,
+verses, and where it is (`settings.hover` picks which, and their order: the
+default is every one but `written` and `bcv`); hovering a reference that
+doesn't exist says what does (`John 3 has 36 verses`). Each reference has an
 information diagnostic with how it's written in your format (`John 3:16`);
 references that don't exist get a warning. Inlay
 hints show the formatted reference where it's written differently.

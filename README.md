@@ -39,6 +39,7 @@ Telescope pickers. With [lazy.nvim](https://lazy.folke.io):
       ['psg-fmt'] = { join_adjacent = true }, -- 3:16-18, not 3:16,17,18
       ['reference-diagnostics'] = 'hint',     -- 'info' (default), 'hint', or 'never'
       ['inlay-hints'] = 'never',              -- 'changed' (default), 'always', 'osis', 'never'
+      hover = { 'osis', 'book', 'genres' },   -- also name, abbreviation, testament, verses, location, written, bcv
       ext = 'md,txt',                         -- what references and searches cover
     },
   },

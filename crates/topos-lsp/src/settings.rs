@@ -45,6 +45,48 @@ pub enum ReferenceDiagnostics {
     Never,
 }
 
+/// A line in the hover, in the order the `hover` setting lists them
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum HoverField {
+    /// The reference as written in the text: `jn 3:16`
+    Written,
+    /// With the book's full name: `John 3:16`
+    Name,
+    /// With the book's abbreviation: `Jn 3:16`
+    #[serde(alias = "abbrev")]
+    Abbreviation,
+    /// The OSIS id: `John.3.16`
+    Osis,
+    /// The book: its name, its number, and how many chapters it has
+    Book,
+    /// Old or New Testament
+    Testament,
+    /// The genres the book is in: `Gospels, Gospels And Acts`
+    #[serde(alias = "genre")]
+    Genres,
+    /// How many verses the reference covers, and which: `36 (3:1-36)`
+    Verses,
+    /// Integer keys (`book * 1_000_000 + chapter * 1_000 + verse`): `43003016`
+    Bcv,
+    /// Where the reference is in the document: line and columns
+    Location,
+}
+
+impl HoverField {
+    /// What the hover shows by default
+    pub const DEFAULT: [HoverField; 8] = [
+        HoverField::Name,
+        HoverField::Abbreviation,
+        HoverField::Osis,
+        HoverField::Book,
+        HoverField::Testament,
+        HoverField::Genres,
+        HoverField::Verses,
+        HoverField::Location,
+    ];
+}
+
 /// One value or a list (`merge-data = "a.json"` or `["a.json", "b.json"]`)
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(untagged)]
@@ -96,6 +138,8 @@ pub struct Settings {
     pub ext: OneOrMany,
     pub inlay_hints: InlayHints,
     pub reference_diagnostics: ReferenceDiagnostics,
+    /// What the hover shows below the reference (`"osis,book"` or a list; `[]` for none)
+    pub hover: Option<OneOrMany>,
     /// Read this config file instead of `~/.config/topos/config.toml`
     pub config: Option<String>,
     /// Don't read a config file
@@ -108,6 +152,7 @@ pub struct Configured {
     pub format: FormatOptions,
     pub inlay_hints: InlayHints,
     pub reference_diagnostics: ReferenceDiagnostics,
+    pub hover: Vec<HoverField>,
     pub extensions: Vec<String>,
 }
 
@@ -257,6 +302,20 @@ impl Settings {
             .map(|ext| ext.trim().trim_start_matches('.').to_ascii_lowercase())
             .filter(|ext| !ext.is_empty())
             .collect();
+        let hover = match &self.hover {
+            None => HoverField::DEFAULT.to_vec(),
+            Some(fields) => fields
+                .values()
+                .iter()
+                .flat_map(|field| field.split(','))
+                .map(str::trim)
+                .filter(|field| !field.is_empty())
+                .map(|field| {
+                    serde_json::from_value(Value::String(field.to_ascii_lowercase()))
+                        .map_err(|_| format!("hover: unknown field `{field}`"))
+                })
+                .collect::<Result<_, _>>()?,
+        };
         Ok(Configured {
             matcher: match context {
                 Some(context) => matcher.with_context(context),
@@ -265,6 +324,7 @@ impl Settings {
             format: self.format_options(),
             inlay_hints: self.inlay_hints,
             reference_diagnostics: self.reference_diagnostics,
+            hover,
             extensions,
         })
     }
@@ -316,5 +376,19 @@ mod tests {
         let table: toml::Table = "inlay-hints = \"sometimes\"".parse().unwrap();
         let config = normalize(serde_json::to_value(table).unwrap());
         assert!(super::settings(config, &Map::new()).is_err());
+    }
+
+    #[test]
+    fn hover_fields() {
+        let default = parse("", json!({})).configure().unwrap().hover;
+        assert_eq!(default, HoverField::DEFAULT);
+        let listed = parse("hover = \"OSIS, bcv\"", json!({}))
+            .configure()
+            .unwrap();
+        assert_eq!(listed.hover, [HoverField::Osis, HoverField::Bcv]);
+        let none = parse("", json!({ "hover": [] })).configure().unwrap();
+        assert!(none.hover.is_empty());
+        let unknown = parse("hover = [\"chapter\"]", json!({})).configure();
+        assert_eq!(unknown.err().unwrap(), "hover: unknown field `chapter`");
     }
 }

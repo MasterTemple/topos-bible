@@ -4,8 +4,10 @@
 
 - **Completion**: book names (`1 Co` → `1 Corinthians`), then chapters and verses from the
   book's versification; each completion rewrites the whole reference (`jn 3:1` → `John 3:16`)
-- **Hover**: the reference under the cursor, normalized, with its OSIS id; on one that doesn't
-  exist, what does (`John 3 has 36 verses`, `John has 21 chapters`)
+- **Hover**: the reference under the cursor, normalized, with what the `hover` setting lists:
+  its full name and abbreviation, OSIS id, book (and its number and chapters), testament,
+  genres, verses, and where it is. On a reference that doesn't exist, what does (`John 3 has
+  36 verses`, `John has 21 chapters`)
 - **Inlay hints**: after each reference, how it's written in your format (where that differs,
   like `jn 3:16` → `John 3:16`), or its OSIS id
 - **Document symbols**: every reference in the file, for outlines and pickers
@@ -43,6 +45,10 @@ so one file configures both. It uses these keys and ignores the others:
 | `ext` | Extensions searched in the workspace, like `"md,txt"` (all text files by default) |
 | `inlay-hints` | `"changed"` (default), `"always"`, `"osis"`, or `"never"` |
 | `reference-diagnostics` | The diagnostic on each reference: `"info"` (default), `"hint"`, or `"never"` |
+| `hover` | The lines below the reference in a hover, in order (a list or `"osis,book"`; `[]` for none): `written`, `name`, `abbreviation`, `osis`, `book`, `testament`, `genres`, `verses`, `bcv`, `location`. The default is every one but `written` and `bcv`. `name` and `abbreviation` are left out when the reference is already written that way |
+
+The CLI skips `inlay-hints`, `reference-diagnostics`, and `hover`, so they can go in the shared
+`config.toml`.
 
 The editor's settings override the file: as initialization options, or as `settings` (changed
 while the server runs, without a restart). They take the same keys, at the top level or under

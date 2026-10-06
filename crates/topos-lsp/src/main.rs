@@ -257,8 +257,10 @@ mod tests {
         let Message::Response(hover) = client.receiver.recv().unwrap() else {
             panic!("expected the hover response")
         };
-        let value = hover.response_result.unwrap()["contents"]["value"].clone();
-        assert_eq!(value, "**Philippians 4:1**\n\nOSIS: `Phil.4.1`");
+        let result = hover.response_result.unwrap();
+        let value = result["contents"]["value"].as_str().unwrap();
+        assert!(value.starts_with("**Philippians 4:1**\n\n"), "{value}");
+        assert!(value.contains("- **OSIS**: `Phil.4.1`"), "{value}");
 
         send(request(3, "shutdown", json!(null)));
         client.receiver.recv().unwrap();

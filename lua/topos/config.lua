@@ -4,7 +4,8 @@ local M = {}
 M.defaults = {
   -- topos-lsp's settings, overriding ~/.config/topos/config.toml (the CLI's keys), like
   -- { format = 'abbreviation', ['psg-fmt'] = { join_adjacent = true },
-  --   ['inlay-hints'] = 'never', ['reference-diagnostics'] = 'hint', ext = 'md,txt' }
+  --   ['inlay-hints'] = 'never', ['reference-diagnostics'] = 'hint', ext = 'md,txt',
+  --   hover = { 'osis', 'book', 'genres', 'verses' } }
   settings = {},
   lsp = {
     enabled = true,
