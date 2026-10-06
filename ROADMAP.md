@@ -46,9 +46,9 @@ The phases are in order, and each one leaves the repo working.
 
 ## Phase 4: Formatting, interop, autocomplete
 
-- [ ] Formatter driven by the syntax tree: Provide user-specified formatting options [#4](https://github.com/MasterTemple/topos/issues/4)
-- [ ] OSIS parse and format, plus a BCV integer key: Create a standard format for specifying segment ranges
-- [ ] Autocomplete `completions(text, cursor, opts)` that returns `TextEdit`s: books, chapters, verses, and normalization edits
+- [x] Formatter (`FormatOptions`, on resolved passages): Provide user-specified formatting options [#4](https://github.com/MasterTemple/topos/issues/4)
+- [x] OSIS parse and format, plus a BCV integer key: Create a standard format for specifying segment ranges
+- [x] Autocomplete `BibleMatcher::complete(text, cursor, opts)` that returns `TextEdit`s: books, chapters, and verses, written with `FormatOptions`
 
 ## Phase 5: CLI
 
