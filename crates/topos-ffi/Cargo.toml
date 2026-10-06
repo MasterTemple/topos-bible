@@ -1,0 +1,13 @@
+[package]
+name = "topos-ffi"
+version = "0.1.0"
+edition = "2024"
+description = "Bindings for TypeScript/WASM, Python, Swift, and Kotlin (via BoltFFI)"
+
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+boltffi = "0.31.0"
+serde_json = { workspace = true }
+topos-lib = { path = "../topos-lib" }

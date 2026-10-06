@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/topos-cli",
+    "crates/topos-ffi",
     "crates/topos-formats",
     "crates/topos-lib",
     "crates/topos-py",
