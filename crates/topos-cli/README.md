@@ -188,6 +188,27 @@ exclude-book = ["Song of Solomon"]
 data = "~/bible/custom.json"   # custom books, genres, or chapter and verse counts
 ```
 
+## Named queries
+
+Name searches you repeat in `~/.config/topos/queries.toml` (next to `config.toml`), and use them
+with `-q NAME`:
+
+```toml
+paul = '--nt -g "Pauline Epistles"'
+sermons = 'Sermons -o "John 1" --exclude-book Philemon'
+gospels = ["-g", "Gospels"]   # or the arguments already split
+```
+
+```sh
+topos -q paul ~/notes          # topos --nt -g "Pauline Epistles" ~/notes
+topos -q sermons -m count      # options after -q add to (or override) the query's
+topos --list-queries
+```
+
+`-q` is replaced by the query's options where it appears, so queries can use other queries, and
+`config.toml` can set a default one (`query = "paul"`). The file is read even with `--no-config`.
+The Obsidian plugin's saved searches use the same syntax.
+
 ## File types
 
 - `.pdf` (with the `pdf` feature) reports the page, and `.epub` reports a CFI
@@ -255,6 +276,12 @@ Options:
 
       --data <DATA>
           A JSON file with custom books, genres, or chapter and verse counts
+
+  -q, --query <NAME>
+          Use a named query from ~/.config/topos/queries.toml (its options go where this is)
+
+      --list-queries
+          List the named queries and exit
 
       --config <PATH>
           Read default options from this file instead of ~/.config/topos/config.toml

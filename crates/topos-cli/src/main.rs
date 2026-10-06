@@ -13,11 +13,13 @@ mod args;
 mod cache;
 mod config;
 mod output;
+mod queries;
 mod search;
 
 /// Like ripgrep: 0 when something matched, 1 when nothing did, 2 on errors
 fn main() -> ExitCode {
-    let argv = match config::with_defaults(std::env::args_os().collect()) {
+    let argv = match config::with_defaults(std::env::args_os().collect()).and_then(queries::expand)
+    {
         Ok(argv) => argv,
         Err(err) => {
             eprintln!("topos: {err}");
@@ -25,6 +27,22 @@ fn main() -> ExitCode {
         }
     };
     let mut args = Args::parse_from(argv);
+    if args.list_queries {
+        return match queries::load() {
+            Ok(queries) => {
+                for (name, query) in queries {
+                    let query =
+                        shlex::try_join(query.iter().map(String::as_str)).unwrap_or_default();
+                    println!("{name}\t{query}");
+                }
+                ExitCode::SUCCESS
+            }
+            Err(err) => {
+                eprintln!("topos: {err}");
+                ExitCode::from(2)
+            }
+        };
+    }
     let matcher = match args.matcher() {
         Ok(matcher) => matcher,
         Err(err) => {

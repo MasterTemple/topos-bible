@@ -308,3 +308,49 @@ fn testaments_narrow_genres() {
     assert_eq!(ot.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&ot.stderr).contains("nothing can match"));
 }
+
+#[test]
+fn named_queries() {
+    let home = scratch("queries");
+    std::fs::create_dir_all(home.join("topos")).unwrap();
+    std::fs::write(
+        home.join("topos/queries.toml"),
+        "paul = '--nt -g \"Pauline Epistles\"'\ngospels = ['-g', 'Gospels']\n",
+    )
+    .unwrap();
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_topos"))
+            .args(args)
+            .env("XDG_CONFIG_HOME", &home)
+            .stdin(Stdio::null())
+            .output()
+            .unwrap()
+    };
+    let text = "John 3:16, Romans 8:28, Genesis 1:1";
+    let paul = run(&[
+        "--text",
+        text,
+        "--no-config",
+        "-q",
+        "paul",
+        "-m",
+        "quickfix",
+    ]);
+    assert_eq!(stdout(&paul), ":1:12: Romans 8:28\n");
+    let gospels = run(&["--text", text, "-qgospels", "-m", "quickfix"]);
+    assert_eq!(stdout(&gospels), ":1:1: John 3:16\n");
+
+    let unknown = run(&["--text", text, "-q", "nope"]);
+    assert_eq!(unknown.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&unknown.stderr)
+            .contains("unknown query `nope` (queries: gospels, paul)")
+    );
+
+    let list = run(&["--list-queries"]);
+    assert_eq!(
+        stdout(&list),
+        "gospels\t-g Gospels\npaul\t--nt -g 'Pauline Epistles'\n"
+    );
+    let _ = std::fs::remove_dir_all(&home);
+}

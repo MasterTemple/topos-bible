@@ -95,6 +95,14 @@ pub struct Args {
     #[arg(long)]
     pub data: Option<PathBuf>,
 
+    /// Use a named query from ~/.config/topos/queries.toml (its options go where this is)
+    #[arg(long, short = 'q', value_name = "NAME")]
+    pub query: Vec<String>,
+
+    /// List the named queries and exit
+    #[arg(long)]
+    pub list_queries: bool,
+
     /// Read default options from this file instead of ~/.config/topos/config.toml
     #[arg(long, value_name = "PATH", conflicts_with = "no_config")]
     pub config: Option<PathBuf>,
