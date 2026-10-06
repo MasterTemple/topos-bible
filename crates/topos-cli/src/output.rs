@@ -1,13 +1,14 @@
 use std::io::{self, IsTerminal, Write};
 
 use serde_json::json;
+use topos_bible::segments::formatter::BookStyle;
 use topos_bible::{
     data::bible_data::BibleData,
     segments::{Passage, Segment, verse_bounds::VerseBounds},
 };
 
 use crate::{
-    args::{Args, ColorChoice, OutputMode, ReferenceFormat},
+    args::{Args, ColorChoice, OutputMode},
     search::{FileHits, Hit},
 };
 
@@ -21,7 +22,6 @@ const RESET: &str = "\x1b[0m";
 pub struct Printer {
     mode: OutputMode,
     color: bool,
-    format: ReferenceFormat,
     options: topos_bible::segments::formatter::FormatOptions,
     data: BibleData,
     context: (usize, usize),
@@ -59,7 +59,6 @@ impl Printer {
         Self {
             mode,
             color,
-            format: args.format,
             options: args.format_options(),
             data,
             context: args.context_lines(),
@@ -221,8 +220,8 @@ impl Printer {
     }
 
     fn reference(&self, passage: &Passage) -> String {
-        let written = match self.format {
-            ReferenceFormat::Osis => passage.to_osis(self.data.books()),
+        let written = match self.options.book {
+            BookStyle::Osis => passage.to_osis(self.data.books()),
             _ => self.options.passage(passage, &self.data),
         };
         written.unwrap_or_else(|| passage.segments.to_string())

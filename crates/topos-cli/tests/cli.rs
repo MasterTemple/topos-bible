@@ -809,3 +809,80 @@ fn passage_filters() {
         stdout(&configured)
     );
 }
+
+#[test]
+fn passage_format_options() {
+    let text = "John 3:16, 17, 18; Jude 1:5";
+    let run = |config: Option<&str>, args: &[&str]| {
+        let mut all = vec!["--text", text, "-m", "quickfix"];
+        all.extend(args);
+        stdout(&topos_with_config(config, &all, None))
+            .lines()
+            .map(|line| line.split(": ").nth(1).unwrap().to_string())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(run(None, &["--no-config"]), ["John 3:16,17,18", "Jude 1:5"]);
+    assert_eq!(
+        run(
+            None,
+            &[
+                "--no-config",
+                "--fmt-join-adjacent",
+                "--fmt-chapter-in-single-chapter-books=false"
+            ]
+        ),
+        ["John 3:16-18", "Jude 5"]
+    );
+    // The whole object, then single fields and -f on top of it
+    let json = r#"{"join_adjacent": true, "book": "abbreviation", "chapter_verse": "."}"#;
+    assert_eq!(
+        run(None, &["--no-config", "--psg-fmt", json]),
+        ["Jn 3.16-18", "Jude 1.5"]
+    );
+    assert_eq!(
+        run(
+            None,
+            &[
+                "--no-config",
+                "--psg-fmt",
+                json,
+                "--fmt-chapter-verse",
+                ":",
+                "-f",
+                "name"
+            ]
+        ),
+        ["John 3:16-18", "Jude 1:5"]
+    );
+
+    // In config.toml: a table, and false for yes/no options
+    let config = "psg-fmt = { join_adjacent = true, range = \"\u{2013}\" }\n\
+                  fmt-chapter-in-single-chapter-books = false\n";
+    assert_eq!(run(Some(config), &[]), ["John 3:16\u{2013}18", "Jude 5"]);
+    // The command line still overrides the config
+    assert_eq!(
+        run(Some(config), &["--fmt-join-adjacent=false"]),
+        ["John 3:16,17,18", "Jude 5"]
+    );
+
+    // Completions use the format too (with a separator wider than a byte)
+    let completions = stdout(&topos_with_config(
+        Some(config),
+        &["--complete", "jn 3:16-"],
+        None,
+    ));
+    assert_eq!(completions.lines().next(), Some("John 3:16\u{2013}17"));
+
+    let bad = topos(
+        &[
+            "--no-config",
+            "--text",
+            "x",
+            "--psg-fmt",
+            r#"{"joins": true}"#,
+        ],
+        None,
+    );
+    assert_eq!(bad.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&bad.stderr).contains("unknown field `joins`"));
+}

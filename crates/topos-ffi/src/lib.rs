@@ -300,6 +300,99 @@ impl ToposQuery {
 }
 
 /**
+How references are written, like the CLI's `--psg-fmt` and `--fmt-*` options. Chain the methods
+(each returns a new format), or start from the CLI's JSON with `withJson`
+
+```ts
+const format = ToposFormat.create().book(BookStyle.Abbreviation).joinAdjacent(true).range("\u2013");
+topos.formatPassage(passage, format); // "Jn 3:16–18"
+```
+
+The defaults write `John 3:16,17,18; 4` (`Jude 1:5` keeps its chapter)
+*/
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ToposFormat {
+    options: FormatOptions,
+}
+
+#[export]
+impl ToposFormat {
+    /// The default format
+    pub fn create() -> Self {
+        Self::default()
+    }
+
+    /// This format with the fields in a JSON object (the CLI's `--psg-fmt`), like
+    /// `{"join_adjacent": true, "chapter_verse": "."}`; unknown fields are an error
+    pub fn with_json(&self, json: String) -> Result<ToposFormat, ToposError> {
+        let invalid = |e: serde_json::Error| ToposError::InvalidConfig {
+            message: e.to_string(),
+        };
+        // Start from this format's fields, then apply the JSON's
+        let mut fields = serde_json::to_value(&self.options).map_err(invalid)?;
+        let changes: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(&json).map_err(invalid)?;
+        if let Some(object) = fields.as_object_mut() {
+            object.extend(changes);
+        }
+        let options = serde_json::from_value(fields).map_err(invalid)?;
+        Ok(Self { options })
+    }
+
+    pub fn book(&self, style: BookStyle) -> Self {
+        self.with(|o| o.book = style.into())
+    }
+
+    /// Between the book and its chapters (`" "`)
+    pub fn book_separator(&self, separator: String) -> Self {
+        self.with(|o| o.book_separator = separator)
+    }
+
+    /// Between a chapter and a verse (`":"`)
+    pub fn chapter_verse(&self, separator: String) -> Self {
+        self.with(|o| o.chapter_verse = separator)
+    }
+
+    /// Between the ends of a range (`"-"`)
+    pub fn range(&self, separator: String) -> Self {
+        self.with(|o| o.range = separator)
+    }
+
+    /// Before another verse in the same chapter (`","`)
+    pub fn verse_separator(&self, separator: String) -> Self {
+        self.with(|o| o.verse_separator = separator)
+    }
+
+    /// Before a part in another chapter (`"; "`)
+    pub fn chapter_separator(&self, separator: String) -> Self {
+        self.with(|o| o.chapter_separator = separator)
+    }
+
+    /// `3:16-18` instead of `3:16,17,18`
+    pub fn join_adjacent(&self, join: bool) -> Self {
+        self.with(|o| o.join_adjacent = join)
+    }
+
+    /// `1-2:3` instead of `1:1-2:3`
+    pub fn omit_first_verse_of_chapter_range(&self, omit: bool) -> Self {
+        self.with(|o| o.omit_first_verse_of_chapter_range = omit)
+    }
+
+    /// `Jude 1:5` (true, the default) or `Jude 5`
+    pub fn chapter_in_single_chapter_books(&self, chapter: bool) -> Self {
+        self.with(|o| o.chapter_in_single_chapter_books = chapter)
+    }
+}
+
+impl ToposFormat {
+    fn with(&self, change: impl FnOnce(&mut FormatOptions)) -> Self {
+        let mut options = self.options.clone();
+        change(&mut options);
+        Self { options }
+    }
+}
+
+/**
 How to build a [`Topos`]: its data and book context, like the CLI's `--data`, `--merge-data`,
 `--remove-data`, `--context-book`, and `--context-heading`. Chain the methods, then pass it to
 [`ToposOptions::build`]
@@ -322,6 +415,8 @@ pub struct ToposOptions {
     pub context_book: Option<String>,
     /// A pattern for headings that set the book for what follows, like `^#+ {book}$`
     pub context_heading: Option<String>,
+    /// How references in results are written
+    pub format: FormatOptions,
 }
 
 #[export]
@@ -366,6 +461,15 @@ impl ToposOptions {
         }
     }
 
+    /// How references in `search` and `searchWith` results are written (`parse` and `complete`
+    /// use it too, with the book style they are given)
+    pub fn format(&self, format: &ToposFormat) -> Self {
+        Self {
+            format: format.options.clone(),
+            ..self.clone()
+        }
+    }
+
     /// A [`Topos`] with these options (an error if the data or context can't be used)
     pub fn build(&self) -> Result<Topos, ToposError> {
         Topos::from_options(self)
@@ -375,6 +479,8 @@ impl ToposOptions {
 /// Finds, parses, formats, and completes Bible references
 pub struct Topos {
     matcher: BibleMatcher,
+    /// How references in results are written (see [`ToposOptions::format`])
+    format: FormatOptions,
 }
 
 #[export]
@@ -383,6 +489,7 @@ impl Topos {
     pub fn new() -> Self {
         Self {
             matcher: BibleMatcher::default(),
+            format: FormatOptions::default(),
         }
     }
 
@@ -394,6 +501,7 @@ impl Topos {
         let data = BibleData::new(input).map_err(|e| invalid(e.to_string()))?;
         Ok(Self {
             matcher: BibleFilter::new(data).create_matcher(),
+            format: FormatOptions::default(),
         })
     }
 
@@ -431,7 +539,7 @@ impl Topos {
             .parse_osis(&reference)
             .ok()
             .or_else(|| books.parse(&reference))?;
-        self.passage(&passage, style.into())
+        self.passage(&passage, &self.format_with(style))
     }
 
     /// Every book, in order
@@ -524,15 +632,45 @@ impl Topos {
         style: BookStyle,
         limit: u32,
     ) -> Vec<Completion> {
+        self.completions(text, cursor, unit, self.format_with(style), limit)
+    }
+
+    /// Like `complete`, writing completions with a [`ToposFormat`] (separators, joined ranges,
+    /// and the book style)
+    pub fn complete_with(
+        &self,
+        text: String,
+        cursor: u32,
+        unit: OffsetUnit,
+        format: &ToposFormat,
+        limit: u32,
+    ) -> Vec<Completion> {
+        self.completions(text, cursor, unit, format.options.clone(), limit)
+    }
+
+    /// A passage written with a [`ToposFormat`] (`None` if its book isn't in this instance's data)
+    pub fn format_passage(&self, passage: Passage, format: &ToposFormat) -> Option<String> {
+        format
+            .options
+            .passage(&CorePassage::from(&passage), self.matcher.data())
+    }
+}
+
+impl Topos {
+    fn completions(
+        &self,
+        text: String,
+        cursor: u32,
+        unit: OffsetUnit,
+        format: FormatOptions,
+        limit: u32,
+    ) -> Vec<Completion> {
         let offsets = Offsets::new(&text, unit);
         let Some(cursor) = offsets.byte_of(cursor) else {
             return vec![];
         };
         let options = CompleteOptions {
-            format: FormatOptions {
-                book: style.into(),
-                ..FormatOptions::default()
-            },
+            format,
             limit: (limit > 0).then_some(limit as usize),
         };
         self.matcher
@@ -602,6 +740,7 @@ impl Topos {
                 Some(context) => matcher.with_context(context.clone()),
                 None => matcher,
             },
+            format: options.format.clone(),
         })
     }
 
@@ -614,7 +753,7 @@ impl Topos {
                 let bytes = m.location.bytes;
                 let line_start = text[..bytes.start].rfind('\n').map_or(0, |i| i + 1);
                 Some(Match {
-                    passage: self.passage(&m.psg, CoreBookStyle::Name)?,
+                    passage: self.passage(&m.psg, &self.format)?,
                     start: offsets.of_byte(bytes.start),
                     end: offsets.of_byte(bytes.end),
                     line: m.location.start.line as u32,
@@ -677,12 +816,16 @@ impl Topos {
             .get_chapter_verses(&passage.book)
     }
 
-    fn passage(&self, passage: &CorePassage, style: CoreBookStyle) -> Option<Passage> {
+    /// The instance's format with another book style
+    fn format_with(&self, style: BookStyle) -> FormatOptions {
+        FormatOptions {
+            book: style.into(),
+            ..self.format.clone()
+        }
+    }
+
+    fn passage(&self, passage: &CorePassage, options: &FormatOptions) -> Option<Passage> {
         let data = self.matcher.data();
-        let options = FormatOptions {
-            book: style,
-            ..FormatOptions::default()
-        };
         let segments = passage.segments.iter().map(PassageSegment::from).collect();
         Some(Passage {
             book_id: passage.book.0,
@@ -871,6 +1014,55 @@ mod tests {
         );
         assert!(
             matches!(unknown, Err(ToposError::InvalidQuery { message }) if message.contains("Jhon"))
+        );
+    }
+
+    #[test]
+    fn formats_for_results_completions_and_passages() {
+        let joined = ToposFormat::create()
+            .book(BookStyle::Abbreviation)
+            .join_adjacent(true)
+            .range("\u{2013}".into());
+        let topos = ToposOptions::create().format(&joined).build().unwrap();
+        let found = topos.search("John 3:16, 17, 18 and Jude 1:5".into(), OffsetUnit::Byte);
+        assert_eq!(references(found.clone()), ["Jn 3:16\u{2013}18", "Jude 1:5"]);
+
+        // complete keeps its own book style; completeWith takes a whole format
+        let text = String::from("jn 3:16-");
+        let labels = |completions: Vec<Completion>| -> Vec<String> {
+            completions.into_iter().map(|c| c.label).collect()
+        };
+        assert_eq!(
+            labels(topos.complete(text.clone(), 8, OffsetUnit::Byte, BookStyle::Name, 1)),
+            ["John 3:16\u{2013}17"]
+        );
+        let dots = ToposFormat::create().chapter_verse(".".into());
+        assert_eq!(
+            labels(Topos::new().complete_with(text, 8, OffsetUnit::Byte, &dots, 1)),
+            ["John 3.16-17"]
+        );
+
+        // formatPassage, and the CLI's JSON (on top of the format it is called on)
+        let jude = found[1].passage.clone();
+        let short = ToposFormat::create()
+            .with_json(r#"{"chapter_in_single_chapter_books": false}"#.into())
+            .unwrap();
+        assert_eq!(
+            topos.format_passage(jude, &short).as_deref(),
+            Some("Jude 5")
+        );
+        let both = joined
+            .with_json(r#"{"chapter_verse": "."}"#.into())
+            .unwrap();
+        assert_eq!(
+            topos
+                .format_passage(found[0].passage.clone(), &both)
+                .as_deref(),
+            Some("Jn 3.16\u{2013}18")
+        );
+        let bad = ToposFormat::create().with_json(r#"{"joins": true}"#.into());
+        assert!(
+            matches!(bad, Err(ToposError::InvalidConfig { message }) if message.contains("joins"))
         );
     }
 

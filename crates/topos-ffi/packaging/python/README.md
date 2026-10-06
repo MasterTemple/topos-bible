@@ -100,6 +100,19 @@ topos = (
 )
 ```
 
+How references are written is a third builder, `ToposFormat` (the CLI's `--psg-fmt`):
+
+```python
+from topos_bible import BookStyle, ToposFormat
+
+fmt = ToposFormat.create().book(BookStyle.ABBREVIATION).join_adjacent(True)  # also book_separator(),
+# chapter_verse(), range(), verse_separator(), chapter_separator(), omit_first_verse_of_chapter_range(),
+# chapter_in_single_chapter_books(), and with_json('{"join_adjacent": true}')
+short = ToposOptions.create().format(fmt).build()  # search results: "Jn 3:16-18"
+short.complete_with(text, cursor, OffsetUnit.CHAR, fmt, 20)
+short.format_passage(passage, fmt)
+```
+
 ### Errors
 
 ```python

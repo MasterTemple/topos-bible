@@ -4,6 +4,7 @@
 
 # mode = "grouped"                   # how to print results: grouped, quickfix, json, count, ...
 # format = "abbreviation"            # how to write references: name, abbreviation, osis
+# psg-fmt = { join_adjacent = true }  # more of how they're written (see README: Writing references)
 # context = 1                        # lines of context around each match
 cache = true                         # reuse results for unchanged files (--no-cache turns it off)
 # sort = true                        # print results sorted by path

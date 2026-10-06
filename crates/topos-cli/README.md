@@ -276,6 +276,36 @@ EPUBs and notes:
 - Entries for deleted files are removed now and then, as are caches unused for a month;
   `topos --clear-cache` deletes everything
 
+## Writing references
+
+`-f` picks the book style (`name`, `abbreviation`, `osis`). The rest of how references are written,
+in results and completions, comes from `--psg-fmt` (the whole format as JSON) or one `--fmt-*`
+option per field, which override it:
+
+| Field | Option | Default |
+|---|---|---|
+| `book` | `-f` | `name` |
+| `book_separator` | `--fmt-book-separator` | `" "` |
+| `chapter_verse` | `--fmt-chapter-verse` | `":"` |
+| `range` | `--fmt-range` | `"-"` |
+| `verse_separator` | `--fmt-verse-separator` | `","` |
+| `chapter_separator` | `--fmt-chapter-separator` | `"; "` |
+| `join_adjacent` (`3:16-18`, not `3:16,17,18`) | `--fmt-join-adjacent` | `false` |
+| `omit_first_verse_of_chapter_range` (`1-2:3`, not `1:1-2:3`) | `--fmt-omit-first-verse-of-chapter-range` | `false` |
+| `chapter_in_single_chapter_books` (`Jude 1:5`, not `Jude 5`) | `--fmt-chapter-in-single-chapter-books` | `true` |
+
+```sh
+topos --psg-fmt '{"join_adjacent": true, "range": "–"}' notes/
+topos --fmt-join-adjacent --fmt-chapter-in-single-chapter-books=false notes/
+```
+
+In `config.toml`, `--psg-fmt` is a table, and the yes/no options take `true` or `false`:
+
+```toml
+psg-fmt = { join_adjacent = true, verse_separator = ", " }
+fmt-chapter-in-single-chapter-books = false
+```
+
 ## Completing references
 
 `--complete TEXT` prints the completions for a partly typed reference, one per line, for scripts
@@ -289,7 +319,8 @@ topos --complete "jn 3:" -f osis  # John.3.1 ...
 topos --complete "Rom 8" -m json  # {"text":"Romans 8","label":"Romans 8","kind":"chapter"}
 ```
 
-`-f` sets the book style, the book and passage filters narrow the list, and `-m json` prints
+`-f`, `--psg-fmt`, and `--fmt-*` set how completions are written, the book and passage filters
+narrow the list, and `-m json` prints
 each completion's text, label, and kind (book, chapter, or verse).
 
 ## Shell completions
@@ -450,14 +481,45 @@ Options:
           [default: auto]
 
   -f, --format <FORMAT>
-          How to write each reference
+          How to write each reference's book (also used by --complete); overrides --psg-fmt's `book` [default: name]
 
           Possible values:
           - name:         `Genesis 1:1`
           - abbreviation: `Gn 1:1`
           - osis:         `Gen.1.1`
+
+      --psg-fmt <JSON>
+          How to write references (results and completions), as JSON with any of: book, book_separator, chapter_verse, range, verse_separator, chapter_separator, omit_first_verse_of_chapter_range, join_adjacent, chapter_in_single_chapter_books. In config.toml it is a table: psg-fmt = { join_adjacent = true }
+
+      --fmt-book-separator <TEXT>
+          Between the book and its chapters [default: " "]
+
+      --fmt-chapter-verse <TEXT>
+          Between a chapter and a verse [default: ":"]
+
+      --fmt-range <TEXT>
+          Between the ends of a range [default: "-"]
+
+      --fmt-verse-separator <TEXT>
+          Before another verse in the same chapter [default: ","]
+
+      --fmt-chapter-separator <TEXT>
+          Before a part in another chapter [default: "; "]
+
+      --fmt-join-adjacent [<BOOL>]
+          Write adjacent verses as a range: 3:16-18 instead of 3:16,17,18 [default: false]
           
-          [default: name]
+          [possible values: true, false]
+
+      --fmt-omit-first-verse-of-chapter-range [<BOOL>]
+          Write a range from a chapter's first verse as 1-2:3 instead of 1:1-2:3 [default: false]
+          
+          [possible values: true, false]
+
+      --fmt-chapter-in-single-chapter-books [<BOOL>]
+          Write the chapter in single-chapter books: Jude 1:5 instead of Jude 5 [default: true]
+          
+          [possible values: true, false]
 
   -A, --after-context <AFTER_CONTEXT>
           Lines of context to show after each match

@@ -159,9 +159,49 @@ pub struct Args {
     #[arg(long, short = 'm', value_enum, default_value_t)]
     pub mode: OutputMode,
 
-    /// How to write each reference
-    #[arg(long, short = 'f', value_enum, default_value_t)]
-    pub format: ReferenceFormat,
+    /// How to write each reference's book (also used by --complete); overrides --psg-fmt's
+    /// `book` [default: name]
+    #[arg(long, short = 'f', value_enum)]
+    pub format: Option<ReferenceFormat>,
+
+    /// How to write references (results and completions), as JSON with any of: book,
+    /// book_separator, chapter_verse, range, verse_separator, chapter_separator,
+    /// omit_first_verse_of_chapter_range, join_adjacent, chapter_in_single_chapter_books. In
+    /// config.toml it is a table: psg-fmt = { join_adjacent = true }
+    #[arg(long, value_name = "JSON", value_parser = parse_format)]
+    pub psg_fmt: Option<FormatOptions>,
+
+    /// Between the book and its chapters [default: " "]
+    #[arg(long, value_name = "TEXT")]
+    pub fmt_book_separator: Option<String>,
+
+    /// Between a chapter and a verse [default: ":"]
+    #[arg(long, value_name = "TEXT")]
+    pub fmt_chapter_verse: Option<String>,
+
+    /// Between the ends of a range [default: "-"]
+    #[arg(long, value_name = "TEXT")]
+    pub fmt_range: Option<String>,
+
+    /// Before another verse in the same chapter [default: ","]
+    #[arg(long, value_name = "TEXT")]
+    pub fmt_verse_separator: Option<String>,
+
+    /// Before a part in another chapter [default: "; "]
+    #[arg(long, value_name = "TEXT")]
+    pub fmt_chapter_separator: Option<String>,
+
+    /// Write adjacent verses as a range: 3:16-18 instead of 3:16,17,18 [default: false]
+    #[arg(long, value_name = "BOOL", num_args = 0..=1, default_missing_value = "true")]
+    pub fmt_join_adjacent: Option<bool>,
+
+    /// Write a range from a chapter's first verse as 1-2:3 instead of 1:1-2:3 [default: false]
+    #[arg(long, value_name = "BOOL", num_args = 0..=1, default_missing_value = "true")]
+    pub fmt_omit_first_verse_of_chapter_range: Option<bool>,
+
+    /// Write the chapter in single-chapter books: Jude 1:5 instead of Jude 5 [default: true]
+    #[arg(long, value_name = "BOOL", num_args = 0..=1, default_missing_value = "true")]
+    pub fmt_chapter_in_single_chapter_books: Option<bool>,
 
     /// Lines of context to show after each match
     #[arg(long, short = 'A', default_value_t = 0)]
@@ -334,6 +374,11 @@ pub enum ColorChoice {
     Never,
 }
 
+/// `--psg-fmt`: format options as JSON, every field optional
+fn parse_format(json: &str) -> Result<FormatOptions, String> {
+    serde_json::from_str(json).map_err(|e| format!("{e} (see --help for the fields)"))
+}
+
 /// `500`, `500K`, `10M`, or `1G` (powers of 1024)
 fn parse_size(text: &str) -> Result<u64, String> {
     let text = text.trim();
@@ -439,16 +484,37 @@ impl Args {
         }
     }
 
-    /// Book style for the core formatter (OSIS is written by [`Passage::to_osis`] instead)
+    /// How references are written: the defaults, then --psg-fmt, then each --fmt-* option, then -f
+    /// (OSIS references are written by [`Passage::to_osis`] instead)
     pub fn format_options(&self) -> FormatOptions {
-        FormatOptions {
-            book: match self.format {
+        let mut options = self.psg_fmt.clone().unwrap_or_default();
+        let text = |value: &Option<String>, field: &mut String| {
+            if let Some(value) = value {
+                *field = value.clone();
+            }
+        };
+        text(&self.fmt_book_separator, &mut options.book_separator);
+        text(&self.fmt_chapter_verse, &mut options.chapter_verse);
+        text(&self.fmt_range, &mut options.range);
+        text(&self.fmt_verse_separator, &mut options.verse_separator);
+        text(&self.fmt_chapter_separator, &mut options.chapter_separator);
+        if let Some(join) = self.fmt_join_adjacent {
+            options.join_adjacent = join;
+        }
+        if let Some(omit) = self.fmt_omit_first_verse_of_chapter_range {
+            options.omit_first_verse_of_chapter_range = omit;
+        }
+        if let Some(chapter) = self.fmt_chapter_in_single_chapter_books {
+            options.chapter_in_single_chapter_books = chapter;
+        }
+        if let Some(format) = self.format {
+            options.book = match format {
                 ReferenceFormat::Name => BookStyle::Name,
                 ReferenceFormat::Abbreviation => BookStyle::Abbreviation,
                 ReferenceFormat::Osis => BookStyle::Osis,
-            },
-            ..FormatOptions::default()
+            };
         }
+        options
     }
 
     /// `--data` (or the defaults), then each `--merge-data`, then each `--remove-data`

@@ -1,12 +1,15 @@
 //! Writing passages as text, with configurable separators and styles (issue #4).
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     data::bible_data::BibleData,
     segments::{passage::Passage, segment::Segment, verse_bounds::VerseBounds},
 };
 
-/// How the book is written
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// How the book is written (`"name"`, `"abbreviation"`, or `"osis"` in JSON and TOML)
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum BookStyle {
     /// `Genesis`
     #[default]
@@ -22,8 +25,11 @@ How passages are written
 - The defaults write the shortest form that parses back to the same passage
 - Changing `chapter_separator` away from a `;` can make the output ambiguous (`3:16, 4` reads as
   verse 4)
+- In JSON or TOML every field is optional, so `{ "join_adjacent": true }` is the defaults with
+  adjacent verses joined
 */
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct FormatOptions {
     pub book: BookStyle,
     /// Between the book and its segments (`" "`)
@@ -219,6 +225,22 @@ fn join_adjacent(segments: &[Segment]) -> Vec<Segment> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn options_from_partial_json() {
+        let options: FormatOptions =
+            serde_json::from_str(r#"{ "join_adjacent": true, "book": "abbreviation" }"#).unwrap();
+        assert_eq!(
+            options,
+            FormatOptions {
+                join_adjacent: true,
+                book: BookStyle::Abbreviation,
+                ..FormatOptions::default()
+            }
+        );
+        // A misspelled field is an error, not silently ignored
+        assert!(serde_json::from_str::<FormatOptions>(r#"{ "join_adjacents": true }"#).is_err());
+    }
+
     use super::*;
     use crate::data::BibleData;
 

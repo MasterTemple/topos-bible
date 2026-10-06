@@ -28,6 +28,8 @@ Every language gets the same object and types:
 | `contains(outer, inner)` / `overlaps(a, b) -> bool` | Verse-by-verse containment and overlap |
 | `search_with(text, unit, query) -> [Match]` | The references a `ToposQuery` keeps (raises `ToposError.InvalidQuery` for an unknown book, genre, or passage) |
 | `contradiction(query) -> String?` | Why nothing can match, if the query's filters contradict each other |
+| `complete_with(text, cursor, unit, format, limit)` | Like `complete`, written with a `ToposFormat` |
+| `format_passage(passage, format) -> String?` | A passage written with a `ToposFormat` |
 
 **Queries** (`ToposQuery`) choose which references to keep, like the CLI's filter options.
 Chain the methods; each returns a new query, so one can be reused and extended:
@@ -71,6 +73,32 @@ const topos = ToposOptions.create()
 
 `build()` raises `ToposError.InvalidConfig` when the data or context can't be used, such as a
 name that would mean two books.
+
+**Formats** (`ToposFormat`) say how references are written, like the CLI's `--psg-fmt`. Chain
+them, or start from the CLI's JSON with `withJson(json)` (unknown fields raise `InvalidConfig`):
+
+```ts
+const format = ToposFormat.create().book(BookStyle.Abbreviation).joinAdjacent(true).range("–");
+const topos = ToposOptions.create().format(format).build(); // results: "Jn 3:16–18"
+topos.completeWith(text, cursor, OffsetUnit.Utf16, format, 20);
+topos.formatPassage(passage, ToposFormat.create().withJson('{"chapter_verse": "."}'));
+```
+
+| Method | CLI | Default |
+|---|---|---|
+| `book(style)` | `-f` | `Name` |
+| `bookSeparator(text)` | `--fmt-book-separator` | `" "` |
+| `chapterVerse(text)` | `--fmt-chapter-verse` | `":"` |
+| `range(text)` | `--fmt-range` | `"-"` |
+| `verseSeparator(text)` | `--fmt-verse-separator` | `","` |
+| `chapterSeparator(text)` | `--fmt-chapter-separator` | `"; "` |
+| `joinAdjacent(bool)` | `--fmt-join-adjacent` | `false` |
+| `omitFirstVerseOfChapterRange(bool)` | `--fmt-omit-first-verse-of-chapter-range` | `false` |
+| `chapterInSingleChapterBooks(bool)` | `--fmt-chapter-in-single-chapter-books` | `true` |
+
+`ToposOptions.format(format)` sets how `search` and `searchWith` write references; `parse` and
+`complete` use it too, with the book style they're given. `completeWith(text, cursor, unit,
+format, limit)` and `formatPassage(passage, format)` take a format directly.
 
 - `Passage { book_id, book, reference, segments, osis }`, written in the requested `BookStyle` (`Name`, `Abbreviation`, `Osis`)
 - `segments: [PassageSegment]`, each part of the reference as written: `Verses { start, end }`

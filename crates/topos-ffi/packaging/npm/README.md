@@ -84,6 +84,17 @@ const topos = ToposOptions.create()
   .build();
 ```
 
+How references are written is a third builder, `ToposFormat` (the CLI's `--psg-fmt`):
+
+```ts
+const format = ToposFormat.create().book(BookStyle.Abbreviation).joinAdjacent(true); // also bookSeparator(),
+// chapterVerse(), range(), verseSeparator(), chapterSeparator(), omitFirstVerseOfChapterRange(),
+// chapterInSingleChapterBooks(), and withJson('{"join_adjacent": true}')
+const short = ToposOptions.create().format(format).build(); // search results: "Jn 3:16-18"
+short.completeWith(text, cursor, OffsetUnit.Utf16, format, 20);
+short.formatPassage(passage, format);
+```
+
 Invalid queries and options throw `ToposErrorException`, with the reason in
 `error.value.message` (an unknown book, a name that would mean two books, ...). Prefer
 `ToposOptions.create().data(json).build()` to `Topos.withConfig(json)`, which returns `null`

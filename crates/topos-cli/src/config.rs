@@ -130,6 +130,12 @@ fn parse(text: &str) -> Result<Vec<OsString>, String> {
         let Some(name) = name.filter(|name| name != "no-config" && name != "config") else {
             return Err(format!("unknown option `{key}`"));
         };
+        // Options that take a yes/no value (like fmt-join-adjacent) get `false` too; switches
+        // (like cache) are left out instead
+        let takes_bool = command
+            .get_arguments()
+            .find(|arg| arg.get_long() == Some(name.as_str()))
+            .is_some_and(|arg| arg.get_action().takes_values());
         let flag = OsString::from(format!("--{name}"));
         let values = match value {
             Value::Array(values) => values,
@@ -137,9 +143,19 @@ fn parse(text: &str) -> Result<Vec<OsString>, String> {
         };
         for value in values {
             match value {
+                Value::Boolean(b) if takes_bool => {
+                    args.push(OsString::from(format!("--{name}={b}")))
+                }
                 Value::Boolean(true) => args.push(flag.clone()),
                 Value::Boolean(false) => {}
                 Value::String(s) => args.extend([flag.clone(), expand_home(&s)]),
+                // A table, like psg-fmt = { join_adjacent = true }, is passed as JSON
+                Value::Table(table) => args.extend([
+                    flag.clone(),
+                    serde_json::to_string(&table)
+                        .map_err(|e| format!("`{key}`: {e}"))?
+                        .into(),
+                ]),
                 Value::Integer(n) => args.extend([flag.clone(), n.to_string().into()]),
                 other => return Err(format!("unsupported value for `{key}`: {other}")),
             }
