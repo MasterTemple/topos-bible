@@ -85,6 +85,12 @@ jobs:
       - name: Install BoltFFI
         shell: bash
         run: command -v boltffi || cargo install boltffi_cli --version "$BOLTFFI_VERSION" --locked
+      # htmloc (a git dependency of topos-formats) has a file name with `?`, which Windows cannot
+      # check out; topos-ffi does not need it, so leave those members out of the workspace
+      - name: Skip members that need htmloc
+        if: runner.os == 'Windows'
+        shell: bash
+        run: sed -i '/"crates\/topos-formats"/d; /"crates\/topos-cli"/d' Cargo.toml
       - name: Build the wheel
         shell: bash
         working-directory: crates/topos-ffi
@@ -109,8 +115,10 @@ jobs:
         with:
           path: ~/.cargo/bin/boltffi*
           key: boltffi-${{ env.BOLTFFI_VERSION }}-ubuntu
-      - name: Install BoltFFI
-        run: command -v boltffi || cargo install boltffi_cli --version "$BOLTFFI_VERSION" --locked
+      - name: Install BoltFFI and wasm-opt
+        run: |
+          command -v boltffi || cargo install boltffi_cli --version "$BOLTFFI_VERSION" --locked
+          sudo apt-get update && sudo apt-get install -y binaryen
       - name: Build the package and run the example against it
         working-directory: crates/topos-ffi
         run: |
