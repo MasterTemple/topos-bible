@@ -1,6 +1,5 @@
 use std::str::Chars;
 
-use line_col::LineColLookup;
 use mupdf::{Document, Rect, TextChar, TextPageOptions, pdf::PdfDocument};
 use regex::Match;
 use unicode_normalization::UnicodeNormalization;

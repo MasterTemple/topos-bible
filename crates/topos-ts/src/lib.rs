@@ -14,7 +14,7 @@ pub fn search(input: &str) -> Vec<String> {
             let name = m.data().books().get_name(r.psg.book).unwrap();
             let segments = r.psg.segments.to_string();
             let start = r.location.start;
-            format!("[{}:{}] {name} {segments}", start.line, start.column)
+            format!("[{}:{}] {name} {segments}", start.line, start.utf16_column)
         })
         .collect()
 }

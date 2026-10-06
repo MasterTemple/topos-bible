@@ -4,24 +4,8 @@ use itertools::Itertools;
 use crate::matcher::{
     bible_matcher::{BibleMatcher, MatchResult, Matcher},
     instance::BibleMatch,
-    location::line_col::{ByteIndex, LineColLocation, Position},
+    location::line_col::LineColLocation,
 };
-
-impl From<Selection> for LineColLocation {
-    fn from(value: Selection) -> Self {
-        LineColLocation {
-            start: Position {
-                line: value.start.line,
-                column: value.start.column,
-            },
-            end: Position {
-                line: value.end.line,
-                column: value.end.column,
-            },
-            bytes: ByteIndex::new(value.bytes.start, value.bytes.end),
-        }
-    }
-}
 
 impl From<LineColLocation> for Selection {
     fn from(val: LineColLocation) -> Self {
