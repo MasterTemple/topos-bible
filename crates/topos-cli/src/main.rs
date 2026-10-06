@@ -4,11 +4,13 @@ use clap::Parser;
 
 use crate::{
     args::Args,
+    cache::Cache,
     output::Printer,
-    search::{Input, search},
+    search::{Input, Searcher, search},
 };
 
 mod args;
+mod cache;
 mod output;
 mod search;
 
@@ -16,7 +18,7 @@ mod search;
 fn main() -> ExitCode {
     let mut args = Args::parse();
     let matcher = match args.matcher() {
-        Ok(matcher) => Arc::new(matcher),
+        Ok(matcher) => matcher,
         Err(err) => {
             eprintln!("topos: {err}");
             return ExitCode::from(2);
@@ -31,7 +33,16 @@ fn main() -> ExitCode {
     };
 
     let mut printer = Printer::new(&args, matcher.data().clone());
-    let results = search(matcher, input);
+    let (before, after) = args.context_lines();
+    let searcher = Arc::new(Searcher {
+        matcher,
+        cache: args
+            .cache
+            .then(|| Cache::open(&args.fingerprint()))
+            .flatten(),
+        needs_text: before + after > 0 || printer.needs_text(),
+    });
+    let results = search(searcher.clone(), input);
     let mut files: Vec<_> = vec![];
     let (mut found, mut failed) = (false, false);
     for result in results {
@@ -56,6 +67,11 @@ fn main() -> ExitCode {
         printer.file(file);
     }
     printer.finish();
+    if let Some(cache) = &searcher.cache
+        && let Err(err) = cache.save()
+    {
+        eprintln!("topos: could not save the cache: {err}");
+    }
 
     if failed {
         ExitCode::from(2)

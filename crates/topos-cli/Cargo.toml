@@ -16,6 +16,7 @@ topos-formats = { path = "../topos-formats" }
 topos-lib = { path = "../topos-lib" }
 
 # workspace dependencies
+serde = { workspace = true }
 serde_json = { workspace = true }
 
 [features]

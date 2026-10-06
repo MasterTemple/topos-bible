@@ -106,6 +106,10 @@ pub struct Args {
     /// Print results sorted by path (waits for the whole search)
     #[arg(long)]
     pub sort: bool,
+
+    /// Reuse results for files that have not changed since the last search with the same options
+    #[arg(long)]
+    pub cache: bool,
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, ValueEnum)]
@@ -150,6 +154,25 @@ pub enum ColorChoice {
 }
 
 impl Args {
+    /// Every option that changes which references are found (for the cache)
+    pub fn fingerprint(&self) -> String {
+        let config = self
+            .config
+            .as_ref()
+            .and_then(|path| fs::read_to_string(path).ok());
+        format!(
+            "{:?}",
+            (
+                (&self.testaments, &self.exclude_testaments),
+                (&self.genres, &self.exclude_genres),
+                (&self.books, &self.exclude_books),
+                (&self.inside, &self.outside),
+                (&self.context_book, &self.context_heading),
+                config,
+            )
+        )
+    }
+
     pub fn context_lines(&self) -> (usize, usize) {
         match self.context {
             Some(lines) => (

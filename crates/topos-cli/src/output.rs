@@ -51,6 +51,11 @@ impl Printer {
         }
     }
 
+    /// JSON output includes each match's text
+    pub fn needs_text(&self) -> bool {
+        self.mode == OutputMode::Json
+    }
+
     pub fn file(&mut self, file: &FileHits) {
         if file.hits.is_empty() {
             return;

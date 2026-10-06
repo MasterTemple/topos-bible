@@ -11,7 +11,7 @@ impl ByteIndex {
 }
 
 /// A position in text; every column is 1-based (subtract 1 for LSP, which is 0-based)
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Position {
     /// 1-based line
     pub line: usize,

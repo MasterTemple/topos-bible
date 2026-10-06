@@ -91,3 +91,35 @@ fn exit_codes() {
     let missing = topos(&["does-not-exist.md"], None);
     assert_eq!(missing.status.code(), Some(2));
 }
+
+#[test]
+fn cache_reuses_and_refreshes_results() {
+    let dir = std::env::temp_dir().join(format!("topos-cache-test-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("docs")).unwrap();
+    let file = dir.join("docs/a.txt");
+    std::fs::write(&file, "See John 3:16\n").unwrap();
+
+    let run = || {
+        let output = Command::new(env!("CARGO_BIN_EXE_topos"))
+            .args(["--cache", "-m", "quickfix"])
+            .arg(&file)
+            .env("XDG_CACHE_HOME", dir.join("cache"))
+            .stdin(Stdio::null())
+            .output()
+            .unwrap();
+        String::from_utf8(output.stdout).unwrap()
+    };
+    let first = run();
+    assert!(first.ends_with(":1:5: John 3:16\n"), "{first}");
+    assert_eq!(
+        std::fs::read_dir(dir.join("cache/topos")).unwrap().count(),
+        1
+    );
+    assert_eq!(run(), first);
+
+    // A changed file is searched again (the size changes, so the mtime resolution does not matter)
+    std::fs::write(&file, "Now Romans 8:28 instead\n").unwrap();
+    assert!(run().ends_with(":1:5: Romans 8:28\n"));
+    let _ = std::fs::remove_dir_all(&dir);
+}

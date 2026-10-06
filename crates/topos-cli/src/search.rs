@@ -7,6 +7,7 @@ use std::{
     thread,
 };
 
+use crate::cache::Cache;
 use ignore::{WalkBuilder, WalkState};
 use topos_formats::{
     SearchFormat,
@@ -57,7 +58,7 @@ fn stdin_is_readable() -> bool {
 }
 
 /// One reference found in a file or text
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Hit {
     pub passage: Passage,
     /// Start and end positions, for text that has lines
@@ -81,34 +82,42 @@ pub struct FileHits {
 /// A result for each searched file, or an error with the file it came from
 pub type FileResult = Result<FileHits, (Option<PathBuf>, String)>;
 
+/// How files are searched
+pub struct Searcher {
+    pub matcher: BibleMatcher,
+    pub cache: Option<Cache>,
+    /// Keep the text of cached files (for context lines)
+    pub needs_text: bool,
+}
+
 /// Searches the input, sending each file's result as soon as it is ready
-pub fn search(matcher: Arc<BibleMatcher>, input: Input) -> mpsc::Receiver<FileResult> {
+pub fn search(searcher: Arc<Searcher>, input: Input) -> mpsc::Receiver<FileResult> {
     let (sender, receiver) = mpsc::channel();
     match input {
         Input::Text(text) => {
-            let _ = sender.send(Ok(search_text(&matcher, None, text)));
+            let _ = sender.send(Ok(search_text(&searcher.matcher, None, text)));
         }
         Input::Paths(paths) => {
-            thread::spawn(move || walk(matcher, paths, sender));
+            thread::spawn(move || walk(searcher, paths, sender));
         }
     }
     receiver
 }
 
-fn walk(matcher: Arc<BibleMatcher>, paths: Vec<PathBuf>, sender: mpsc::Sender<FileResult>) {
+fn walk(searcher: Arc<Searcher>, paths: Vec<PathBuf>, sender: mpsc::Sender<FileResult>) {
     let mut builder = WalkBuilder::new(&paths[0]);
     for path in &paths[1..] {
         builder.add(path);
     }
     builder.build_parallel().run(|| {
-        let matcher = matcher.clone();
+        let searcher = searcher.clone();
         let sender = sender.clone();
         Box::new(move |entry| {
             let result = match entry {
                 Ok(entry) if entry.file_type().is_some_and(|t| t.is_dir()) => {
                     return WalkState::Continue;
                 }
-                Ok(entry) => match search_file(&matcher, entry.path()) {
+                Ok(entry) => match searcher.search_file(entry.path()) {
                     Ok(Some(hits)) => Ok(hits),
                     Ok(None) => return WalkState::Continue,
                     Err(err) => Err((Some(entry.path().to_path_buf()), err)),
@@ -121,6 +130,29 @@ fn walk(matcher: Arc<BibleMatcher>, paths: Vec<PathBuf>, sender: mpsc::Sender<Fi
             }
         })
     });
+}
+
+impl Searcher {
+    /// Uses the cache when the file has not changed
+    fn search_file(&self, path: &Path) -> Result<Option<FileHits>, String> {
+        let Some(cache) = &self.cache else {
+            return search_file(&self.matcher, path);
+        };
+        if let Some(hits) = cache.get(path) {
+            let text = self
+                .needs_text
+                .then(|| fs::read(path).ok())
+                .flatten()
+                .map(|bytes| Arc::from(String::from_utf8_lossy(&bytes).as_ref()));
+            let path = Some(path.to_path_buf());
+            return Ok(Some(FileHits { path, text, hits }));
+        }
+        let found = search_file(&self.matcher, path)?;
+        if let Some(found) = &found {
+            cache.insert(path, &found.hits);
+        }
+        Ok(found)
+    }
 }
 
 /// `Ok(None)` for files that are skipped (binary files without a supported format)
