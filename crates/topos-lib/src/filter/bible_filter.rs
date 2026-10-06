@@ -108,10 +108,17 @@ impl BibleFilter {
         &self.ids
     }
 
-    /// Only keep matches that overlap this passage (`Err` if it cannot be parsed)
+    /// Keep matches entirely inside this passage (`Err` if it cannot be parsed)
     pub fn filter_inside(&mut self, passage: &str) -> ToposResult<()> {
         let psg = self.parse_passage(passage)?;
         self.complex_filter.inside(psg);
+        Ok(())
+    }
+
+    /// Keep matches that share any verse with this passage (`Err` if it cannot be parsed)
+    pub fn filter_overlaps(&mut self, passage: &str) -> ToposResult<()> {
+        let psg = self.parse_passage(passage)?;
+        self.complex_filter.overlaps(psg);
         Ok(())
     }
 
@@ -169,13 +176,22 @@ mod tests {
     }
 
     #[test]
-    fn inside_filter() {
-        let mut filter = BibleFilter::default();
-        filter.filter_inside("Romans 8").unwrap();
-        assert!(filter.filter_inside("not a passage").is_err());
-        assert_eq!(
-            search(filter, "Romans 8:28, Romans 9:1, John 8:1"),
-            ["Romans 8:28"]
-        );
+    fn inside_and_overlaps_filters() {
+        let text = "Romans 8:28, Romans 8:38-9:1, Romans 9:2, John 8:1";
+        let mut inside = BibleFilter::default();
+        inside.filter_inside("Romans 8").unwrap();
+        assert!(inside.filter_inside("not a passage").is_err());
+        assert_eq!(search(inside, text), ["Romans 8:28"]);
+
+        let mut overlaps = BibleFilter::default();
+        overlaps.filter_overlaps("Romans 8").unwrap();
+        assert_eq!(search(overlaps, text), ["Romans 8:28", "Romans 8:38-9:1"]);
+
+        // Inclusions are joined with OR; exclusions apply after
+        let mut both = BibleFilter::default();
+        both.filter_inside("Romans 9").unwrap();
+        both.filter_overlaps("John 8").unwrap();
+        both.filter_outside("Romans 9:2").unwrap();
+        assert_eq!(search(both, text), ["John 8:1"]);
     }
 }

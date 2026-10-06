@@ -43,7 +43,7 @@ impl BibleMatcher {
     }
 
     pub fn filter(&self) -> FilteredBibleMatches<'_> {
-        self.complex_filter.as_filter()
+        self.complex_filter.as_filter(&self.data)
     }
 }
 

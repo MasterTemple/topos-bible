@@ -1,4 +1,5 @@
 pub mod autocomplete;
+pub mod coverage;
 pub mod formatter;
 pub mod grammar;
 pub mod osis;

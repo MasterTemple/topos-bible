@@ -1,25 +1,26 @@
 use std::collections::BTreeSet;
 
-use crate::{data::books::BookId, matcher::instance::BibleMatch, segments::passage::Passage};
+use crate::{
+    data::{bible_data::BibleData, books::BookId},
+    matcher::instance::BibleMatch,
+    segments::passage::Passage,
+};
 
+/// Decides which matches to keep, after every book has been matched
 /// Decides which matches to keep, after every book has been matched
 #[derive(Clone, Debug, Default)]
 pub struct ComplexFilter {
     /// [`None`] keeps every book
     books: Option<BTreeSet<BookId>>,
+    /// Keep matches entirely inside one of these
     inside_of: Vec<Passage>,
+    /// Keep matches that share a verse with one of these
+    overlapping: Vec<Passage>,
+    /// Drop matches that share a verse with any of these
     outside_of: Vec<Passage>,
 }
 
 impl ComplexFilter {
-    pub fn new(inside_of: Vec<Passage>, outside_of: Vec<Passage>) -> Self {
-        Self {
-            books: None,
-            inside_of,
-            outside_of,
-        }
-    }
-
     /// Only keep matches in these books
     pub fn books(&mut self, books: BTreeSet<BookId>) {
         self.books = Some(books);
@@ -29,50 +30,62 @@ impl ComplexFilter {
         self.inside_of.push(psg);
     }
 
+    pub fn overlaps(&mut self, psg: Passage) {
+        self.overlapping.push(psg);
+    }
+
     pub fn outside(&mut self, psg: Passage) {
         self.outside_of.push(psg);
     }
 
-    pub fn keep(&self, psg: &Passage) -> bool {
+    /**
+    - Inside and overlapping passages are inclusions, joined with a logical OR: a match is kept
+      if it is inside any `inside` passage or overlaps any `overlaps` passage
+    - Then a match that overlaps any `outside` passage is dropped
+    */
+    pub fn keep(&self, psg: &Passage, data: &BibleData) -> bool {
         if self.books.as_ref().is_some_and(|b| !b.contains(&psg.book)) {
             return false;
         }
-
-        let is_inside = self.inside_of.is_empty()
+        let versification = data.chapter_verses().get_chapter_verses(&psg.book);
+        let included = (self.inside_of.is_empty() && self.overlapping.is_empty())
             || self
                 .inside_of
                 .iter()
-                .any(|inside| inside.overlaps_with(psg));
-
-        if !is_inside {
-            return false;
-        }
-
-        self.outside_of
-            .iter()
-            .all(|outside| !outside.overlaps_with(psg))
+                .any(|outer| outer.contains_passage(psg, versification))
+            || self
+                .overlapping
+                .iter()
+                .any(|other| other.overlaps_passage(psg, versification));
+        included
+            && !self
+                .outside_of
+                .iter()
+                .any(|outside| outside.overlaps_passage(psg, versification))
     }
 
-    pub fn as_filter<'a>(&'a self) -> FilteredBibleMatches<'a> {
-        FilteredBibleMatches::new(self)
+    pub fn as_filter<'a>(&'a self, data: &'a BibleData) -> FilteredBibleMatches<'a> {
+        FilteredBibleMatches::new(self, data)
     }
 }
 
 pub struct FilteredBibleMatches<'a> {
     filter: &'a ComplexFilter,
+    data: &'a BibleData,
     matches: Vec<BibleMatch>,
 }
 
 impl<'a> FilteredBibleMatches<'a> {
-    pub fn new(filter: &'a ComplexFilter) -> Self {
+    pub fn new(filter: &'a ComplexFilter, data: &'a BibleData) -> Self {
         Self {
             filter,
+            data,
             matches: vec![],
         }
     }
 
     pub fn try_add(&mut self, m: BibleMatch) {
-        if self.filter.keep(&m.psg) {
+        if self.filter.keep(&m.psg, self.data) {
             self.matches.push(m);
         }
     }

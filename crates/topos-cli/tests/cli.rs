@@ -5,9 +5,30 @@ use std::{
     process::{Command, Output, Stdio},
 };
 
+/// A directory for this test process (configs and caches never touch the real home)
+fn scratch(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("topos-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
 fn topos(args: &[&str], stdin: Option<&str>) -> Output {
+    topos_with_config(None, args, stdin)
+}
+
+/// Runs with `config` as the default config file (or no config file)
+fn topos_with_config(config: Option<&str>, args: &[&str], stdin: Option<&str>) -> Output {
+    static RUNS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let run = RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let home = scratch(&format!("config-{run}"));
+    if let Some(config) = config {
+        std::fs::create_dir_all(home.join("topos")).unwrap();
+        std::fs::write(home.join("topos/config.toml"), config).unwrap();
+    }
     let mut child = Command::new(env!("CARGO_BIN_EXE_topos"))
         .args(args)
+        .env("XDG_CONFIG_HOME", &home)
         .stdin(if stdin.is_some() {
             Stdio::piped()
         } else {
@@ -105,6 +126,7 @@ fn cache_reuses_and_refreshes_results() {
             .args(["--cache", "-m", "quickfix"])
             .arg(&file)
             .env("XDG_CACHE_HOME", dir.join("cache"))
+            .env("XDG_CONFIG_HOME", dir.join("config"))
             .stdin(Stdio::null())
             .output()
             .unwrap();
@@ -122,4 +144,45 @@ fn cache_reuses_and_refreshes_results() {
     std::fs::write(&file, "Now Romans 8:28 instead\n").unwrap();
     assert!(run().ends_with(":1:5: Romans 8:28\n"));
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn inside_overlaps_and_outside() {
+    let text = "Rom 8:28; Rom 8:38-9:1; Rom 9:2";
+    let refs = |args: &[&str]| {
+        let mut all = vec!["--text", text, "-m", "quickfix"];
+        all.extend(args);
+        stdout(&topos(&all, None))
+    };
+    assert_eq!(refs(&["-i", "Romans 8"]), ":1:1: Romans 8:28\n");
+    assert_eq!(
+        refs(&["-o", "Romans 8"]),
+        ":1:1: Romans 8:28\n:1:11: Romans 8:38-9:1\n"
+    );
+    assert_eq!(
+        refs(&["-o", "Romans 9", "--outside", "Romans 9:2"]),
+        ":1:11: Romans 8:38-9:1\n"
+    );
+}
+
+#[test]
+fn default_config_file() {
+    let config = "format = \"osis\"\nmode = \"quickfix\"\n";
+    let run = |args: &[&str]| {
+        let mut all = vec!["--text", "John 3:16"];
+        all.extend(args);
+        stdout(&topos_with_config(Some(config), &all, None))
+    };
+    // The config applies, the command line overrides it, and --no-config ignores it
+    assert_eq!(run(&[]), ":1:1: John.3.16\n");
+    assert_eq!(run(&["-f", "name"]), ":1:1: John 3:16\n");
+    assert_eq!(run(&["--no-config", "-m", "quickfix"]), ":1:1: John 3:16\n");
+
+    let bad = topos_with_config(Some("colour = \"always\""), &["--text", "x"], None);
+    assert_eq!(bad.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&bad.stderr);
+    assert!(
+        stderr.contains("config.toml: unknown option `colour`"),
+        "{stderr}"
+    );
 }

@@ -17,6 +17,7 @@ topos-lib = { path = "../topos-lib" }
 
 # workspace dependencies
 serde = { workspace = true }
+toml = "1.1"
 serde_json = { workspace = true }
 
 [features]

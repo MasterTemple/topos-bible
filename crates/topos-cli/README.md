@@ -113,12 +113,12 @@ topos -b Romans -m table
 | ./Church 02-23-25.md | 224  | 8   | Romans 8      |
 ```
 
-### Filter Inside Passage
+### Filter by Passage
 
 **Command**
 
 ```bash
-topos -i "1 Peter 1:1-5, 4:11,14-16" -m table
+topos -o "1 Peter 1:1-5, 4:11,14-16" -m table
 ```
 
 **Output**
@@ -133,9 +133,12 @@ topos -i "1 Peter 1:1-5, 4:11,14-16" -m table
 | ./Church 03-09-25.md | 241  | 12  | 1 Peter 1:3-4 |
 ```
 
+`-o`/`--overlaps` keeps references that share any verse with the passage (like `1 Peter 4` above).
+`-i`/`--inside` only keeps references entirely inside it, so `1 Peter 4` would be dropped.
+
 ### Exclude Testament/Genre/Book/Passage
 
-Use just like above, but prefix full command with `exclude`
+Use just like above, but prefix the full option with `exclude` (or use `--outside` for passages)
 
 ```bash
 topos --exclude-testament new -m table
@@ -159,7 +162,21 @@ topos --exclude-testament new -m table
 - Including a testament, genre, or book excludes everything else in that category
 - Exclusions are applied after all inclusions, so a book can be excluded from an included genre
 - Several inclusions are joined with a logical OR (`-t new -b Psalms` is the New Testament and Psalms)
+- `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches
 - Unknown books or genres are errors
+
+## Config
+
+Default options go in `~/.config/topos/config.toml` (or `$XDG_CONFIG_HOME/topos/config.toml`).
+Each key is a long option name; the command line overrides them, and `--no-config` ignores the file.
+
+```toml
+mode = "grouped"
+color = "always"
+cache = true
+exclude-book = ["Song of Solomon"]
+data = "~/bible/custom.json"   # custom books, genres, or chapter and verse counts
+```
 
 ## File types
 
@@ -175,6 +192,7 @@ Find Bible references in files, directories, text, or stdin.
 - Including a testament, genre, or book excludes everything else in that category
 - Exclusions are applied after inclusions, so a book can be excluded from an included genre
 - Several inclusions of the same kind are joined with a logical OR
+- `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches
 
 Usage: topos [OPTIONS] [PATHS]...
 
@@ -205,10 +223,13 @@ Options:
           Exclude a book
 
   -i, --inside <INSIDE>
-          Only keep references that overlap this passage (e.g. "John 1:2-3")
+          Only keep references entirely inside this passage (e.g. "John 1" keeps John 1:2-3)
 
-  -o, --outside <OUTSIDE>
-          Drop references that overlap this passage (e.g. "John 3:4-5")
+  -o, --overlaps <OVERLAPS>
+          Only keep references that share any verse with this passage (e.g. "John 1" keeps John 1:51-2:1)
+
+      --outside <OUTSIDE>
+          Drop references that share any verse with this passage
 
       --context-book <CONTEXT_BOOK>
           Treat the input as being about this book, so references like 3:16 match
@@ -216,8 +237,11 @@ Options:
       --context-heading <CONTEXT_HEADING>
           Lines matching this pattern set the book for references after them, like '^#+ {book}$'
 
-      --config <CONFIG>
+      --data <DATA>
           A JSON file with custom books, genres, or chapter and verse counts
+
+      --no-config
+          Do not read the default options from ~/.config/topos/config.toml
 
   -m, --mode <MODE>
           How to print results
@@ -263,6 +287,9 @@ Options:
 
       --sort
           Print results sorted by path (waits for the whole search)
+
+      --cache
+          Reuse results for files that have not changed since the last search with the same options
 
   -h, --help
           Print help (see a summary with '-h')

@@ -18,13 +18,16 @@ Find Bible references in files, directories, text, or stdin.
 - Including a testament, genre, or book excludes everything else in that category
 - Exclusions are applied after inclusions, so a book can be excluded from an included genre
 - Several inclusions of the same kind are joined with a logical OR
+- `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches
 */
 #[derive(Parser, Debug)]
 #[command(
     name = "topos",
     version,
     about = "Find Bible references, like ripgrep",
-    verbatim_doc_comment
+    verbatim_doc_comment,
+    // Options from the config file come first, so the command line overrides them
+    args_override_self = true
 )]
 pub struct Args {
     /// Files or directories to search (respecting .gitignore); defaults to stdin when piped,
@@ -59,12 +62,17 @@ pub struct Args {
     #[arg(long = "exclude-book")]
     pub exclude_books: Vec<String>,
 
-    /// Only keep references that overlap this passage (e.g. "John 1:2-3")
+    /// Only keep references entirely inside this passage (e.g. "John 1" keeps John 1:2-3)
     #[arg(long = "inside", short = 'i')]
     pub inside: Vec<String>,
 
-    /// Drop references that overlap this passage (e.g. "John 3:4-5")
-    #[arg(long = "outside", short = 'o')]
+    /// Only keep references that share any verse with this passage (e.g. "John 1" keeps
+    /// John 1:51-2:1)
+    #[arg(long = "overlaps", short = 'o')]
+    pub overlaps: Vec<String>,
+
+    /// Drop references that share any verse with this passage
+    #[arg(long = "outside")]
     pub outside: Vec<String>,
 
     /// Treat the input as being about this book, so references like 3:16 match
@@ -77,7 +85,11 @@ pub struct Args {
 
     /// A JSON file with custom books, genres, or chapter and verse counts
     #[arg(long)]
-    pub config: Option<PathBuf>,
+    pub data: Option<PathBuf>,
+
+    /// Do not read the default options from ~/.config/topos/config.toml
+    #[arg(long)]
+    pub no_config: bool,
 
     /// How to print results
     #[arg(long, short = 'm', value_enum, default_value_t)]
@@ -156,8 +168,8 @@ pub enum ColorChoice {
 impl Args {
     /// Every option that changes which references are found (for the cache)
     pub fn fingerprint(&self) -> String {
-        let config = self
-            .config
+        let data = self
+            .data
             .as_ref()
             .and_then(|path| fs::read_to_string(path).ok());
         format!(
@@ -166,9 +178,9 @@ impl Args {
                 (&self.testaments, &self.exclude_testaments),
                 (&self.genres, &self.exclude_genres),
                 (&self.books, &self.exclude_books),
-                (&self.inside, &self.outside),
+                (&self.inside, &self.overlaps, &self.outside),
                 (&self.context_book, &self.context_heading),
-                config,
+                data,
             )
         )
     }
@@ -196,7 +208,7 @@ impl Args {
     }
 
     pub fn matcher(&self) -> AnyResult<BibleMatcher> {
-        let data = match &self.config {
+        let data = match &self.data {
             Some(path) => {
                 let input: BibleDataInput = serde_json::from_str(&fs::read_to_string(path)?)
                     .map_err(|e| format!("{}: {e}", path.display()))?;
@@ -213,6 +225,9 @@ impl Args {
         filter.exclude_many(self.exclude_books.iter().map(BookFilter::new))?;
         for passage in &self.inside {
             filter.filter_inside(passage)?;
+        }
+        for passage in &self.overlaps {
+            filter.filter_overlaps(passage)?;
         }
         for passage in &self.outside {
             filter.filter_outside(passage)?;

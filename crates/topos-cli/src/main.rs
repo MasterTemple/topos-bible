@@ -11,12 +11,20 @@ use crate::{
 
 mod args;
 mod cache;
+mod config;
 mod output;
 mod search;
 
 /// Like ripgrep: 0 when something matched, 1 when nothing did, 2 on errors
 fn main() -> ExitCode {
-    let mut args = Args::parse();
+    let argv = match config::with_defaults(std::env::args_os().collect()) {
+        Ok(argv) => argv,
+        Err(err) => {
+            eprintln!("topos: {err}");
+            return ExitCode::from(2);
+        }
+    };
+    let mut args = Args::parse_from(argv);
     let matcher = match args.matcher() {
         Ok(matcher) => matcher,
         Err(err) => {
