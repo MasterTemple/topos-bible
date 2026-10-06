@@ -22,7 +22,8 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
   then every verse, up to 176), narrowing as you type. In passage inputs, Enter adds a finished
   reference (`Add "John 3:16"` is the first choice) and Tab completes. Remove a chip with × or a
   middle-click
-- Sort by order in your notes or order in the Bible; group by note or by book (remembered)
+- Sort by order in your notes or order in the Bible; group by note or by book; show lines of
+  context around each result (±1 to ±10 lines, read from the notes). All remembered
 - **Saved searches**: name the current filters (and folder) with *Save*, pick one from the list,
   or open one with the *Open a saved search* command. Each is stored as the CLI's options, like
   `Sermons --nt -g "Pauline Epistles" -o "John 1"`, which you can also write or edit under
@@ -102,7 +103,8 @@ includes these bindings, the dependency can point at the npm version instead.
 
 - `npm run dev` rebuilds `main.js` on every change
 - `npm test` runs the tests with Node: the core logic, the bundled WebAssembly loading, the
-  bundled worker (in a Node worker thread), the built plugin against a stand-in for Obsidian's
+  bundled worker (in a Node worker thread), the sidebar in a DOM (happy-dom: inputs, chips,
+  context lines), the built plugin against a stand-in for Obsidian's
   API (loading, indexing with both engines, commands, and autocomplete), and the sidebar rendered
   to HTML. The CLI tests use `../target/debug/topos` (`cargo build -p topos-cli`) and are skipped
   without it

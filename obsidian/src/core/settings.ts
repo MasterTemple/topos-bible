@@ -29,6 +29,8 @@ export interface ToposSettings {
   /** The sidebar's order and grouping, remembered between sessions */
   sort: SortOrder;
   groupBy: "file" | "book";
+  /** Lines of context around each result in the sidebar */
+  context: number;
   /** Named searches, with the CLI's filter options */
   queries: SavedQuery[];
   /** Index the vault in a background thread, or with the topos CLI (desktop only) */
@@ -52,6 +54,7 @@ export const DEFAULT_SETTINGS: ToposSettings = {
   excludeFolders: "",
   sort: "file",
   groupBy: "file",
+  context: 0,
   queries: [],
   engine: "builtin",
   cliPath: "",

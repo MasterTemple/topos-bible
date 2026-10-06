@@ -21,7 +21,7 @@ test("the sidebar renders filtered, grouped results", async () => {
      import { DEFAULT_SETTINGS } from ${src("core/settings.ts")};
      import { NO_FILTERS } from ${src("core/filters.ts")};
 
-     export function render(filters, groupBy, queries = []) {
+     export function render(filters, groupBy, queries = [], context = 0) {
        const topos = Topos.new();
        const index = new ReferenceIndex(topos);
        index.update("a.md", "Read Jn 3:16 and Rom 8:28");
@@ -29,9 +29,12 @@ test("the sidebar renders filtered, grouped results", async () => {
        const plugin = {
          topos, index, indexVersion: 1, indexing: false,
          settings: { ...DEFAULT_SETTINGS, queries },
-         search: new SearchStore({ filters: { ...NO_FILTERS, ...filters }, groupBy }),
+         search: new SearchStore({ filters: { ...NO_FILTERS, ...filters }, groupBy, context }),
          subscribeIndex: () => () => {},
-         app: { workspace: { getActiveFile: () => null, on: () => ({}), offref() {} } },
+         app: {
+           workspace: { getActiveFile: () => null, on: () => ({}), offref() {} },
+           vault: { getFileByPath: (path) => ({ path }), cachedRead: async () => "" },
+         },
        };
        return renderToString(<SearchApp plugin={plugin} />);
      }`,
@@ -85,6 +88,9 @@ test("the sidebar renders filtered, grouped results", async () => {
   assert.match(text(render({ overlaps: ["John 3"] }, "file")), /1 reference in 1 note/);
   assert.match(text(render({ inside: ["John 1-3"] }, "file")), /2 references in 2 notes/);
   assert.match(text(render({ outside: ["John 1-3"] }, "file")), /2 references in 2 notes.*Romans 8:28/);
+
+  // The context control (lines are read after the first render, so the server render has none)
+  assert.match(render({}, "file", [], 2), /<option value="2" selected="">±2 lines<\/option>/);
 
   const bad = text(render({ books: ["Jhon"] }, "file"));
   assert.match(bad, /Unknown book &quot;Jhon&quot;/);

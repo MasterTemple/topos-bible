@@ -22,8 +22,11 @@ function Dropdown({
   onPick: (index: number) => void;
 }) {
   const activeItem = useRef<HTMLLIElement>(null);
-  // Keep the keyboard's choice visible while scrolling through long lists
-  useEffect(() => activeItem.current?.scrollIntoView({ block: "nearest" }), [active, options.length]);
+  // Keep the keyboard's choice visible while scrolling through long lists. (A block body: in
+  // recent Chromium scrollIntoView returns a promise, which React would call as a cleanup.)
+  useEffect(() => {
+    activeItem.current?.scrollIntoView({ block: "nearest" });
+  }, [active, options.length]);
   if (options.length === 0) return null;
   return (
     <ul className="topos-dropdown">

@@ -2,6 +2,7 @@ import { ItemView, type WorkspaceLeaf } from "obsidian";
 import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type ToposPlugin from "../main.ts";
+import { ErrorBoundary } from "./ErrorBoundary.tsx";
 import { SearchApp } from "./SearchApp.tsx";
 
 export const SEARCH_VIEW = "topos-bible-search";
@@ -32,7 +33,9 @@ export class SearchView extends ItemView {
     this.root = createRoot(this.contentEl);
     this.root.render(
       <StrictMode>
-        <SearchApp plugin={this.plugin} />
+        <ErrorBoundary>
+          <SearchApp plugin={this.plugin} />
+        </ErrorBoundary>
       </StrictMode>,
     );
   }

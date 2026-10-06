@@ -49,14 +49,15 @@ export default class ToposPlugin extends Plugin {
     await this.loadSettings();
     this.topos = await loadTopos();
     this.index = new ReferenceIndex(this.topos);
-    this.search.set({ sort: this.settings.sort, groupBy: this.settings.groupBy });
-    // Remember the sidebar's order and grouping
+    const { sort, groupBy, context } = this.settings;
+    this.search.set({ sort, groupBy, context });
+    // Remember the sidebar's order, grouping, and context lines
     this.search.subscribe(() => {
-      const { sort, groupBy } = this.search.get();
-      if (sort === this.settings.sort && groupBy === this.settings.groupBy) return;
-      this.settings.sort = sort;
-      this.settings.groupBy = groupBy;
-      void this.saveData(this.settings);
+      const { sort, groupBy, context } = this.search.get();
+      const settings = this.settings;
+      if (sort === settings.sort && groupBy === settings.groupBy && context === settings.context) return;
+      Object.assign(settings, { sort, groupBy, context });
+      void this.saveData(settings);
     });
 
     this.registerView(SEARCH_VIEW, (leaf) => new SearchView(leaf, this));

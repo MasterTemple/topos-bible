@@ -306,3 +306,17 @@
 .topos-chip {
   user-select: none;
 }
+/* With context, lines wrap in full so they line up */
+.topos-context-line,
+.topos-hit.has-context .topos-hit-context {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.topos-context-line {
+  color: var(--text-faint);
+}
+.topos-crash pre {
+  white-space: pre-wrap;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-error);
+}

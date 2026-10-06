@@ -61,6 +61,11 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
     [hits, shown, state.groupBy, books],
   );
   const fileCount = useMemo(() => new Set(hits.map((h) => h.path)).size, [hits]);
+  const shownPaths = useMemo(
+    () => [...new Set(groups.flatMap((g) => g.hits.map((h) => h.path)))],
+    [groups],
+  );
+  const fileLines = useFileLines(plugin, state.context > 0 ? shownPaths : [], indexVersion);
 
   const setFilters = (update: Partial<Filters>) => {
     plugin.search.set({ filters: { ...state.filters, ...update } });
@@ -114,6 +119,18 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
         >
           <option value="file">Group by note</option>
           <option value="book">Group by book</option>
+        </select>
+        <select
+          value={state.context}
+          onChange={(e) => plugin.search.set({ context: Number(e.target.value) })}
+          aria-label="Context lines"
+          title="Lines of context around each result"
+        >
+          {[0, 1, 2, 3, 5, 10].map((n) => (
+            <option key={n} value={n}>
+              {n === 0 ? "No context" : `±${n} line${n === 1 ? "" : "s"}`}
+            </option>
+          ))}
         </select>
         <select
           value={styleName}
@@ -312,6 +329,8 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
                     hit={hit}
                     reference={styled(topos, hit.passage, style)}
                     showPath={state.groupBy === "book"}
+                    context={state.context}
+                    lines={fileLines.get(hit.path)}
                   />
                 ))}
             </div>
@@ -369,22 +388,54 @@ function TestamentToggle({
   );
 }
 
+/**
+ * The lines of the notes being shown, for context (read on demand, so it works the same whichever
+ * engine indexed them, and costs nothing with context off)
+ */
+function useFileLines(plugin: ToposPlugin, paths: string[], indexVersion: number): Map<string, string[]> {
+  const [lines, setLines] = useState(() => new Map<string, string[]>());
+  const key = paths.join("\n");
+  useEffect(() => {
+    if (paths.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const next = new Map<string, string[]>();
+      for (const path of paths) {
+        const file = plugin.app.vault.getFileByPath?.(path);
+        if (!file) continue;
+        next.set(path, (await plugin.app.vault.cachedRead(file)).split(/\r?\n/));
+      }
+      if (!cancelled) setLines(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // paths is summarized by key; indexVersion re-reads notes that changed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plugin, key, indexVersion]);
+  return lines;
+}
+
 function HitRow({
   plugin,
   hit,
   reference,
   showPath,
+  context,
+  lines,
 }: {
   plugin: ToposPlugin;
   hit: Hit;
   reference: string;
   showPath: boolean;
+  context: number;
+  lines: string[] | undefined;
 }) {
   const from = hit.column - 1;
   const to = Math.min(hit.lineText.length, from + (hit.end - hit.start));
   const url = literalWordUrl(hit.passage, plugin.settings.translation);
   return (
-    <div className="topos-hit" onClick={() => void plugin.openHit(hit)}>
+    <div className={`topos-hit${context > 0 ? " has-context" : ""}`} onClick={() => void plugin.openHit(hit)}>
       <div className="topos-hit-head">
         <span className="topos-hit-reference">{reference}</span>
         <span className="topos-hit-location">
@@ -404,11 +455,26 @@ function HitRow({
           </button>
         )}
       </div>
+      {context > 0 && lines && <ContextLines lines={lines} from={hit.line - 1 - context} to={hit.line - 2} />}
       <div className="topos-hit-context">
-        {hit.lineText.slice(0, from).trimStart()}
+        {context > 0 ? hit.lineText.slice(0, from) : hit.lineText.slice(0, from).trimStart()}
         <mark>{hit.lineText.slice(from, to)}</mark>
         {hit.lineText.slice(to)}
       </div>
+      {context > 0 && lines && <ContextLines lines={lines} from={hit.line} to={hit.line - 1 + context} />}
     </div>
   );
+}
+
+/** Lines `from` to `to` (0-based, inclusive) of a note, for context around a result */
+function ContextLines({ lines, from, to }: { lines: string[]; from: number; to: number }) {
+  const shown = [];
+  for (let i = Math.max(0, from); i <= Math.min(lines.length - 1, to); i++) {
+    shown.push(
+      <div key={i} className="topos-context-line">
+        {lines[i] || "\u00a0"}
+      </div>,
+    );
+  }
+  return <>{shown}</>;
 }

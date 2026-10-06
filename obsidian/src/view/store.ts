@@ -9,6 +9,8 @@ export interface SearchState {
   folder: string;
   sort: SortOrder;
   groupBy: "file" | "book";
+  /** Lines to show before and after each result's line */
+  context: number;
 }
 
 /** The sidebar's state, kept on the plugin so commands can set filters and the view survives reloads */
@@ -17,7 +19,7 @@ export class SearchStore {
   private readonly listeners = new Set<() => void>();
 
   constructor(initial: Partial<SearchState> = {}) {
-    this.state = { filters: NO_FILTERS, scope: "vault", folder: "", sort: "file", groupBy: "file", ...initial };
+    this.state = { filters: NO_FILTERS, scope: "vault", folder: "", sort: "file", groupBy: "file", context: 0, ...initial };
   }
 
   get = (): SearchState => this.state;
