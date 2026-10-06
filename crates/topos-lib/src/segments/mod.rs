@@ -1,6 +1,7 @@
 pub mod autocomplete;
 pub mod formatter;
 pub mod grammar;
+pub mod osis;
 pub mod passage;
 pub mod resolve;
 pub mod segment;

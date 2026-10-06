@@ -46,6 +46,10 @@ pub struct Books {
     book_id_to_name: BTreeMap<BookId, String>,
     /// map of book id to abbreviation (for display)
     book_id_to_abbreviation: BTreeMap<BookId, String>,
+    /// map of book id to OSIS book id (`Gen`, `1Sam`)
+    book_id_to_osis: BTreeMap<BookId, String>,
+    /// map of OSIS book id to book id
+    osis_to_book_id: BTreeMap<String, BookId>,
     /// normalized abbreviations that are also common words (`is`, `am`)
     ambiguous: BTreeSet<String>,
     regexes: BookRegexes,
@@ -115,6 +119,14 @@ impl Books {
     pub fn get_abbrev(&self, id: BookId) -> Option<&String> {
         self.id_to_abbrev().get(&id)
     }
+    /// The OSIS book id, like `Gen` or `1Sam`
+    pub fn get_osis(&self, id: BookId) -> Option<&String> {
+        self.book_id_to_osis.get(&id)
+    }
+    /// The book for an OSIS book id (exact, case-sensitive)
+    pub fn search_osis(&self, osis: &str) -> Option<BookId> {
+        self.osis_to_book_id.get(osis).copied()
+    }
 
     /**
     - Book names in `text` that are followed by something that could start a chapter (a digit or
@@ -165,8 +177,14 @@ impl Books {
         let mut book_id_to_name = BTreeMap::new();
         let mut book_id_to_abbreviation = BTreeMap::new();
         let mut ambiguous = BTreeSet::new();
+        let mut book_id_to_osis = BTreeMap::new();
+        let mut osis_to_book_id = BTreeMap::new();
 
         for book in data.0 {
+            if let Some(osis) = &book.osis {
+                book_id_to_osis.insert(book.id, osis.clone());
+                osis_to_book_id.insert(osis.clone(), book.id);
+            }
             ambiguous.extend(book.ambiguous.iter().map(|a| Books::normalize_book_name(a)));
             abbreviations_to_book_id.insert(Books::normalize_book_name(&book.book), book.id);
             book_id_to_name.insert(book.id, book.book);
@@ -183,6 +201,8 @@ impl Books {
             input_to_book_id: abbreviations_to_book_id,
             book_id_to_name,
             book_id_to_abbreviation,
+            book_id_to_osis,
+            osis_to_book_id,
             ambiguous,
             regexes,
         })
@@ -262,6 +282,11 @@ pub struct Book {
     #[serde(alias = "abbrv")]
     #[serde(alias = "abbrev")]
     abbreviation: String,
+
+    /// - the OSIS book id, like `Gen`, `1Sam`, or `John`
+    /// - used to read and write OSIS references
+    #[serde(default)]
+    osis: Option<String>,
 
     /// - does not need to include book name or abbreviation
     /// - meant for matching/parsing references

@@ -3,6 +3,7 @@
     "id": 1,
     "book": "Genesis",
     "abbreviation": "Gn",
+    "osis": "Gen",
     "abbreviations": [
       "gen",
       "ge",
@@ -13,6 +14,7 @@
     "id": 2,
     "book": "Exodus",
     "abbreviation": "Ex",
+    "osis": "Exod",
     "abbreviations": [
       "ex",
       "exod",
@@ -26,6 +28,7 @@
     "id": 3,
     "book": "Leviticus",
     "abbreviation": "Lv",
+    "osis": "Lev",
     "abbreviations": [
       "lev",
       "le",
@@ -39,6 +42,7 @@
     "id": 4,
     "book": "Numbers",
     "abbreviation": "Nm",
+    "osis": "Num",
     "abbreviations": [
       "num",
       "nu",
@@ -54,6 +58,7 @@
     "id": 5,
     "book": "Deuteronomy",
     "abbreviation": "Dt",
+    "osis": "Deut",
     "abbreviations": [
       "deut",
       "de",
@@ -68,6 +73,7 @@
     "id": 6,
     "book": "Joshua",
     "abbreviation": "Jos",
+    "osis": "Josh",
     "abbreviations": [
       "josh",
       "jos",
@@ -78,6 +84,7 @@
     "id": 7,
     "book": "Judges",
     "abbreviation": "Jgs",
+    "osis": "Judg",
     "abbreviations": [
       "judg",
       "jdg",
@@ -89,6 +96,7 @@
     "id": 8,
     "book": "Ruth",
     "abbreviation": "Ru",
+    "osis": "Ruth",
     "abbreviations": [
       "ruth",
       "rth",
@@ -103,6 +111,7 @@
     "id": 9,
     "book": "1 Samuel",
     "abbreviation": "1 Sm",
+    "osis": "1Sam",
     "abbreviations": [
       "1 sam",
       "1 sm",
@@ -123,6 +132,7 @@
     "id": 10,
     "book": "2 Samuel",
     "abbreviation": "2 Sm",
+    "osis": "2Sam",
     "abbreviations": [
       "2 sam",
       "2 sm",
@@ -143,6 +153,7 @@
     "id": 11,
     "book": "1 Kings",
     "abbreviation": "1 Kgs",
+    "osis": "1Kgs",
     "abbreviations": [
       "1 kings",
       "1 kgs",
@@ -163,6 +174,7 @@
     "id": 12,
     "book": "2 Kings",
     "abbreviation": "2 Kgs",
+    "osis": "2Kgs",
     "abbreviations": [
       "2 kings",
       "2 kgs",
@@ -183,6 +195,7 @@
     "id": 13,
     "book": "1 Chronicles",
     "abbreviation": "1 Chr",
+    "osis": "1Chr",
     "abbreviations": [
       "1 chron",
       "1 chr",
@@ -204,6 +217,7 @@
     "id": 14,
     "book": "2 Chronicles",
     "abbreviation": "2 Chr",
+    "osis": "2Chr",
     "abbreviations": [
       "2 chron",
       "2 chr",
@@ -225,6 +239,7 @@
     "id": 15,
     "book": "Ezra",
     "abbreviation": "Ezr",
+    "osis": "Ezra",
     "abbreviations": [
       "ezra",
       "ezr",
@@ -235,6 +250,7 @@
     "id": 16,
     "book": "Nehemiah",
     "abbreviation": "Neh",
+    "osis": "Neh",
     "abbreviations": [
       "neh",
       "ne"
@@ -244,6 +260,7 @@
     "id": 17,
     "book": "Esther",
     "abbreviation": "Est",
+    "osis": "Esth",
     "abbreviations": [
       "est",
       "esth",
@@ -257,6 +274,7 @@
     "id": 18,
     "book": "Job",
     "abbreviation": "Jb",
+    "osis": "Job",
     "abbreviations": [
       "job",
       "jb"
@@ -266,6 +284,7 @@
     "id": 19,
     "book": "Psalms",
     "abbreviation": "Ps",
+    "osis": "Ps",
     "abbreviations": [
       "ps",
       "psalm",
@@ -280,6 +299,7 @@
     "id": 20,
     "book": "Proverbs",
     "abbreviation": "Prv",
+    "osis": "Prov",
     "abbreviations": [
       "prov",
       "pro",
@@ -295,6 +315,7 @@
     "id": 21,
     "book": "Ecclesiastes",
     "abbreviation": "Eccl",
+    "osis": "Eccl",
     "abbreviations": [
       "eccles",
       "eccle",
@@ -310,6 +331,7 @@
     "id": 22,
     "book": "Song of Solomon",
     "abbreviation": "Sg",
+    "osis": "Song",
     "abbreviations": [
       "song",
       "song of songs",
@@ -331,6 +353,7 @@
     "id": 23,
     "book": "Isaiah",
     "abbreviation": "Is",
+    "osis": "Isa",
     "abbreviations": [
       "isa",
       "is"
@@ -343,6 +366,7 @@
     "id": 24,
     "book": "Jeremiah",
     "abbreviation": "Jer",
+    "osis": "Jer",
     "abbreviations": [
       "jer",
       "je",
@@ -353,6 +377,7 @@
     "id": 25,
     "book": "Lamentations",
     "abbreviation": "Lam",
+    "osis": "Lam",
     "abbreviations": [
       "lam",
       "la"
@@ -365,6 +390,7 @@
     "id": 26,
     "book": "Ezekiel",
     "abbreviation": "Ezk",
+    "osis": "Ezek",
     "abbreviations": [
       "ezek",
       "eze",
@@ -375,6 +401,7 @@
     "id": 27,
     "book": "Daniel",
     "abbreviation": "Dn",
+    "osis": "Dan",
     "abbreviations": [
       "dan",
       "da",
@@ -388,6 +415,7 @@
     "id": 28,
     "book": "Hosea",
     "abbreviation": "Hos",
+    "osis": "Hos",
     "abbreviations": [
       "hos",
       "ho"
@@ -400,6 +428,7 @@
     "id": 29,
     "book": "Joel",
     "abbreviation": "Jl",
+    "osis": "Joel",
     "abbreviations": [
       "joel",
       "jl",
@@ -410,6 +439,7 @@
     "id": 30,
     "book": "Amos",
     "abbreviation": "Am",
+    "osis": "Amos",
     "abbreviations": [
       "amos",
       "am",
@@ -423,6 +453,7 @@
     "id": 31,
     "book": "Obadiah",
     "abbreviation": "Ob",
+    "osis": "Obad",
     "abbreviations": [
       "obad",
       "ob",
@@ -436,6 +467,7 @@
     "id": 32,
     "book": "Jonah",
     "abbreviation": "Jon",
+    "osis": "Jonah",
     "abbreviations": [
       "jonah",
       "jnh",
@@ -446,6 +478,7 @@
     "id": 33,
     "book": "Micah",
     "abbreviation": "Mi",
+    "osis": "Mic",
     "abbreviations": [
       "mic",
       "mc"
@@ -455,6 +488,7 @@
     "id": 34,
     "book": "Nahum",
     "abbreviation": "Na",
+    "osis": "Nah",
     "abbreviations": [
       "nah",
       "na",
@@ -468,6 +502,7 @@
     "id": 35,
     "book": "Habakkuk",
     "abbreviation": "Hab",
+    "osis": "Hab",
     "abbreviations": [
       "hab",
       "hb"
@@ -477,6 +512,7 @@
     "id": 36,
     "book": "Zephaniah",
     "abbreviation": "Zep",
+    "osis": "Zeph",
     "abbreviations": [
       "zeph",
       "zep",
@@ -487,6 +523,7 @@
     "id": 37,
     "book": "Haggai",
     "abbreviation": "Hg",
+    "osis": "Hag",
     "abbreviations": [
       "hag",
       "hg"
@@ -499,6 +536,7 @@
     "id": 38,
     "book": "Zechariah",
     "abbreviation": "Zec",
+    "osis": "Zech",
     "abbreviations": [
       "zech",
       "zec",
@@ -509,6 +547,7 @@
     "id": 39,
     "book": "Malachi",
     "abbreviation": "Mal",
+    "osis": "Mal",
     "abbreviations": [
       "mal",
       "ml"
@@ -518,6 +557,7 @@
     "id": 40,
     "book": "Matthew",
     "abbreviation": "Mt",
+    "osis": "Matt",
     "abbreviations": [
       "matt",
       "matth",
@@ -532,6 +572,7 @@
     "id": 41,
     "book": "Mark",
     "abbreviation": "Mk",
+    "osis": "Mark",
     "abbreviations": [
       "mark",
       "mrk",
@@ -549,6 +590,7 @@
     "id": 42,
     "book": "Luke",
     "abbreviation": "Lk",
+    "osis": "Luke",
     "abbreviations": [
       "luke",
       "luk",
@@ -560,6 +602,7 @@
     "id": 43,
     "book": "John",
     "abbreviation": "Jn",
+    "osis": "John",
     "abbreviations": [
       "john",
       "joh",
@@ -571,6 +614,7 @@
     "id": 44,
     "book": "Acts",
     "abbreviation": "Acts",
+    "osis": "Acts",
     "abbreviations": [
       "acts",
       "act",
@@ -585,6 +629,7 @@
     "id": 45,
     "book": "Romans",
     "abbreviation": "Rom",
+    "osis": "Rom",
     "abbreviations": [
       "rom",
       "ro",
@@ -595,6 +640,7 @@
     "id": 46,
     "book": "1 Corinthians",
     "abbreviation": "1 Cor",
+    "osis": "1Cor",
     "abbreviations": [
       "1 cor",
       "1 co",
@@ -612,6 +658,7 @@
     "id": 47,
     "book": "2 Corinthians",
     "abbreviation": "2 Cor",
+    "osis": "2Cor",
     "abbreviations": [
       "2 cor",
       "2 co",
@@ -629,6 +676,7 @@
     "id": 48,
     "book": "Galatians",
     "abbreviation": "Gal",
+    "osis": "Gal",
     "abbreviations": [
       "gal",
       "ga"
@@ -641,6 +689,7 @@
     "id": 49,
     "book": "Ephesians",
     "abbreviation": "Eph",
+    "osis": "Eph",
     "abbreviations": [
       "eph",
       "ephes"
@@ -650,6 +699,7 @@
     "id": 50,
     "book": "Philippians",
     "abbreviation": "Phil",
+    "osis": "Phil",
     "abbreviations": [
       "phil",
       "php"
@@ -659,6 +709,7 @@
     "id": 51,
     "book": "Colossians",
     "abbreviation": "Col",
+    "osis": "Col",
     "abbreviations": [
       "col",
       "co"
@@ -672,6 +723,7 @@
     "id": 52,
     "book": "1 Thessalonians",
     "abbreviation": "1 Thes",
+    "osis": "1Thess",
     "abbreviations": [
       "1 thess",
       "1 thes",
@@ -694,6 +746,7 @@
     "id": 53,
     "book": "2 Thessalonians",
     "abbreviation": "2 Thes",
+    "osis": "2Thess",
     "abbreviations": [
       "2 thess",
       "2 thes",
@@ -715,6 +768,7 @@
     "id": 54,
     "book": "1 Timothy",
     "abbreviation": "1 Tm",
+    "osis": "1Tim",
     "abbreviations": [
       "1 tim",
       "1 ti",
@@ -734,6 +788,7 @@
     "id": 55,
     "book": "2 Timothy",
     "abbreviation": "2 Tm",
+    "osis": "2Tim",
     "abbreviations": [
       "2 tim",
       "2 ti",
@@ -753,6 +808,7 @@
     "id": 56,
     "book": "Titus",
     "abbreviation": "Ti",
+    "osis": "Titus",
     "abbreviations": [
       "titus",
       "tit",
@@ -766,6 +822,7 @@
     "id": 57,
     "book": "Philemon",
     "abbreviation": "Phlm",
+    "osis": "Phlm",
     "abbreviations": [
       "philem",
       "phm",
@@ -779,6 +836,7 @@
     "id": 58,
     "book": "Hebrews",
     "abbreviation": "Heb",
+    "osis": "Heb",
     "abbreviations": [
       "heb"
     ]
@@ -787,6 +845,7 @@
     "id": 59,
     "book": "James",
     "abbreviation": "Jas",
+    "osis": "Jas",
     "abbreviations": [
       "james",
       "jas",
@@ -797,6 +856,7 @@
     "id": 60,
     "book": "1 Peter",
     "abbreviation": "1 Pt",
+    "osis": "1Pet",
     "abbreviations": [
       "1 pet",
       "1 pe",
@@ -819,6 +879,7 @@
     "id": 61,
     "book": "2 Peter",
     "abbreviation": "2 Pt",
+    "osis": "2Pet",
     "abbreviations": [
       "2 pet",
       "2 pe",
@@ -841,6 +902,7 @@
     "id": 62,
     "book": "1 John",
     "abbreviation": "1 Jn",
+    "osis": "1John",
     "abbreviations": [
       "1 john",
       "1 jhn",
@@ -865,6 +927,7 @@
     "id": 63,
     "book": "2 John",
     "abbreviation": "2 Jn",
+    "osis": "2John",
     "abbreviations": [
       "2 john",
       "2 jhn",
@@ -889,6 +952,7 @@
     "id": 64,
     "book": "3 John",
     "abbreviation": "3 Jn",
+    "osis": "3John",
     "abbreviations": [
       "3 john",
       "3 jhn",
@@ -913,6 +977,7 @@
     "id": 65,
     "book": "Jude",
     "abbreviation": "Jude",
+    "osis": "Jude",
     "abbreviations": [
       "jude",
       "jud",
@@ -923,6 +988,7 @@
     "id": 66,
     "book": "Revelation",
     "abbreviation": "Rv",
+    "osis": "Rev",
     "abbreviations": [
       "rev",
       "re",
