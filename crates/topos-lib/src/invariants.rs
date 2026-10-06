@@ -2,7 +2,10 @@
 
 use std::sync::LazyLock;
 
-use crate::{matcher::BibleMatcher, segments::grammar::SegmentList};
+use crate::{
+    matcher::BibleMatcher,
+    segments::{autocomplete::CompleteOptions, grammar::SegmentList},
+};
 
 static MATCHER: LazyLock<BibleMatcher> = LazyLock::new(BibleMatcher::default);
 
@@ -11,7 +14,13 @@ pub fn check(input: &str) {
     check_grammar(input);
     check_search(input);
     // Autocomplete only has to not panic
-    let _ = MATCHER.completer().suggest(input);
+    for completion in MATCHER.complete(input, input.len(), &CompleteOptions::default()) {
+        check_span(
+            input,
+            completion.edit.range.start,
+            completion.edit.range.end,
+        );
+    }
 }
 
 fn check_span(input: &str, start: usize, end: usize) {

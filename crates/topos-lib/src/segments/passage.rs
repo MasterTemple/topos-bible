@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Passage {
     pub book: BookId,
     pub segments: Segments,
@@ -35,7 +35,7 @@ impl Passage {
 
 /// TODO: I need Segments and PartialSegments/Incomplete segments to be unified under a large
 /// Segment type that I can use for auto-completions
-#[derive(Clone, Debug, Deref, DerefMut, Serialize, Deserialize, IntoIterator)]
+#[derive(Clone, Debug, PartialEq, Eq, Deref, DerefMut, Serialize, Deserialize, IntoIterator)]
 pub struct Segments(pub Vec<Segment>);
 
 impl Default for Segments {

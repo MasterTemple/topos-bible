@@ -22,6 +22,7 @@ use crate::{
     Eq,
     PartialOrd,
     Ord,
+    Hash,
     Serialize,
     Deserialize,
     derive_more::From,

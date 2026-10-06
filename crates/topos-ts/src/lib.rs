@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use topos_lib::matcher::bible_matcher::BibleMatcher;
+use topos_lib::{matcher::bible_matcher::BibleMatcher, segments::autocomplete::CompleteOptions};
 use wasm_bindgen::prelude::*;
 
 static BIBLE: Lazy<BibleMatcher> = Lazy::new(BibleMatcher::default);
@@ -19,17 +19,11 @@ pub fn search(input: &str) -> Vec<String> {
 }
 
 #[wasm_bindgen]
-pub fn autocomplete(input: &str) -> Option<Vec<String>> {
-    let m = &*BIBLE;
-    let comp = m.completer().suggest(input)?;
-    let book = m.data().books().get_name(comp.book)?;
-    Some(
-        comp.suggestions
-            .iter()
-            .map(|sug| {
-                let segs = comp.segments.with_suggestion(*sug);
-                format!("{} {}", book, segs)
-            })
-            .collect(),
-    )
+pub fn autocomplete(input: &str) -> Vec<String> {
+    let options = CompleteOptions::default();
+    BIBLE
+        .complete(input, input.len(), &options)
+        .into_iter()
+        .map(|completion| completion.label)
+        .collect()
 }

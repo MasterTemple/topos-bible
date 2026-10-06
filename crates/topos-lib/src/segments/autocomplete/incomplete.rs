@@ -9,8 +9,10 @@ use crate::{
     },
 };
 
+/// The numbers typed so far are kept (unused for now) to filter suggestions by prefix later
+#[allow(dead_code, clippy::enum_variant_names)]
 #[derive(Clone, Debug)]
-pub enum IncompleteSegment {
+pub(crate) enum IncompleteSegment {
     /// - Example Segment: ""
     /// - Suggests: chapters or verses
     ChapterOrVerse { start: Option<u8> },
