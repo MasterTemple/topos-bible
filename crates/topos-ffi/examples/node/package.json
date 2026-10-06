@@ -1,0 +1,11 @@
+{
+  "name": "topos-node-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.ts"
+  },
+  "dependencies": {
+    "topos": "file:../../dist/wasm/pkg"
+  }
+}

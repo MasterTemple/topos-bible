@@ -1,0 +1,14 @@
+{
+  "name": "topos-ffi-build",
+  "private": true,
+  "description": "Build dependencies for `boltffi pack wasm` (it type-checks the generated bindings)",
+  "scripts": {
+    "pack:wasm": "boltffi pack wasm",
+    "pack:python": "boltffi pack python"
+  },
+  "devDependencies": {
+    "@boltffi/runtime": "0.31.0",
+    "@types/node": "^26.6.4",
+    "typescript": "^6.0.3"
+  }
+}
