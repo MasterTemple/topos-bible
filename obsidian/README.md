@@ -10,11 +10,19 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
 **Verse search sidebar** (the ribbon's book icon, or *Open verse search*), the CLI as a GUI:
 
 - Search the whole vault, the current note, or a folder
-- Filter by testament (click OT/NT to include, again to exclude), genre, and book, each
-  included or excluded, like `-t`, `-g`, `-b`, and `--exclude-*`
+- Open **Filters** to filter by testament (click OT/NT to include, again to exclude), genre,
+  and book, each included or excluded, like `-t`, `-g`, `-b`, and `--exclude-*`. A testament
+  narrows the rest (NT + Pauline Epistles is Paul's letters), included genres and books add up
+  (Pentateuch + Revelation), and exclusions always win. The header shows how many filters are on
+  and how many books they leave, and warns when they contradict each other (OT + Pauline
+  Epistles)
 - Filter by passage: **Inside** (entirely within, like `-i`), **Overlapping** (shares a verse,
   like `-o`), and **Outside** (`--outside`); the inputs autocomplete references
-- Sort by order in your notes or order in the Bible; group by note or by book
+- Sort by order in your notes or order in the Bible; group by note or by book (remembered)
+- **Saved searches**: name the current filters (and folder) with *Save*, pick one from the list,
+  or open one with the *Open a saved search* command. Each is stored as the CLI's options, like
+  `Sermons --nt -g "Pauline Epistles" -o "John 1"`, which you can also write or edit under
+  *Settings → Saved searches*; the filter panel shows the current filters in that form
 - Each result shows its line with the reference highlighted; click to jump there, or ↗ to open
   it in Literal Word
 - Results update as notes change
@@ -35,6 +43,7 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
 |---|---|
 | Open verse search | The sidebar |
 | Search references in the current note | The sidebar, scoped to the note |
+| Open a saved search | The sidebar with a saved search's filters |
 | Go to a reference in the vault | Type a passage, pick a note that references it |
 | Insert a verse reference | A dialog with autocomplete; books and chapters keep it open to refine |
 | Find references to the verses under the cursor | The sidebar, filtered to overlapping references |

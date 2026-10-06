@@ -4,7 +4,10 @@ export type Testament = "old" | "new";
 
 /** The search filters, like the CLI's options */
 export interface Filters {
-  /** Including any testament, genre, or book excludes everything else in that category */
+  /**
+   * Included testaments limit the search; included genres and books add up within them;
+   * exclusions always win (the CLI's rules)
+   */
   testaments: Testament[];
   genres: string[];
   books: string[];
@@ -35,6 +38,8 @@ export const NO_FILTERS: Filters = {
 export interface CompiledFilter {
   /** Allowed book ids, or null for every book */
   books: Set<number> | null;
+  /** Why nothing can match, when the included genres and books are outside the testaments */
+  conflict: string | null;
   inside: Passage[];
   overlaps: Passage[];
   outside: Passage[];
@@ -55,10 +60,7 @@ export function isEmpty(filters: Filters): boolean {
   return Object.values(filters).every((values) => values.length === 0);
 }
 
-/**
- * Resolves names and passages, with the CLI's rules: inclusions of any kind are joined with
- * a logical OR and start from no books; exclusions apply after all inclusions.
- */
+/** Resolves names and passages, with the CLI's rules (see {@link Filters}) */
 export function compileFilters(topos: Topos, filters: Filters): CompiledFilter {
   const errors: string[] = [];
   const bookIds = (names: string[]) =>
@@ -81,13 +83,12 @@ export function compileFilters(topos: Topos, filters: Filters): CompiledFilter {
       return passage === null ? [] : [passage];
     });
 
-  const included = [
-    ...filters.testaments.flatMap((t) => TESTAMENT_BOOKS[t]),
-    ...genreIds(filters.genres),
-    ...bookIds(filters.books),
-  ];
-  const hasInclusion =
-    filters.testaments.length + filters.genres.length + filters.books.length > 0;
+  const scope =
+    filters.testaments.length > 0 ? new Set(filters.testaments.flatMap((t) => TESTAMENT_BOOKS[t])) : null;
+  const included =
+    filters.genres.length + filters.books.length > 0
+      ? new Set([...genreIds(filters.genres), ...bookIds(filters.books)])
+      : null;
   const excluded = new Set([
     ...filters.excludeTestaments.flatMap((t) => TESTAMENT_BOOKS[t]),
     ...genreIds(filters.excludeGenres),
@@ -95,13 +96,25 @@ export function compileFilters(topos: Topos, filters: Filters): CompiledFilter {
   ]);
 
   let books: Set<number> | null = null;
-  if (hasInclusion || excluded.size > 0) {
-    const start = hasInclusion ? included : topos.books().map((b) => b.id);
-    books = new Set(start.filter((id) => !excluded.has(id)));
+  if (scope || included || excluded.size > 0) {
+    books = new Set(
+      topos
+        .books()
+        .map((b) => b.id)
+        .filter((id) => (!scope || scope.has(id)) && (!included || included.has(id)) && !excluded.has(id)),
+    );
+  }
+
+  let conflict: string | null = null;
+  if (scope && included && included.size > 0 && ![...included].some((id) => scope.has(id))) {
+    const testaments = filters.testaments.map((t) => (t === "old" ? "Old" : "New")).join(" and ");
+    const names = [...filters.genres, ...filters.books].join(", ");
+    conflict = `${names} ${filters.genres.length + filters.books.length === 1 ? "is" : "are"} not in the ${testaments} Testament${filters.testaments.length === 1 ? "" : "s"}, so nothing can match`;
   }
 
   return {
     books,
+    conflict,
     inside: passages(filters.inside),
     overlaps: passages(filters.overlaps),
     outside: passages(filters.outside),

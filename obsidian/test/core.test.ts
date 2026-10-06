@@ -62,6 +62,20 @@ test("filters follow the CLI's rules", () => {
   assert.deepEqual(filtered({ books: ["Romans"], outside: ["Rom 9"] }, text), ["Romans 8:28"]);
 });
 
+test("testaments narrow genres and books, and contradictions are explained", () => {
+  const text = "Gen 1:1, John 3:16, Rom 8:28, 2 Cor 4:4";
+  assert.deepEqual(filtered({ testaments: ["new"], genres: ["Pauline Epistles"] }, text), [
+    "Romans 8:28",
+    "2 Corinthians 4:4",
+  ]);
+  assert.deepEqual(filtered({ testaments: ["old"], genres: ["Pauline Epistles"] }, text), []);
+  const conflict = compileFilters(topos, { ...NO_FILTERS, testaments: ["old"], genres: ["Pauline Epistles"] });
+  assert.equal(conflict.conflict, "Pauline Epistles is not in the Old Testament, so nothing can match");
+  assert.equal(compileFilters(topos, { ...NO_FILTERS, testaments: ["new"], genres: ["Pauline Epistles"] }).conflict, null);
+  // Exclusions always win, whatever else is included
+  assert.deepEqual(filtered({ testaments: ["new"], excludeTestaments: ["new"] }, text), []);
+});
+
 test("unknown names are reported, not silently dropped", () => {
   const filter = compileFilters(topos, { ...NO_FILTERS, books: ["Jhon"], inside: ["nope"] });
   assert.deepEqual(filter.errors, ['Unknown book "Jhon"', 'Not a reference: "nope"']);

@@ -191,6 +191,30 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
     plugin.settings.engine = "builtin";
   }
 
+  // The sidebar's order and grouping are saved
+  const saved: any[] = [];
+  plugin.saveData = async (data: any) => void saved.push(structuredClone(data));
+  plugin.search.set({ sort: "bible", groupBy: "book" });
+  assert.equal(saved.at(-1).sort, "bible");
+  assert.equal(saved.at(-1).groupBy, "book");
+
+  // Saved searches: saving replaces by name, and applying one sets the sidebar's filters
+  await plugin.saveQuery({ name: "Paul", query: '--nt -g "Pauline Epistles"' });
+  await plugin.saveQuery({ name: "Sermons", query: "Sermons -b John" });
+  await plugin.saveQuery({ name: "Paul", query: "-g pauline" });
+  assert.deepEqual(saved.at(-1).queries, [
+    { name: "Paul", query: "-g pauline" },
+    { name: "Sermons", query: "Sermons -b John" },
+  ]);
+  assert.deepEqual(plugin.applyQuery(plugin.settings.queries[1]), []);
+  assert.equal(plugin.search.get().scope, "folder");
+  assert.equal(plugin.search.get().folder, "Sermons");
+  assert.deepEqual(plugin.search.get().filters.books, ["John"]);
+  assert.deepEqual(plugin.applyQuery({ name: "x", query: "--bogus" }), ["Unknown option --bogus"]);
+  await plugin.deleteQuery("Paul");
+  assert.deepEqual(saved.at(-1).queries.map((q: any) => q.name), ["Sermons"]);
+  assert.ok(plugin.commands.some((c: any) => c.id === "open-saved-search"));
+
   // Commands that need a reference under the cursor are only available on one
   const copy = plugin.commands.find((c: any) => c.id === "copy-osis");
   assert.equal(copy.editorCheckCallback(true, fakeEditor("See Jn 3:16 here", 6)), true);

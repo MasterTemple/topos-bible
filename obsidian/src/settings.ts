@@ -1,4 +1,5 @@
 import { App, Notice, Platform, PluginSettingTab, Setting } from "obsidian";
+import { parseQuery } from "./core/query.ts";
 import type { BookCompletion } from "./core/completions.ts";
 import { TRANSLATIONS, type Translation } from "./core/literalWord.ts";
 import type { StyleName } from "./core/settings.ts";
@@ -177,5 +178,73 @@ export class ToposSettingTab extends PluginSettingTab {
           void save().then(() => this.plugin.reindex());
         }),
       );
+
+    this.savedSearches(containerEl);
+  }
+
+  /** Each saved search is a name and the CLI's filter options, editable here */
+  private savedSearches(containerEl: HTMLElement): void {
+    const { settings } = this.plugin;
+    new Setting(containerEl)
+      .setName("Saved searches")
+      .setHeading()
+      .setDesc(
+          'Filters written like the topos CLI\'s options, plus an optional folder: Sermons --nt -g "Pauline Epistles" -b John --exclude-book Philemon -i "Romans 8" -o "John 1" --outside "Psalm 23". Save the sidebar\'s filters with its Save button, or add one here.',
+      );
+    const persist = () => {
+      void this.plugin.saveData(settings).then(() => this.plugin.search.set({}));
+    };
+    settings.queries.forEach((saved, i) => {
+      const setting = new Setting(containerEl);
+      const showErrors = () => {
+        const { errors } = parseQuery(saved.query);
+        setting.setDesc(errors.join("; "));
+        setting.descEl.toggleClass("topos-query-error", errors.length > 0);
+      };
+      setting
+        .addText((t) =>
+          t
+            .setPlaceholder("Name")
+            .setValue(saved.name)
+            .onChange((value) => {
+              saved.name = value;
+              persist();
+            }),
+        )
+        .addText((t) => {
+          t.inputEl.addClass("topos-query-input");
+          t.setPlaceholder('--nt -g "Pauline Epistles"')
+            .setValue(saved.query)
+            .onChange((value) => {
+              saved.query = value;
+              showErrors();
+              persist();
+            });
+        })
+        .addExtraButton((b) =>
+          b
+            .setIcon("search")
+            .setTooltip("Show in the sidebar")
+            .onClick(() => void this.plugin.openQuery(saved)),
+        )
+        .addExtraButton((b) =>
+          b
+            .setIcon("trash")
+            .setTooltip("Delete")
+            .onClick(() => {
+              settings.queries.splice(i, 1);
+              persist();
+              this.display();
+            }),
+        );
+      showErrors();
+    });
+    new Setting(containerEl).addButton((b) =>
+      b.setButtonText("Add a saved search").onClick(() => {
+        settings.queries.push({ name: `Search ${settings.queries.length + 1}`, query: "" });
+        persist();
+        this.display();
+      }),
+    );
   }
 }

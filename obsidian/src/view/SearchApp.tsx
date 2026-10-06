@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { compileFilters, isEmpty, keep, NO_FILTERS, type Filters, type Testament } from "../core/filters.ts";
 import { literalWordUrl } from "../core/literalWord.ts";
+import { formatQuery, parseQuery } from "../core/query.ts";
 import { styled } from "../core/references.ts";
 import type { Hit } from "../core/search.ts";
 import { groupHits, sortHits, type SortOrder } from "../core/sort.ts";
@@ -24,6 +25,8 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [shown, setShown] = useState(PAGE);
   const [filtersOpen, setFiltersOpen] = useState(!isEmpty(state.filters));
+  /** The name being typed to save the current search, or null */
+  const [saving, setSaving] = useState<string | null>(null);
   const style = bookStyle(styleName);
 
   useEffect(() => {
@@ -68,6 +71,19 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
   const removeFrom = (key: ListKey) => (i: number) =>
     setFilters({ [key]: state.filters[key].filter((_, j) => j !== i) } as Partial<Filters>);
 
+  const activeFilters = Object.values(state.filters).reduce((n, values) => n + values.length, 0);
+  const query = formatQuery(state.filters, state.scope === "folder" ? state.folder.replace(/\/+$/, "") || null : null);
+  const savedQueries = plugin.settings.queries;
+  const sameQuery = (text: string) => {
+    const parsed = parseQuery(text);
+    return parsed.errors.length === 0 && formatQuery(parsed.filters, parsed.folder) === query;
+  };
+  const active = savedQueries.find((saved) => sameQuery(saved.query)) ?? null;
+  const save = () => {
+    if (saving?.trim()) void plugin.saveQuery({ name: saving, query });
+    setSaving(null);
+  };
+
   const bookOptions = books.map((b) => ({ name: b.name, aliases: [b.abbreviation, b.osis] }));
   const genreOptions = genres.map((g) => ({ name: g.name, aliases: [] }));
 
@@ -109,6 +125,63 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
           <option value="osis">John.3.16</option>
         </select>
       </div>
+      <div className="topos-saved">
+        {saving === null ? (
+          <>
+            <select
+              value={active?.name ?? ""}
+              onChange={(e) => {
+                const saved = savedQueries.find((q) => q.name === e.target.value);
+                if (!saved) return;
+                plugin.applyQuery(saved);
+                setFiltersOpen(true);
+                setShown(PAGE);
+              }}
+              aria-label="Saved searches"
+            >
+              <option value="" disabled>
+                {savedQueries.length === 0 ? "No saved searches" : active ? "" : "Saved searches…"}
+              </option>
+              {savedQueries.map((saved) => (
+                <option key={saved.name} value={saved.name} title={saved.query}>
+                  {saved.name}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setSaving(active?.name ?? "")}
+              disabled={activeFilters === 0 && state.scope !== "folder"}
+              title="Save these filters under a name"
+            >
+              Save
+            </button>
+            {active && (
+              <button onClick={() => void plugin.deleteQuery(active.name)} title={`Delete "${active.name}"`}>
+                Delete
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <input
+              type="text"
+              autoFocus
+              value={saving}
+              placeholder="Name this search"
+              onChange={(e) => setSaving(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") save();
+                if (e.key === "Escape") setSaving(null);
+              }}
+            />
+            <button className="mod-cta" onClick={save} disabled={!saving.trim()}>
+              Save
+            </button>
+            <button onClick={() => setSaving(null)}>Cancel</button>
+          </>
+        )}
+      </div>
+
       {state.scope === "folder" && (
         <input
           className="topos-folder"
@@ -125,7 +198,15 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
         onToggle={(e) => setFiltersOpen((e.target as HTMLDetailsElement).open)}
       >
         <summary>
-          Filters
+          <span className="topos-filters-title">
+            Filters
+            {activeFilters > 0 && <span className="topos-badge">{activeFilters}</span>}
+          </span>
+          {filter.books && !filter.conflict && (
+            <span className="topos-filters-books">
+              {`${filter.books.size} book${filter.books.size === 1 ? "" : "s"}`}
+            </span>
+          )}
           {!isEmpty(state.filters) && (
             <button
               className="topos-clear"
@@ -181,7 +262,23 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
             ))}
           </ul>
         )}
+        {query && (
+          <div className="topos-query" title="These filters as topos CLI options, for saved searches or the terminal">
+            <code>{query}</code>
+            <button
+              className="topos-copy"
+              onClick={() => {
+                void navigator.clipboard.writeText(query);
+              }}
+              title="Copy"
+            >
+              Copy
+            </button>
+          </div>
+        )}
       </details>
+
+      {filter.conflict && <div className="topos-conflict">⚠ {filter.conflict}</div>}
 
       <div className="topos-summary">
         {plugin.indexing

@@ -19,7 +19,12 @@ CLI's search and filters as a sidebar, plus editor features the CLI can't have. 
 | `--sort` | Sort by file, by position in the Bible, or group by book |
 | jumping in Vim's quickfix list | Click a result to open the note with the reference selected |
 
-Filters update the results live. Results can also be sorted canonically (by book, chapter, and
+Filters update the results live. Included testaments narrow the included genres and books,
+which add up; exclusions always win (the same rules as the CLI, which warns about contradictory
+inclusions like `--ot -g "Pauline Epistles"`; the sidebar shows the warning even with the filter
+panel closed). Searches can be saved under a name, stored as CLI options (an optional folder plus
+`-t/--nt/--ot`, `-g`, `-b`, `--exclude-*`, `-i`, `-o`, `--outside`), and edited in the settings.
+The sort order and grouping are remembered. Results can also be sorted canonically (by book, chapter, and
 verse) or grouped by book, which the CLI can't do.
 
 ### Editor

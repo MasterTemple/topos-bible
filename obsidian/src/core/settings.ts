@@ -1,6 +1,7 @@
 import { BookStyle } from "topos-bible";
 import type { BookCompletion } from "./completions.ts";
 import type { Translation } from "./literalWord.ts";
+import type { SavedQuery } from "./query.ts";
 import type { SortOrder } from "./sort.ts";
 
 export type StyleName = "name" | "abbreviation" | "osis";
@@ -25,8 +26,11 @@ export interface ToposSettings {
   extensions: string;
   /** Folders to leave out of search, one per line */
   excludeFolders: string;
+  /** The sidebar's order and grouping, remembered between sessions */
   sort: SortOrder;
   groupBy: "file" | "book";
+  /** Named searches, with the CLI's filter options */
+  queries: SavedQuery[];
   /** Index the vault in a background thread, or with the topos CLI (desktop only) */
   engine: "builtin" | "cli";
   /** Path to the topos command ("" finds it in ~/.cargo/bin or PATH) */
@@ -48,6 +52,7 @@ export const DEFAULT_SETTINGS: ToposSettings = {
   excludeFolders: "",
   sort: "file",
   groupBy: "file",
+  queries: [],
   engine: "builtin",
   cliPath: "",
   cliCache: true,

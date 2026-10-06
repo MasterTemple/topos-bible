@@ -43,12 +43,99 @@
 .topos-input input {
   width: 100%;
 }
+/* Looks like a control: flex hides the native disclosure triangle, so draw one */
 .topos-filters summary {
   cursor: pointer;
   font-weight: var(--font-semibold);
   display: flex;
-  justify-content: space-between;
+  gap: var(--size-4-2);
   align-items: center;
+  list-style: none;
+  padding: var(--size-4-1) var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+}
+.topos-filters summary::-webkit-details-marker {
+  display: none;
+}
+.topos-filters summary::before {
+  content: "▸";
+  color: var(--text-muted);
+  transition: transform 100ms ease-in-out;
+}
+.topos-filters[open] summary::before {
+  transform: rotate(90deg);
+}
+.topos-filters summary:hover {
+  background: var(--background-modifier-hover);
+}
+.topos-filters-title {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-1);
+  flex: 1;
+}
+.topos-badge {
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-normal);
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  border-radius: var(--radius-l);
+  padding: 0 var(--size-4-2);
+}
+.topos-filters-books {
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-normal);
+  color: var(--text-muted);
+}
+.topos-conflict {
+  margin-top: var(--size-4-2);
+  padding: var(--size-4-1) var(--size-4-2);
+  border-radius: var(--radius-s);
+  color: var(--text-warning);
+  background: rgba(var(--color-orange-rgb), 0.1);
+  font-size: var(--font-ui-small);
+}
+.topos-saved {
+  display: flex;
+  gap: var(--size-4-1);
+  margin-bottom: var(--size-4-2);
+}
+.topos-saved select,
+.topos-saved input {
+  flex: 1;
+  min-width: 0;
+}
+.topos-query {
+  display: flex;
+  gap: var(--size-4-2);
+  align-items: center;
+  margin-top: var(--size-4-2);
+}
+.topos-query code {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+.topos-copy {
+  font-size: var(--font-ui-smaller);
+  padding: 0 var(--size-4-2);
+  height: auto;
+}
+.topos-query-text {
+  display: block;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+}
+.topos-query-input {
+  width: 22em;
+  font-family: var(--font-monospace);
+}
+.topos-query-error {
+  color: var(--text-error);
 }
 .topos-clear {
   font-size: var(--font-ui-smaller);

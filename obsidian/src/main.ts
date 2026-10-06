@@ -11,6 +11,7 @@ import {
 } from "obsidian";
 import type { Passage, Topos } from "topos-bible";
 import { OutdatedCliError } from "./core/cli.ts";
+import { parseQuery, type SavedQuery } from "./core/query.ts";
 import { NO_FILTERS } from "./core/filters.ts";
 import { literalWordUrl } from "./core/literalWord.ts";
 import { applyReplacements, normalizeReferences, referenceAt } from "./core/references.ts";
@@ -21,7 +22,7 @@ import { engineWasm, loadTopos } from "./engine.ts";
 import { BackgroundSearcher } from "./indexers/background.ts";
 import { defaultCliPath, runCli, type CliRun } from "./indexers/cli.ts";
 import workerSource from "topos-worker-source";
-import { GoToReferenceModal, InsertReferenceModal } from "./modals.ts";
+import { GoToReferenceModal, InsertReferenceModal, SavedQueryModal } from "./modals.ts";
 import { linkReferences } from "./reading.ts";
 import { bookStyle, DEFAULT_SETTINGS, ToposSettingTab, type ToposSettings } from "./settings.ts";
 import { SEARCH_VIEW, SearchView } from "./view/SearchView.tsx";
@@ -49,6 +50,14 @@ export default class ToposPlugin extends Plugin {
     this.topos = await loadTopos();
     this.index = new ReferenceIndex(this.topos);
     this.search.set({ sort: this.settings.sort, groupBy: this.settings.groupBy });
+    // Remember the sidebar's order and grouping
+    this.search.subscribe(() => {
+      const { sort, groupBy } = this.search.get();
+      if (sort === this.settings.sort && groupBy === this.settings.groupBy) return;
+      this.settings.sort = sort;
+      this.settings.groupBy = groupBy;
+      void this.saveData(this.settings);
+    });
 
     this.registerView(SEARCH_VIEW, (leaf) => new SearchView(leaf, this));
     this.addRibbonIcon("book-open", "Verse search", () => void this.activateSearch());
@@ -89,6 +98,40 @@ export default class ToposPlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) as Partial<ToposSettings>) };
+    this.settings.queries = (this.settings.queries ?? []).filter((q) => q && typeof q.name === "string");
+  }
+
+  // Saved searches
+
+  /** Saves a search under a name, replacing one with the same name */
+  async saveQuery(query: SavedQuery): Promise<void> {
+    const name = query.name.trim();
+    if (!name) return;
+    const others = this.settings.queries.filter((q) => q.name !== name);
+    const index = this.settings.queries.findIndex((q) => q.name === name);
+    others.splice(index === -1 ? others.length : index, 0, { name, query: query.query });
+    this.settings.queries = others;
+    await this.saveData(this.settings);
+    this.search.set({}); // re-render the sidebar's list
+  }
+
+  async deleteQuery(name: string): Promise<void> {
+    this.settings.queries = this.settings.queries.filter((q) => q.name !== name);
+    await this.saveData(this.settings);
+    this.search.set({});
+  }
+
+  /** Shows a saved search in the sidebar; returns the query's mistakes, if any */
+  applyQuery(query: SavedQuery): string[] {
+    const { filters, folder, errors } = parseQuery(query.query);
+    this.search.set(folder ? { filters, scope: "folder", folder } : { filters, scope: "vault", folder: "" });
+    return errors;
+  }
+
+  async openQuery(query: SavedQuery): Promise<void> {
+    const errors = this.applyQuery(query);
+    if (errors.length > 0) new Notice(`Saved search "${query.name}": ${errors.join("; ")}`);
+    await this.activateSearch();
   }
 
   async saveSettings(): Promise<void> {
@@ -336,6 +379,14 @@ export default class ToposPlugin extends Plugin {
       callback: () => {
         this.search.set({ scope: "file" });
         void this.activateSearch();
+      },
+    });
+    this.addCommand({
+      id: "open-saved-search",
+      name: "Open a saved search",
+      callback: () => {
+        if (this.settings.queries.length === 0) new Notice("No saved searches yet: save one from the verse search sidebar.");
+        else new SavedQueryModal(this.app, this).open();
       },
     });
     this.addCommand({

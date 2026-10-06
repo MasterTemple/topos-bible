@@ -2,6 +2,7 @@ import { App, Editor, SuggestModal } from "obsidian";
 import { CompletionKind, type Completion } from "topos-bible";
 import { applyCompletion, completionsBefore } from "./core/completions.ts";
 import { compileFilters, keep, NO_FILTERS } from "./core/filters.ts";
+import type { SavedQuery } from "./core/query.ts";
 import { styled } from "./core/references.ts";
 import type { Hit } from "./core/search.ts";
 import { sortHits } from "./core/sort.ts";
@@ -98,5 +99,32 @@ export class GoToReferenceModal extends SuggestModal<Hit> {
 
   onChooseSuggestion(hit: Hit): void {
     void this.plugin.openHit(hit);
+  }
+}
+
+/** Pick a saved search to show in the sidebar */
+export class SavedQueryModal extends SuggestModal<SavedQuery> {
+  private readonly plugin: ToposPlugin;
+
+  constructor(app: App, plugin: ToposPlugin) {
+    super(app);
+    this.plugin = plugin;
+    this.setPlaceholder("Saved search");
+  }
+
+  getSuggestions(query: string): SavedQuery[] {
+    const q = query.trim().toLowerCase();
+    return this.plugin.settings.queries.filter(
+      (saved) => saved.name.toLowerCase().includes(q) || saved.query.toLowerCase().includes(q),
+    );
+  }
+
+  renderSuggestion(saved: SavedQuery, el: HTMLElement): void {
+    el.createDiv({ text: saved.name });
+    el.createEl("small", { text: saved.query || "(no filters)", cls: "topos-query-text" });
+  }
+
+  onChooseSuggestion(saved: SavedQuery): void {
+    void this.plugin.openQuery(saved);
   }
 }

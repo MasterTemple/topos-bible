@@ -21,14 +21,14 @@ test("the sidebar renders filtered, grouped results", async () => {
      import { DEFAULT_SETTINGS } from ${src("core/settings.ts")};
      import { NO_FILTERS } from ${src("core/filters.ts")};
 
-     export function render(filters, groupBy) {
+     export function render(filters, groupBy, queries = []) {
        const topos = Topos.new();
        const index = new ReferenceIndex(topos);
        index.update("a.md", "Read Jn 3:16 and Rom 8:28");
        index.update("b.md", "Psalm 23, then John 1:1");
        const plugin = {
          topos, index, indexVersion: 1, indexing: false,
-         settings: DEFAULT_SETTINGS,
+         settings: { ...DEFAULT_SETTINGS, queries },
          search: new SearchStore({ filters: { ...NO_FILTERS, ...filters }, groupBy }),
          subscribeIndex: () => () => {},
          app: { workspace: { getActiveFile: () => null, on: () => ({}), offref() {} } },
@@ -61,6 +61,25 @@ test("the sidebar renders filtered, grouped results", async () => {
   assert.match(nt, /3 references in 2 notes/);
   assert.match(nt, /John 2 John 3:16/);
   assert.doesNotMatch(nt, /Psalms/);
+
+  // Contradictory filters say why nothing matches, even with the panel closed
+  const conflict = text(render({ testaments: ["old"], genres: ["Pauline Epistles"] }, "file"));
+  assert.match(conflict, /0 references/);
+  assert.match(conflict, /Pauline Epistles is not in the Old Testament, so nothing can match/);
+
+  // The header counts filters and books; the panel shows them as CLI options
+  const pauline = text(render({ testaments: ["new"], genres: ["Pauline Epistles"] }, "file"));
+  assert.match(pauline, /Filters 2 13 books/);
+  assert.match(pauline, /--nt -g &quot;Pauline Epistles&quot;/);
+  assert.match(pauline, /1 reference in 1 note/);
+
+  // A saved search matching the filters is selected
+  const saved = render({ testaments: ["new"] }, "file", [
+    { name: "Old", query: "--ot" },
+    { name: "New", query: "-t new" },
+  ]);
+  assert.match(saved, /<option value="New" title="-t new" selected="">New<\/option>/);
+  assert.match(text(saved), /Delete/);
 
   const bad = text(render({ books: ["Jhon"] }, "file"));
   assert.match(bad, /Unknown book &quot;Jhon&quot;/);
