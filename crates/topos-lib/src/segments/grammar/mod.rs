@@ -10,5 +10,5 @@ pub mod roman;
 pub mod tree;
 
 pub use tree::{
-    Delimiter, DelimiterKind, Number, NumberKind, Part, SegmentList, SegmentNode, Span,
+    Delimiter, DelimiterKind, Following, Number, NumberKind, Part, SegmentList, SegmentNode, Span,
 };

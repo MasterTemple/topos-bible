@@ -71,3 +71,8 @@ the mar 5 sale =>
 Mark 5 => Mark 5
 # Spoken transcripts say "Luke 16, 13" for 16:13; written text means chapters 16 and 13
 ?Luke 16, 13. Conclusion => Luke 16:13
+
+# `cf.` and `ff` (issue #10)
+John 3:16ff => John 3:16-36
+John 3:16f. => John 3:16-17
+see John 3:16 ff. and cf. Rom 5:8 => John 3:16-36 | Romans 5:8

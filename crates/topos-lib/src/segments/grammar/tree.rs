@@ -27,7 +27,18 @@ pub struct Number {
     pub kind: NumberKind,
     /// `b` in `28:18b`
     pub subverse: Option<char>,
+    /// `f` or `ff` in `3:16ff`
+    pub following: Option<Following>,
     pub span: Span,
+}
+
+/// Verses after a number, written `f` or `ff` (`John 3:16ff`)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Following {
+    /// `f`: and the next verse
+    Next,
+    /// `ff`: and the rest of the chapter
+    Rest,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -138,6 +149,14 @@ impl SegmentNode {
         let end = self.end?.number?.value;
         let end_verse = self.end_verse.and_then(|p| p.number).map(|n| n.value);
         Some((end, end_verse))
+    }
+
+    /// The last number with a value (what `f` or `ff` would follow)
+    pub fn last_number(&self) -> Number {
+        self.parts()
+            .filter_map(|p| p.number)
+            .last()
+            .unwrap_or(self.start)
     }
 
     /// This node with only its first `keep` parts (`1:2-3:4` keeping 1 is `1:2`)

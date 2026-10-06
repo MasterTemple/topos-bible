@@ -1,7 +1,7 @@
 use crate::{
     data::chapter_verses::ChapterVerses,
     segments::{
-        grammar::{Number, NumberKind, SegmentNode},
+        grammar::{Following, Number, NumberKind, SegmentNode},
         passage::Segments,
         segment::Segment,
         verse_bounds::VerseBounds,
@@ -61,6 +61,7 @@ impl<'a> Resolver<'a> {
             let accepted = std::iter::once(parts.len()).chain(keeps).find_map(|keep| {
                 let node = node.truncated(keep);
                 let segment = self.resolve_node(&node, prev_node.as_ref(), segments.last())?;
+                let segment = self.apply_following(&node, segment);
                 self.exists(&segment).then_some((node, segment))
             });
             let Some((accepted, segment)) = accepted else {
@@ -164,6 +165,33 @@ impl<'a> Resolver<'a> {
         })
     }
 
+    /**
+    Extends a segment ending in `f` or `ff`
+    - `3:16f` is `3:16-17`, and `3:16ff` is `3:16-36` (the end of the chapter)
+    - Without versification, `ff` cannot be resolved and is left as written
+    */
+    fn apply_following(&self, node: &SegmentNode, segment: Segment) -> Segment {
+        let (Some(following), Some(end_verse)) =
+            (node.last_number().following, segment.ending_verse())
+        else {
+            return segment;
+        };
+        let chapter = segment.ending_chapter();
+        let last = self.versification.and_then(|v| v.get_last_verse(chapter));
+        let end = match (following, last) {
+            (Following::Next, Some(last)) => end_verse.saturating_add(1).min(last),
+            (Following::Next, None) => end_verse.saturating_add(1),
+            (Following::Rest, Some(last)) => last,
+            (Following::Rest, None) => return segment,
+        };
+        Segment::chapter_range(
+            segment.starting_chapter(),
+            segment.starting_verse(),
+            chapter,
+            end,
+        )
+    }
+
     /// Whether every chapter and verse exists (always true without versification data)
     fn exists(&self, segment: &Segment) -> bool {
         let Some(versification) = self.versification else {
@@ -248,6 +276,21 @@ mod tests {
         // a Roman numeral where a verse goes ends the reference
         assert_eq!(resolve(None, "3:16, i"), "3:16");
         assert_eq!(resolve(None, "3:iv"), "");
+    }
+
+    #[test]
+    fn following_verses() {
+        // John 3 has 36 verses
+        assert_eq!(resolve(Some(43), "3:16f"), "3:16-17");
+        assert_eq!(resolve(Some(43), "3:16ff"), "3:16-36");
+        assert_eq!(resolve(Some(43), "3:36f"), "3:36");
+        assert_eq!(resolve(Some(43), "3:16-18 ff"), "3:16-36");
+        assert_eq!(resolve(Some(43), "3:16, 20ff"), "3:16, 3:20-36");
+        // Jude has 25 verses
+        assert_eq!(resolve(Some(65), "5ff"), "1:5-25");
+        // A chapter is unaffected, and `ff` needs versification
+        assert_eq!(resolve(Some(43), "3ff"), "3");
+        assert_eq!(resolve(None, "3:16ff"), "3:16");
     }
 
     #[test]

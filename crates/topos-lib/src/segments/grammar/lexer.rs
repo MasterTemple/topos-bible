@@ -1,6 +1,6 @@
 use crate::segments::grammar::{
     roman,
-    tree::{Delimiter, DelimiterKind, Number, NumberKind, Span},
+    tree::{Delimiter, DelimiterKind, Following, Number, NumberKind, Span},
 };
 
 /// Characters that can follow a verse number to mark part of a verse (`Matthew 28:18b`)
@@ -87,7 +87,23 @@ fn lex_decimal(s: &str, start: usize) -> Option<(Number, usize)> {
         .chars()
         .next()
         .filter(|c| SUBVERSE.contains(*c) && at_boundary(&after[1..]));
-    let len = digits + subverse.map_or(0, char::len_utf8);
+    let mut len = digits + subverse.map_or(0, char::len_utf8);
+
+    // `16f` (and the next verse) or `16ff` (and the rest of the chapter), maybe after a space
+    let mut following = None;
+    if subverse.is_none() {
+        let after = &s[len..];
+        let spaces = after.len() - after.trim_start_matches(' ').len();
+        let suffix = &after[spaces..];
+        for (word, kind) in [("ff", Following::Rest), ("f", Following::Next)] {
+            if suffix.starts_with(word) && at_boundary(&suffix[word.len()..]) {
+                following = Some(kind);
+                len += spaces + word.len();
+                break;
+            }
+        }
+    }
+
     // Otherwise a number must end the word, so `GA9hNK` is not Galatians 9
     if !at_boundary(&s[len..]) {
         return None;
@@ -97,6 +113,7 @@ fn lex_decimal(s: &str, start: usize) -> Option<(Number, usize)> {
         value,
         kind: NumberKind::Decimal,
         subverse,
+        following,
         span: Span::new(start, start + len),
     };
     Some((number, len))
@@ -113,6 +130,7 @@ fn lex_roman(s: &str, start: usize) -> Option<(Number, usize)> {
         value,
         kind: NumberKind::Roman,
         subverse: None,
+        following: None,
         span: Span::new(start, start + len),
     };
     Some((number, len))
@@ -155,6 +173,18 @@ mod tests {
         assert_eq!(kinds("8, xylophone"), ["8", ","]);
         // non-ASCII digits are not numbers
         assert_eq!(kinds("٣"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn following_verses() {
+        let following = |input: &str| match Lexer::new(input).next() {
+            Some(Token::Number(n)) => (n.following, n.span.end),
+            _ => panic!("{input}"),
+        };
+        assert_eq!(following("16f"), (Some(Following::Next), 3));
+        assert_eq!(following("16ff"), (Some(Following::Rest), 4));
+        assert_eq!(following("16 ff."), (Some(Following::Rest), 5));
+        assert_eq!(following("16 for"), (None, 2));
     }
 
     #[test]
