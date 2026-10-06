@@ -43,7 +43,7 @@ function filtered(filters: Partial<Filters>, text: string): string[] {
 
 test("filters follow the CLI's rules", () => {
   const text = "Gen 1:1, Ps 23, Matt 5:3, John 3:16, Rom 8:28, Rom 9:2, Jude 5";
-  assert.deepEqual(filtered({ testaments: ["old"] }, text), ["Genesis 1:1", "Psalms 23"]);
+  assert.deepEqual(filtered({ testaments: ["old"] }, text), ["Genesis 1:1", "Psalm 23"]);
   assert.deepEqual(filtered({ genres: ["gospels"], books: ["Jude"] }, text), [
     "Matthew 5:3",
     "John 3:16",
@@ -56,7 +56,7 @@ test("filters follow the CLI's rules", () => {
   ]);
   assert.deepEqual(filtered({ inside: ["Romans 8"] }, text), ["Romans 8:28"]);
   assert.deepEqual(filtered({ anyOverlap: ["Romans 8:28-9:1", "Ps 23:1"] }, text), [
-    "Psalms 23",
+    "Psalm 23",
     "Romans 8:28",
   ]);
   assert.deepEqual(filtered({ books: ["Romans"], excludeOverlap: ["Rom 9"] }, text), ["Romans 8:28"]);

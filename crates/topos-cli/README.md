@@ -167,10 +167,10 @@ topos --exclude-testament new -m table
 | ./Church 07-20-25.md | 108  | 93  | Numbers 12        |
 | ./Church 07-20-25.md | 131  | 12  | Isaiah 53:7       |
 | ./Church 07-20-25.md | 143  | 12  | Proverbs 16:32    |
-| ./Church 07-20-25.md | 204  | 7   | Psalms 117        |
-| ./Church 07-20-25.md | 208  | 12  | Psalms 117:1-2    |
+| ./Church 07-20-25.md | 204  | 7   | Psalm 117         |
+| ./Church 07-20-25.md | 208  | 12  | Psalm 117:1-2     |
 | ./Church 07-20-25.md | 234  | 12  | Habakkuk 2:14     |
-| ./Church 07-20-25.md | 255  | 12  | Psalms 117:2      |
+| ./Church 07-20-25.md | 255  | 12  | Psalm 117:2       |
 ```
 
 ## Rules

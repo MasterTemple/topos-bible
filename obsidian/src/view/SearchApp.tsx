@@ -270,7 +270,7 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
         </FilterRow>
         <FilterRow label="Not books">
           <Chips values={state.filters.excludeBooks} onRemove={removeFrom("excludeBooks")} exclude />
-          <NameInput options={bookOptions} placeholder="Psalms" onSubmit={addTo("excludeBooks")} />
+          <NameInput options={bookOptions} placeholder="Psalm" onSubmit={addTo("excludeBooks")} />
         </FilterRow>
         {PASSAGE_ROWS.map((row) => (
           <FilterRow key={row.key} label={row.label} hint={row.hint}>

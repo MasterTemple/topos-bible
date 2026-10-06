@@ -210,8 +210,8 @@ impl Server {
                 CompletionItem {
                     label: completion.label.clone(),
                     kind: Some(match completion.kind {
-                        CompletionKind::Book => CompletionItemKind::MODULE,
-                        CompletionKind::Chapter => CompletionItemKind::FOLDER,
+                        CompletionKind::Book => CompletionItemKind::FOLDER,
+                        CompletionKind::Chapter => CompletionItemKind::MODULE,
                         CompletionKind::Verse => CompletionItemKind::REFERENCE,
                     }),
                     /*

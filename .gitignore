@@ -11,3 +11,5 @@ Cargo.lock
 *.bak
 **/dist/
 doc/tags
+
+.harper-dictionary.txt

@@ -203,7 +203,7 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   assert.deepEqual(plugin.views, ["topos-bible-search"]);
   assert.deepEqual(
     plugin.index.all().map((h: any) => `${h.path} ${h.passage.reference}`),
-    ["Archive/old.md Genesis 1:1", "Sermons/a.md John 3:16", "Sermons/a.md Romans 8:28", "Sermons/b.md Psalms 23"],
+    ["Archive/old.md Genesis 1:1", "Sermons/a.md John 3:16", "Sermons/a.md Romans 8:28", "Sermons/b.md Psalm 23"],
   );
   const ids = plugin.commands.map((c: any) => c.id);
   for (const id of ["open-search", "insert-reference", "go-to-reference", "open-literal-word", "normalize-references"]) {

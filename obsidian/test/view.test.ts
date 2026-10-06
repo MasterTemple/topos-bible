@@ -58,12 +58,12 @@ test("the sidebar renders filtered, grouped results", async () => {
   const all = text(render({}, "file"));
   assert.match(all, /4 references in 2 notes/);
   assert.match(all, /John 3:16/);
-  assert.match(all, /Psalms 23/);
+  assert.match(all, /Psalm 23/);
 
   const nt = text(render({ testaments: ["new"] }, "book"));
   assert.match(nt, /3 references in 2 notes/);
   assert.match(nt, /John 2 John 3:16/);
-  assert.doesNotMatch(nt, /Psalms/);
+  assert.doesNotMatch(nt, /▾ Psalm/);
 
   // Contradictory filters say why nothing matches, even with the panel closed
   const conflict = text(render({ testaments: ["old"], genres: ["Pauline Epistles"] }, "file"));

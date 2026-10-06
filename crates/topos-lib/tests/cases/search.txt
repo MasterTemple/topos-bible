@@ -10,7 +10,7 @@ Jn. 3:16 => John 3:16
 jn 3.16 => John 3:16
 Romans 8:28-30 => Romans 8:28-30
 Romans 8:28–9:1 => Romans 8:28-9:1
-Psalm 119:176 => Psalms 119:176
+Psalm 119:176 => Psalm 119:176
 Genesis 1 => Genesis 1
 Genesis 1-3 => Genesis 1-3
 Hello there, nothing here => 
@@ -98,7 +98,7 @@ Jn.3 => John 3
 Gn5 => 
 
 # Older abbreviations
-Psal. 10:3 => Psalms 10:3
+Psal. 10:3 => Psalm 10:3
 
 # Quantities: numbers with units or symbols are not chapters or verses
 is 2.5% => 
@@ -108,7 +108,7 @@ John 3:16% =>
 John 3:16 % => 
 Gen 1.5° => 
 John 3:16, 5% of people => John 3:16
-Ps 23 at 50% => Psalms 23
+Ps 23 at 50% => Psalm 23
 Is. 53.5 => Isaiah 53:5
 
 # Numbers too large to be any verse (256-999): after a `:` the verse doesn't exist (like 6:180);

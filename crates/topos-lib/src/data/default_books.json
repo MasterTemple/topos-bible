@@ -282,13 +282,14 @@
   },
   {
     "id": 19,
-    "book": "Psalms",
+    "book": "Psalm",
     "abbreviation": "Ps",
     "osis": "Ps",
     "abbreviations": [
       "ps",
       "psal",
       "psalm",
+      "psalms",
       "pslm",
       "psa",
       "psm",
