@@ -189,6 +189,7 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
     view: Object.assign(new obsidian.MarkdownView(), {
       editor: { cm: { dispatch: () => redrawn.push("editor") } },
       previewMode: { rerender: () => redrawn.push("reading view") },
+      contentEl: { querySelectorAll: () => (redrawn.push("rendered blocks"), []) },
     }),
   };
   const app = {
@@ -297,7 +298,7 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   setting("Open references in").controls[0].change("biblehub");
   await new Promise((resolve) => setTimeout(resolve, 0));
   // Open notes are redrawn, so their links go to the new site
-  assert.deepEqual(redrawn, ["editor", "reading view"]);
+  assert.deepEqual(redrawn, ["editor", "rendered blocks", "reading view"]);
   assert.equal(
     setting("Link template").desc,
     "Preview: https://biblehub.com/john/3-16.htm   https://biblehub.com/psalms/23.htm",

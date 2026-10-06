@@ -25,7 +25,7 @@ import { BackgroundSearcher } from "./indexers/background.ts";
 import { defaultCliPath, runCli, type CliRun } from "./indexers/cli.ts";
 import workerSource from "topos-worker-source";
 import { GoToReferenceModal, InsertReferenceModal, SavedQueryModal } from "./modals.ts";
-import { linkReferences } from "./reading.ts";
+import { linkReferences, relinkEditor } from "./reading.ts";
 import { bookStyle, DEFAULT_SETTINGS, ToposSettingTab, type ToposSettings } from "./settings.ts";
 import { SEARCH_VIEW, SearchView } from "./view/SearchView.tsx";
 import { SearchStore } from "./view/store.ts";
@@ -175,6 +175,8 @@ export default class ToposPlugin extends Plugin {
       // Editors keep their decorations until the text or viewport changes, so ask for new ones
       const editor = (leaf.view.editor as { cm?: EditorView } | undefined)?.cm;
       editor?.dispatch({ effects: refreshReferences.of(null) });
+      // Callouts, tables, and embedded notes in live preview are rendered once, like reading view
+      relinkEditor(this, leaf.view.contentEl);
       // Reading view keeps the HTML it rendered (and linked) until told to render again
       leaf.view.previewMode?.rerender(true);
     }
