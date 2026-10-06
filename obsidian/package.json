@@ -1,6 +1,6 @@
 {
   "name": "obsidian-topos-bible",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Find, search, link, and autocomplete Bible references in Obsidian",
   "license": "CC0-1.0",
