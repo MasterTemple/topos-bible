@@ -213,6 +213,24 @@ topos --list-queries
 `config.toml` can set a default one (`query = "paul"`). The file is read even with `--no-config`.
 The Obsidian plugin's saved searches use the same syntax.
 
+## Cache
+
+`--cache` (or `cache = true` in `config.toml`) keeps each file's references between runs, until
+the file changes (its size or modification time). Results are stored **before filtering**, so
+one run serves every later search of the same files, whatever its filters. On a vault with 2,000
+EPUBs and notes:
+
+| | Time |
+|---|---|
+| First run | 5.7 s |
+| Again, with the same or any other filters (`--nt`, `-b John`, `-o "Romans 8"`) | 0.1–0.16 s |
+
+- Only `--data`, `--context-book`, `--context-heading`, and the version get a separate cache
+- Each file has a small binary entry in `~/.cache/topos` (or `$XDG_CACHE_HOME/topos`) that
+  records which books it mentions, so files that can't match the filters are skipped
+- Entries for deleted files are removed now and then, as are caches unused for a month;
+  `topos --clear-cache` deletes everything
+
 ## Shell completions
 
 Tab completes options and their values: modes and formats, book and genre names (`-b jn` offers
@@ -364,7 +382,10 @@ Options:
           Print results sorted by path (waits for the whole search)
 
       --cache
-          Reuse results for files that have not changed since the last search with the same options
+          Reuse results for files that have not changed (stored unfiltered, so any filters can use them)
+
+      --clear-cache
+          Delete the cache (in ~/.cache/topos) and exit
 
       --ext <EXT>
           Only search files with these extensions when walking directories (e.g. md,txt); files

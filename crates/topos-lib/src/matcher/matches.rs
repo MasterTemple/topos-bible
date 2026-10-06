@@ -64,6 +64,23 @@ impl ComplexFilter {
                 .any(|outside| outside.overlaps_passage(psg, versification))
     }
 
+    /// The only books a kept match can be in, or [`None`] for any book: the allowed books,
+    /// narrowed to the books of the inside and overlapping passages when there are any
+    pub fn possible_books(&self) -> Option<BTreeSet<BookId>> {
+        let mut books = self.books.clone();
+        if !self.inside_of.is_empty() || !self.overlapping.is_empty() {
+            let passages: BTreeSet<BookId> = (self.inside_of.iter())
+                .chain(&self.overlapping)
+                .map(|psg| psg.book)
+                .collect();
+            books = Some(match books {
+                Some(books) => books.intersection(&passages).copied().collect(),
+                None => passages,
+            });
+        }
+        books
+    }
+
     pub fn as_filter<'a>(&'a self, data: &'a BibleData) -> FilteredBibleMatches<'a> {
         FilteredBibleMatches::new(self, data)
     }

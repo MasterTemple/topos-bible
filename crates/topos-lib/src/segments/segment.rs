@@ -34,8 +34,7 @@ use crate::{
 /// Chapter Range:       `7:7-8:8`                          |
 /// --------------------------------------------------------+
 /// ```
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Segment {
     /// - This is a single chapter/verse reference
     /// - Ex: `1:2` in `John 1:2`
@@ -231,3 +230,53 @@ impl std::str::FromStr for Segment {
         }
     }
 }
+
+/**
+- JSON (and other human-readable formats) write a segment untagged, by its fields alone
+- Binary formats can't tell untagged variants apart, so they get the variant's tag (the CLI's
+  cache uses postcard)
+*/
+macro_rules! segment_serde {
+    ($($variant:ident),+ $(,)?) => {
+        #[derive(Serialize, Deserialize)]
+        #[serde(untagged)]
+        enum Untagged { $($variant($variant)),+ }
+
+        #[derive(Serialize, Deserialize)]
+        enum Tagged { $($variant($variant)),+ }
+
+        impl Serialize for Segment {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                match (*self, serializer.is_human_readable()) {
+                    $(
+                        (Segment::$variant(inner), true) => Untagged::$variant(inner).serialize(serializer),
+                        (Segment::$variant(inner), false) => Tagged::$variant(inner).serialize(serializer),
+                    )+
+                }
+            }
+        }
+
+        impl<'de> Deserialize<'de> for Segment {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                if deserializer.is_human_readable() {
+                    Ok(match Untagged::deserialize(deserializer)? {
+                        $(Untagged::$variant(inner) => Segment::$variant(inner)),+
+                    })
+                } else {
+                    Ok(match Tagged::deserialize(deserializer)? {
+                        $(Tagged::$variant(inner) => Segment::$variant(inner)),+
+                    })
+                }
+            }
+        }
+    };
+}
+
+segment_serde!(
+    ChapterVerse,
+    ChapterVerseRange,
+    ChapterRange,
+    FullChapter,
+    FullChapterRange,
+    FullChapterVerseRange,
+);

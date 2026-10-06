@@ -7,14 +7,16 @@ use std::{
     thread,
 };
 
-use crate::cache::Cache;
+use crate::cache::{Cache, Cached};
 use ignore::{WalkBuilder, WalkState};
+use std::collections::BTreeSet;
 use topos_formats::{
     SearchFormat,
     epub::CfiLocation,
     srt::{SRTDocument, SRTTimeStamp},
 };
 use topos_lib::{
+    data::books::BookId,
     matcher::{BibleMatcher, Position},
     segments::Passage,
 };
@@ -85,11 +87,30 @@ pub type FileResult = Result<FileHits, (Option<PathBuf>, String)>;
 /// How files are searched
 pub struct Searcher {
     pub matcher: BibleMatcher,
-    pub cache: Option<Cache>,
+    /// With a cache: what is searched and stored (`matcher` without filters), and the only books
+    /// `matcher` can keep
+    pub cached: Option<CachedSearch>,
     /// Keep the text of cached files (for context lines)
     pub needs_text: bool,
     /// Lowercase extensions to search when walking directories (empty searches every file)
     pub extensions: Vec<String>,
+}
+
+/// Searching with a cache of unfiltered results
+pub struct CachedSearch {
+    pub cache: Cache,
+    pub unfiltered: BibleMatcher,
+    pub possible_books: Option<BTreeSet<BookId>>,
+}
+
+impl CachedSearch {
+    pub fn new(cache: Cache, matcher: &BibleMatcher) -> Self {
+        Self {
+            cache,
+            unfiltered: matcher.without_filters(),
+            possible_books: matcher.possible_books(),
+        }
+    }
 }
 
 /// Searches the input, sending each file's result as soon as it is ready
@@ -149,25 +170,43 @@ impl Searcher {
             })
     }
 
-    /// Uses the cache when the file has not changed
+    /**
+    Uses the cache when the file has not changed
+    - The cache holds unfiltered results, so they are filtered here, whatever the filters
+    - New results are found without filters, stored, then filtered
+    - Skipped (binary) files are stored with no results, so they aren't read again
+    */
     fn search_file(&self, path: &Path) -> Result<Option<FileHits>, String> {
-        let Some(cache) = &self.cache else {
+        let Some(cached) = &self.cached else {
             return search_file(&self.matcher, path);
         };
-        if let Some(hits) = cache.get(path) {
-            let text = self
-                .needs_text
-                .then(|| fs::read(path).ok())
-                .flatten()
-                .map(|bytes| Arc::from(String::from_utf8_lossy(&bytes).as_ref()));
-            let path = Some(path.to_path_buf());
-            return Ok(Some(FileHits { path, text, hits }));
+        let keep = |hits: Vec<Hit>| -> Vec<Hit> {
+            hits.into_iter()
+                .filter(|hit| self.matcher.keeps(&hit.passage))
+                .collect()
+        };
+        match cached.cache.get(path, cached.possible_books.as_ref()) {
+            Some(Cached::NoMatch) => Ok(None),
+            Some(Cached::Hits(hits)) => {
+                let hits = keep(hits);
+                let text = (self.needs_text && !hits.is_empty())
+                    .then(|| fs::read(path).ok())
+                    .flatten()
+                    .map(|bytes| Arc::from(String::from_utf8_lossy(&bytes).as_ref()));
+                let path = Some(path.to_path_buf());
+                Ok(Some(FileHits { path, text, hits }))
+            }
+            None => {
+                let found = search_file(&cached.unfiltered, path)?;
+                cached
+                    .cache
+                    .insert(path, found.as_ref().map_or(&[], |f| &f.hits));
+                Ok(found.map(|found| FileHits {
+                    hits: keep(found.hits),
+                    ..found
+                }))
+            }
         }
-        let found = search_file(&self.matcher, path)?;
-        if let Some(found) = &found {
-            cache.insert(path, &found.hits);
-        }
-        Ok(found)
     }
 }
 

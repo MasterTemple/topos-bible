@@ -147,9 +147,13 @@ pub struct Args {
     #[arg(long)]
     pub sort: bool,
 
-    /// Reuse results for files that have not changed since the last search with the same options
+    /// Reuse results for files that have not changed (stored unfiltered, so any filters can use them)
     #[arg(long)]
     pub cache: bool,
+
+    /// Delete the cache (in ~/.cache/topos) and exit
+    #[arg(long)]
+    pub clear_cache: bool,
 
     /// Only search files with these extensions when walking directories (e.g. md,txt); files
     /// named on the command line are always searched
@@ -201,23 +205,14 @@ pub enum ColorChoice {
 }
 
 impl Args {
-    /// Every option that changes which references are found (for the cache)
+    /// Every option that changes which references are found before filtering (for the cache,
+    /// which stores unfiltered results, so filters are left out)
     pub fn fingerprint(&self) -> String {
         let data = self
             .data
             .as_ref()
             .and_then(|path| fs::read_to_string(path).ok());
-        format!(
-            "{:?}",
-            (
-                (&self.testaments, self.nt, self.ot, &self.exclude_testaments),
-                (&self.genres, &self.exclude_genres),
-                (&self.books, &self.exclude_books),
-                (&self.inside, &self.overlaps, &self.outside),
-                (&self.context_book, &self.context_heading),
-                data,
-            )
-        )
+        format!("{:?}", (&self.context_book, &self.context_heading, data))
     }
 
     pub fn context_lines(&self) -> (usize, usize) {
