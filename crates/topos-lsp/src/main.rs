@@ -4,18 +4,24 @@ use std::error::Error;
 
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::{
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, Uri,
+    DidChangeConfigurationParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, InitializeParams, MessageType, ShowMessageParams, Uri,
     notification::{
-        DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument,
-        Notification as LspNotification, PublishDiagnostics,
+        DidChangeConfiguration, DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument,
+        Notification as LspNotification, PublishDiagnostics, ShowMessage,
     },
-    request::{Completion, DocumentSymbolRequest, HoverRequest, Request as LspRequest},
+    request::{
+        CodeActionRequest, Completion, DocumentSymbolRequest, ExecuteCommand, HoverRequest,
+        InlayHintRequest, References, Request as LspRequest,
+    },
 };
 use topos_bible::matcher::BibleMatcher;
 
 use crate::server::Server;
 
 mod server;
+mod settings;
+mod workspace;
 
 type AnyError = Box<dyn Error + Send + Sync>;
 
@@ -26,9 +32,47 @@ fn main() -> Result<(), AnyError> {
     Ok(())
 }
 
+/// Tells the editor something went wrong (like bad settings), without stopping the server
+fn warn(connection: &Connection, message: String) -> Result<(), AnyError> {
+    let params = ShowMessageParams {
+        typ: MessageType::WARNING,
+        message,
+    };
+    let notification = Notification::new(ShowMessage::METHOD.into(), params);
+    connection
+        .sender
+        .send(Message::Notification(notification))?;
+    Ok(())
+}
+
+fn publish_diagnostics(
+    connection: &Connection,
+    server: &Server,
+    uri: &Uri,
+) -> Result<(), AnyError> {
+    let notification =
+        Notification::new(PublishDiagnostics::METHOD.into(), server.diagnostics(uri));
+    connection
+        .sender
+        .send(Message::Notification(notification))?;
+    Ok(())
+}
+
 fn run(connection: &Connection) -> Result<(), AnyError> {
-    connection.initialize(serde_json::to_value(Server::capabilities())?)?;
+    let init = connection.initialize(serde_json::to_value(Server::capabilities())?)?;
+    let init: InitializeParams = serde_json::from_value(init).unwrap_or_default();
     let mut server = Server::new(BibleMatcher::default());
+    // The workspace folders, for go-to-references and searches
+    #[allow(deprecated)]
+    let roots = match &init.workspace_folders {
+        Some(folders) => folders.iter().map(|f| f.uri.clone()).collect(),
+        None => init.root_uri.iter().cloned().collect::<Vec<_>>(),
+    };
+    server.set_roots(roots.iter().filter_map(workspace::uri_to_path).collect());
+    let options = init.initialization_options.unwrap_or_default();
+    if let Err(err) = server.configure(options) {
+        warn(connection, err)?;
+    }
     for message in &connection.receiver {
         match message {
             Message::Request(request) => {
@@ -39,14 +83,27 @@ fn run(connection: &Connection) -> Result<(), AnyError> {
                     .sender
                     .send(Message::Response(respond(&server, request)))?;
             }
+            Message::Notification(notification)
+                if notification.method == DidChangeConfiguration::METHOD =>
+            {
+                let Ok(params) =
+                    serde_json::from_value::<DidChangeConfigurationParams>(notification.params)
+                else {
+                    continue;
+                };
+                match server.configure(params.settings) {
+                    // New data can change which references exist
+                    Ok(()) => {
+                        for uri in server.documents() {
+                            publish_diagnostics(connection, &server, &uri)?;
+                        }
+                    }
+                    Err(err) => warn(connection, err)?,
+                }
+            }
             Message::Notification(notification) => {
                 if let Some(uri) = notify(&mut server, notification) {
-                    let diagnostics = server.diagnostics(&uri);
-                    let notification =
-                        Notification::new(PublishDiagnostics::METHOD.into(), diagnostics);
-                    connection
-                        .sender
-                        .send(Message::Notification(notification))?;
+                    publish_diagnostics(connection, &server, &uri)?;
                 }
             }
             Message::Response(_) => {}
@@ -61,6 +118,10 @@ fn respond(server: &Server, request: Request) -> Response {
         Completion::METHOD => params(request).map(|p| json(server.completion(p))),
         HoverRequest::METHOD => params(request).map(|p| json(server.hover(p))),
         DocumentSymbolRequest::METHOD => params(request).map(|p| json(server.document_symbols(p))),
+        InlayHintRequest::METHOD => params(request).map(|p| json(server.inlay_hints(p))),
+        CodeActionRequest::METHOD => params(request).map(|p| json(server.code_actions(p))),
+        References::METHOD => params(request).map(|p| json(server.references(p))),
+        ExecuteCommand::METHOD => params(request).and_then(|p| server.execute_command(p).map(json)),
         method => {
             let code = lsp_server::ErrorCode::MethodNotFound as i32;
             return Response::new_err(id, code, format!("unsupported request {method}"));

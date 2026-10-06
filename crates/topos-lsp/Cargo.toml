@@ -12,8 +12,10 @@ name = "topos-lsp"
 path = "src/main.rs"
 
 [dependencies]
+ignore = "0.4.23"
 lsp-server = "0.10.0"
 lsp-types = "0.97.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
+toml = "1.1"
 topos-bible = { path = "../topos-lib" }
