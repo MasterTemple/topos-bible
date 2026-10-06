@@ -8,8 +8,8 @@ use crate::{
 };
 
 pub trait IsFilter {
-    /// These are the ids that correspond to the argument, excluded or included
-    fn get_ids(&self, data: &BibleData) -> BTreeSet<BookId>;
+    /// The books this filter names (an error if the name is unknown)
+    fn get_ids(&self, data: &BibleData) -> ToposResult<BTreeSet<BookId>>;
 }
 
 pub enum Operation<T> {
@@ -27,7 +27,7 @@ impl<T> Operation<T> {
 }
 
 impl<T: IsFilter> IsFilter for Operation<T> {
-    fn get_ids(&self, data: &BibleData) -> BTreeSet<BookId> {
+    fn get_ids(&self, data: &BibleData) -> ToposResult<BTreeSet<BookId>> {
         self.inner().get_ids(data)
     }
 }
@@ -58,8 +58,8 @@ impl BibleFilter {
         }
     }
 
-    pub fn push<T: IsFilter>(&mut self, op: Operation<T>) {
-        let ids = op.get_ids(&self.data);
+    pub fn push<T: IsFilter>(&mut self, op: Operation<T>) -> ToposResult<()> {
+        let ids = op.get_ids(&self.data)?;
 
         match op {
             Operation::Include(_) => {
@@ -74,31 +74,34 @@ impl BibleFilter {
                 self.ids.retain(|id| !ids.contains(id));
             }
         };
+        Ok(())
     }
 
-    pub fn with<T: IsFilter>(mut self, op: Operation<T>) -> BibleFilter {
-        self.push(op);
-        self
+    pub fn with<T: IsFilter>(mut self, op: Operation<T>) -> ToposResult<BibleFilter> {
+        self.push(op)?;
+        Ok(self)
     }
 
-    pub fn include<T: IsFilter>(&mut self, value: T) {
-        self.push(Operation::Include(value));
+    pub fn include<T: IsFilter>(&mut self, value: T) -> ToposResult<()> {
+        self.push(Operation::Include(value))
     }
 
-    pub fn include_many<T: IsFilter>(&mut self, list: Vec<T>) {
-        for value in list {
-            self.include(value);
-        }
+    pub fn include_many<T: IsFilter>(
+        &mut self,
+        list: impl IntoIterator<Item = T>,
+    ) -> ToposResult<()> {
+        list.into_iter().try_for_each(|value| self.include(value))
     }
 
-    pub fn exclude<T: IsFilter>(&mut self, value: T) {
-        self.push(Operation::Exclude(value));
+    pub fn exclude<T: IsFilter>(&mut self, value: T) -> ToposResult<()> {
+        self.push(Operation::Exclude(value))
     }
 
-    pub fn exclude_many<T: IsFilter>(&mut self, list: Vec<T>) {
-        for value in list {
-            self.exclude(value);
-        }
+    pub fn exclude_many<T: IsFilter>(
+        &mut self,
+        list: impl IntoIterator<Item = T>,
+    ) -> ToposResult<()> {
+        list.into_iter().try_for_each(|value| self.exclude(value))
     }
 
     pub fn ids(&self) -> &BTreeSet<BookId> {
@@ -158,7 +161,7 @@ mod tests {
     #[test]
     fn book_filter_does_not_split_numbered_books() {
         let mut filter = BibleFilter::default();
-        filter.include(BookFilter::new("John"));
+        filter.include(BookFilter::new("John")).unwrap();
         assert_eq!(
             search(filter, "1 John 2:1, John 3:16, 3 John 4"),
             ["John 3:16"]

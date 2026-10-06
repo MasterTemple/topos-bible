@@ -52,12 +52,12 @@ The phases are in order, and each one leaves the repo working.
 
 ## Phase 5: CLI
 
-- [ ] Stream results while the directory walk runs (no `thread::scope` blocking)
-- [ ] Output modes: rg-style `path:line:col: ref` (default when piped), grouped and colored (TTY), real NDJSON `--json`, `--count`
-- [ ] Context: `-C/-A/-B` lines, `--only-matching`, `--format osis|full|abbrev`, highlighting
-- [ ] Choose a format by file extension through `topos-formats`, and report unreadable files on stderr
-- [ ] Clarify inputs: `topos [PASSAGE] [PATH]...`, where the optional passage acts as `--inside`. Use `--text`/stdin for literal text
-- [ ] `--config` for custom book, genre and versification data
+- [x] Stream results while the directory walk runs (`--sort` waits and sorts by path)
+- [x] Output modes: rg-style `path:line:col: ref` (default when piped), grouped and colored (TTY), real NDJSON (`-m json`), counts, aligned tables
+- [x] Context: `-C/-A/-B` lines with highlighting, `--format name|abbreviation|osis`, `--color`
+- [x] Choose a format by file extension through `topos-formats`, skip binary files, and report unreadable files on stderr (exit codes like ripgrep)
+- [x] Clarify inputs: `topos [PATH]...` (paths only, like ripgrep), with `--text` or piped stdin for literal text (`-i` already filters by passage)
+- [x] `--config` for custom book, genre and versification data (JSON, via `BibleDataInput`)
 - [ ] Cache search results [#2](https://github.com/MasterTemple/topos/issues/2)
 
 ## Phase 6: Bindings and tooling

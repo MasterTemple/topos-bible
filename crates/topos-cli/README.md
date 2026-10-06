@@ -2,7 +2,9 @@
 
 ## Examples
 
-*Results are truncated and currently aligned manually*
+*Results are truncated. These examples use `-m table`; on a terminal the default output groups results by file, and when piped it prints `path:line:column: reference`.*
+
+Install with `cargo install --path crates/topos-cli` (add `--features pdf` to search PDFs).
 
 ### Default Search
 
@@ -11,7 +13,7 @@ Search for all Bible verses in current directory recursively (respecting `.gitig
 **Command**
 
 ```bash
-topos
+topos -m table
 ```
 
 **Output**
@@ -31,7 +33,7 @@ topos
 **Command**
 
 ```bash
-topos "Church 07-27-25.md"
+topos "Church 07-27-25.md" -m table
 ```
 
 **Output**
@@ -53,7 +55,7 @@ topos "Church 07-27-25.md"
 **Command**
 
 ```bash
-topos -t new
+topos -t new -m table
 ```
 
 **Output**
@@ -72,7 +74,7 @@ topos -t new
 **Command**
 
 ```bash
-topos -g wisdom
+topos -g wisdom -m table
 ```
 
 **Output**
@@ -92,7 +94,7 @@ topos -g wisdom
 **Command**
 
 ```bash
-topos -b Romans
+topos -b Romans -m table
 ```
 
 **Output**
@@ -116,7 +118,7 @@ topos -b Romans
 **Command**
 
 ```bash
-topos -i "1 Peter 1:1-5, 4:11,14-16"
+topos -i "1 Peter 1:1-5, 4:11,14-16" -m table
 ```
 
 **Output**
@@ -136,7 +138,7 @@ topos -i "1 Peter 1:1-5, 4:11,14-16"
 Use just like above, but prefix full command with `exclude`
 
 ```bash
-topos --exclude-testament new
+topos --exclude-testament new -m table
 ```
 
 ```
@@ -154,71 +156,113 @@ topos --exclude-testament new
 
 ## Rules
 
-- By positively specifying a testament/genre/book, you will implicitly telling the program to exclude the remaining items in that category.
-- You may choose to exclude a subset from a larger inclusion (ex: book from a genre), however this must be specified **after** the inclusion (or else it will be re-added)
-- You may combine multiple filters, and they will be joined with a logical OR
+- Including a testament, genre, or book excludes everything else in that category
+- Exclusions are applied after all inclusions, so a book can be excluded from an included genre
+- Several inclusions are joined with a logical OR (`-t new -b Psalms` is the New Testament and Psalms)
+- Unknown books or genres are errors
+
+## File types
+
+- `.pdf` (with the `pdf` feature) reports the page, and `.epub` reports a CFI
+- `.srt`, `.vtt`, and `.sbv` also report the cue's start time
+- Everything else is searched as text; binary files and files ignored by `.gitignore` are skipped
 
 ## Usage
 
-```bash
-Usage: topos [OPTIONS] [INPUT]
+```
+Find Bible references in files, directories, text, or stdin.
+
+- Including a testament, genre, or book excludes everything else in that category
+- Exclusions are applied after inclusions, so a book can be excluded from an included genre
+- Several inclusions of the same kind are joined with a logical OR
+
+Usage: topos [OPTIONS] [PATHS]...
 
 Arguments:
-  [INPUT]
-          The input can be a directory path, a file path, text, or stdin.
+  [PATHS]...
+          Files or directories to search (respecting .gitignore); defaults to stdin when piped, otherwise the current directory
 
 Options:
+      --text <TEXT>
+          Search this text instead of files
+
   -t, --testament <TESTAMENTS>
-          Include books from a specific testament (old/new)
+          Include books from a testament (old/new)
 
       --exclude-testament <EXCLUDE_TESTAMENTS>
-          Exclude books from a specific testament
+          Exclude books from a testament
 
   -g, --genre <GENRES>
-          Include books of a specific genre (e.g. epistles, gospels)
+          Include books of a genre (e.g. epistles, gospels)
 
       --exclude-genre <EXCLUDE_GENRES>
-          Exclude books of a specific genre
+          Exclude books of a genre
 
   -b, --book <BOOKS>
-          Include specific books (e.g. John)
+          Include a book (e.g. John)
 
       --exclude-book <EXCLUDE_BOOKS>
-          Exclude specific books
+          Exclude a book
 
   -i, --inside <INSIDE>
-          Limit search to a verse range (e.g. John 1:2-3)
+          Only keep references that overlap this passage (e.g. "John 1:2-3")
 
   -o, --outside <OUTSIDE>
-          Forbid search from matching a verse range (e.g. John 3:4-5)
+          Drop references that overlap this passage (e.g. "John 3:4-5")
+
+      --context-book <CONTEXT_BOOK>
+          Treat the input as being about this book, so references like 3:16 match
+
+      --context-heading <CONTEXT_HEADING>
+          Lines matching this pattern set the book for references after them, like '^#+ {book}$'
 
       --config <CONFIG>
-          Use a custom configuration file
+          A JSON file with custom books, genres, or chapter and verse counts
 
   -m, --mode <MODE>
-          Specify output mode
-
-          [default: table]
+          How to print results
 
           Possible values:
-          - count:    Count total matches
-          - json:     Output matches as JSON
-          - table:    Output matches as a table
-          - quickfix: Output matches for the Neovim Quickfix List
+          - auto:     Grouped by file on a terminal, otherwise `path:line:column: reference`
+          - grouped:  Grouped by file, with optional context lines
+          - quickfix: `path:line:column: reference` (for Vim's quickfix list)
+          - table:    A Markdown table
+          - json:     One JSON object per match
+          - count:    Matches per file
+          
+          [default: auto]
 
-  -v, --verbose
-          Include more data about each match
+  -f, --format <FORMAT>
+          How to write each reference
 
-  -c, --context <CONTEXT>
-          Units of context
+          Possible values:
+          - name:         `Genesis 1:1`
+          - abbreviation: `Gn 1:1`
+          - osis:         `Gen.1.1`
+          
+          [default: name]
 
-          [default: 1]
+  -A, --after-context <AFTER_CONTEXT>
+          Lines of context to show after each match
+          
+          [default: 0]
 
-      --before <BEFORE_CONTEXT>
-          Specify units of context before match to provide
+  -B, --before-context <BEFORE_CONTEXT>
+          Lines of context to show before each match
+          
+          [default: 0]
 
-      --after <AFTER_CONTEXT>
-          Specify units of context after match to provide
+  -C, --context <CONTEXT>
+          Lines of context to show before and after each match
+
+      --color <COLOR>
+          When to use colors
+          
+          [default: auto]
+          [possible values: auto, always, never]
+
+      --sort
+          Print results sorted by path (waits for the whole search)
 
   -h, --help
           Print help (see a summary with '-h')

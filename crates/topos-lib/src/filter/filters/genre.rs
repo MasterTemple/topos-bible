@@ -1,4 +1,8 @@
-use crate::{data::books::BookId, filter::bible_filter::IsFilter};
+use crate::{
+    data::books::BookId,
+    error::{ToposError, ToposResult},
+    filter::bible_filter::IsFilter,
+};
 
 pub struct GenreFilter {
     input: String,
@@ -16,11 +20,11 @@ impl IsFilter for GenreFilter {
     fn get_ids(
         &self,
         data: &crate::data::bible_data::BibleData,
-    ) -> std::collections::BTreeSet<BookId> {
+    ) -> ToposResult<std::collections::BTreeSet<BookId>> {
         data.genres()
             .genre_ids(&self.input)
             .cloned()
-            .unwrap_or_default()
+            .ok_or_else(|| ToposError::UnknownGenre(self.input.clone()))
     }
 }
 
@@ -38,7 +42,7 @@ mod tests {
                 let data = crate::data::bible_data::BibleData::default();
                 let mut filter = crate::filter::bible_filter::BibleFilter::new(data);
                 $(
-                    filter.push($filter);
+                    filter.push($filter).unwrap();
                 )*
                 assert_eq!(filter.ids().len(), $count);
             }

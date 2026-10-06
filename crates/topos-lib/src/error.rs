@@ -19,6 +19,8 @@ pub enum ToposError {
     InvalidPassage(String),
     #[error("unknown book {0:?}")]
     UnknownBook(String),
+    #[error("unknown genre {0:?}")]
+    UnknownGenre(String),
     #[error("unknown testament {0:?} (expected `old` or `new`)")]
     UnknownTestament(String),
     #[error("invalid OSIS reference {0:?}")]

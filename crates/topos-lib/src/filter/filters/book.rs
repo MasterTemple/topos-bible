@@ -1,6 +1,10 @@
 use std::collections::BTreeSet;
 
-use crate::{data::books::BookId, filter::bible_filter::IsFilter};
+use crate::{
+    data::books::BookId,
+    error::{ToposError, ToposResult},
+    filter::bible_filter::IsFilter,
+};
 
 pub struct BookFilter {
     input: String,
@@ -15,15 +19,12 @@ impl BookFilter {
 }
 
 impl IsFilter for BookFilter {
-    fn get_ids(
-        &self,
-        data: &crate::data::bible_data::BibleData,
-    ) -> std::collections::BTreeSet<BookId> {
-        let mut ids = BTreeSet::new();
-        if let Some(value) = data.books().search(&self.input) {
-            ids.insert(value);
-        }
-        ids
+    fn get_ids(&self, data: &crate::data::bible_data::BibleData) -> ToposResult<BTreeSet<BookId>> {
+        let book = data
+            .books()
+            .search(&self.input)
+            .ok_or_else(|| ToposError::UnknownBook(self.input.clone()))?;
+        Ok(BTreeSet::from([book]))
     }
 }
 
@@ -41,7 +42,7 @@ mod tests {
                 let data = crate::data::bible_data::BibleData::default();
                 let mut filter = crate::filter::bible_filter::BibleFilter::new(data);
                 $(
-                    filter.push($filter);
+                    filter.push($filter).unwrap();
                 )*
                 assert_eq!(filter.ids().len(), $count);
             }

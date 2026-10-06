@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use itertools::Itertools;
 
-use crate::error::ToposError;
+use crate::error::{ToposError, ToposResult};
 use crate::{data::books::BookId, filter::bible_filter::IsFilter};
 
 #[derive(Copy, Clone, Debug)]
@@ -24,13 +24,13 @@ impl IsFilter for TestamentFilter {
     fn get_ids(
         &self,
         _data: &crate::data::bible_data::BibleData,
-    ) -> std::collections::BTreeSet<BookId> {
-        match self {
+    ) -> ToposResult<std::collections::BTreeSet<BookId>> {
+        Ok(match self {
             TestamentFilter::Old => 1..=39,
             TestamentFilter::New => 40..=66,
         }
         .map_into()
-        .collect()
+        .collect())
     }
 }
 
@@ -57,7 +57,7 @@ mod tests {
                 let data = crate::data::bible_data::BibleData::default();
                 let mut filter = crate::filter::bible_filter::BibleFilter::new(data);
                 $(
-                    filter.push($filter);
+                    filter.push($filter).unwrap();
                 )*
                 assert_eq!(filter.ids().len(), $count);
             }

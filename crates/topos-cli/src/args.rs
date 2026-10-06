@@ -1,197 +1,210 @@
-use clap::Parser;
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
+
+use clap::{Parser, ValueEnum};
 use topos_lib::{
+    data::bible_data::{BibleData, BibleDataInput},
+    error::AnyResult,
     filter::{
         bible_filter::BibleFilter,
         filters::{book::BookFilter, genre::GenreFilter, testament::TestamentFilter},
     },
-    matcher::{bible_matcher::BibleMatcher, context::BookContext},
+    matcher::{BibleMatcher, context::BookContext},
+    segments::formatter::{BookStyle, FormatOptions},
 };
 
-use crate::outputs::OutputMode;
-
 /**
-- By positively specifying a testament/genre/book, you will implicitly telling the program to exclude the remaining items in that category.
-- You may choose to exclude a subset from a larger inclusion (ex: book from a genre), however this must be specified **after** the inclusion (or else it will be re-added)
-- You may combine multiple filters, and they will be joined with a logical OR
+Find Bible references in files, directories, text, or stdin.
+
+- Including a testament, genre, or book excludes everything else in that category
+- Exclusions are applied after inclusions, so a book can be excluded from an included genre
+- Several inclusions of the same kind are joined with a logical OR
 */
 #[derive(Parser, Debug)]
-#[clap(
+#[command(
     name = "topos",
-    about = "A Bible passage search tool inspired by ripgrep",
-    version = "0.1.0"
+    version,
+    about = "Find Bible references, like ripgrep",
+    verbatim_doc_comment
 )]
 pub struct Args {
-    #[clap(help = "The input can be a directory path, a file path, text, or stdin.")]
-    pub input: Option<String>,
+    /// Files or directories to search (respecting .gitignore); defaults to stdin when piped,
+    /// otherwise the current directory
+    pub paths: Vec<PathBuf>,
 
-    // Testament filters
-    #[clap(
-        long = "testament",
-        short = 't',
-        help = "Include books from a specific testament (old/new)"
-    )]
-    pub testaments: Option<Vec<TestamentFilter>>,
+    /// Search this text instead of files
+    #[arg(long, conflicts_with = "paths")]
+    pub text: Option<String>,
 
-    #[clap(
-        long = "exclude-testament",
-        help = "Exclude books from a specific testament"
-    )]
-    pub exclude_testaments: Option<Vec<TestamentFilter>>,
+    /// Include books from a testament (old/new)
+    #[arg(long = "testament", short = 't')]
+    pub testaments: Vec<TestamentFilter>,
 
-    // Genre filters
-    #[clap(
-        long = "genre",
-        short = 'g',
-        help = "Include books of a specific genre (e.g. epistles, gospels)"
-    )]
-    pub genres: Option<Vec<String>>,
+    /// Exclude books from a testament
+    #[arg(long = "exclude-testament")]
+    pub exclude_testaments: Vec<TestamentFilter>,
 
-    #[clap(long = "exclude-genre", help = "Exclude books of a specific genre")]
-    pub exclude_genres: Option<Vec<String>>,
+    /// Include books of a genre (e.g. epistles, gospels)
+    #[arg(long = "genre", short = 'g')]
+    pub genres: Vec<String>,
 
-    // Book filters
-    #[clap(
-        long = "book",
-        short = 'b',
-        help = "Include specific books (e.g. John)"
-    )]
-    pub books: Option<Vec<String>>,
+    /// Exclude books of a genre
+    #[arg(long = "exclude-genre")]
+    pub exclude_genres: Vec<String>,
 
-    #[clap(long = "exclude-book", help = "Exclude specific books")]
-    pub exclude_books: Option<Vec<String>>,
+    /// Include a book (e.g. John)
+    #[arg(long = "book", short = 'b')]
+    pub books: Vec<String>,
 
-    // Verse range filters
-    #[clap(
-        long = "inside",
-        short = 'i',
-        help = "Limit search to a verse range (e.g. John 1:2-3)"
-    )]
-    pub inside: Option<Vec<String>>,
+    /// Exclude a book
+    #[arg(long = "exclude-book")]
+    pub exclude_books: Vec<String>,
 
-    // Verse range filters
-    #[clap(
-        long = "outside",
-        short = 'o',
-        help = "Forbid search from matching a verse range (e.g. John 3:4-5)"
-    )]
-    pub outside: Option<Vec<String>>,
+    /// Only keep references that overlap this passage (e.g. "John 1:2-3")
+    #[arg(long = "inside", short = 'i')]
+    pub inside: Vec<String>,
 
-    #[clap(
-        long = "context-book",
-        help = "Treat the input as being about this book, so references like 3:16 match"
-    )]
+    /// Drop references that overlap this passage (e.g. "John 3:4-5")
+    #[arg(long = "outside", short = 'o')]
+    pub outside: Vec<String>,
+
+    /// Treat the input as being about this book, so references like 3:16 match
+    #[arg(long)]
     pub context_book: Option<String>,
 
-    #[clap(
-        long = "context-heading",
-        help = "Lines matching this pattern set the book for following references, like '^#+ {book}$'",
-        conflicts_with = "context_book"
-    )]
+    /// Lines matching this pattern set the book for references after them, like '^#+ {book}$'
+    #[arg(long, conflicts_with = "context_book")]
     pub context_heading: Option<String>,
 
-    // TODO: actually implement this
-    #[clap(long = "config", help = "Use a custom configuration file")]
+    /// A JSON file with custom books, genres, or chapter and verse counts
+    #[arg(long)]
     pub config: Option<PathBuf>,
 
-    // #[clap(long = "igonre", help = "Ignore when non-real books/genres are given")]
-    // pub ignore_non_existent: bool,
-
-    // TODO: actually implement this
-    #[clap(
-        long = "mode",
-        short = 'm',
-        help = "Specify output mode",
-        default_value_t
-    )]
-    #[arg(value_enum)]
+    /// How to print results
+    #[arg(long, short = 'm', value_enum, default_value_t)]
     pub mode: OutputMode,
 
-    #[clap(
-        long = "verbose",
-        short = 'v',
-        help = "Include more data about each match"
-    )]
-    pub versbose: bool,
+    /// How to write each reference
+    #[arg(long, short = 'f', value_enum, default_value_t)]
+    pub format: ReferenceFormat,
 
-    // TODO: actually implement this
-    #[clap(
-        long = "context",
-        short = 'c',
-        help = "Units of context",
-        default_value_t = 1
-    )]
-    pub context: u64,
+    /// Lines of context to show after each match
+    #[arg(long, short = 'A', default_value_t = 0)]
+    pub after_context: usize,
 
-    // TODO: actually implement this
-    #[clap(
-        long = "before",
-        help = "Specify units of context before match to provide"
-    )]
-    pub before_context: Option<u64>,
+    /// Lines of context to show before each match
+    #[arg(long, short = 'B', default_value_t = 0)]
+    pub before_context: usize,
 
-    // TODO: actually implement this
-    #[clap(
-        long = "after",
-        help = "Specify units of context after match to provide"
-    )]
-    pub after_context: Option<u64>,
+    /// Lines of context to show before and after each match
+    #[arg(long, short = 'C')]
+    pub context: Option<usize>,
+
+    /// When to use colors
+    #[arg(long, value_enum, default_value_t)]
+    pub color: ColorChoice,
+
+    /// Print results sorted by path (waits for the whole search)
+    #[arg(long)]
+    pub sort: bool,
 }
 
-impl TryFrom<Args> for BibleMatcher {
-    type Error = Box<dyn std::error::Error>;
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, ValueEnum)]
+pub enum OutputMode {
+    /// Grouped by file on a terminal, otherwise `path:line:column: reference`
+    #[default]
+    Auto,
+    /// Grouped by file, with optional context lines
+    Grouped,
+    /// `path:line:column: reference` (for Vim's quickfix list)
+    #[value(alias = "qf", alias = "vimgrep")]
+    Quickfix,
+    /// A Markdown table
+    #[value(alias = "t")]
+    Table,
+    /// One JSON object per match
+    #[value(alias = "j")]
+    Json,
+    /// Matches per file
+    #[value(alias = "c")]
+    Count,
+}
 
-    fn try_from(args: Args) -> Result<Self, Self::Error> {
-        // TODO: get alternate Bible/Genre data
-        let mut filter = BibleFilter::default();
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, ValueEnum)]
+pub enum ReferenceFormat {
+    /// `Genesis 1:1`
+    #[default]
+    Name,
+    /// `Gn 1:1`
+    #[value(alias = "abbrev")]
+    Abbreviation,
+    /// `Gen.1.1`
+    Osis,
+}
 
-        if let Some(list) = args.testaments {
-            filter.include_many(list);
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, ValueEnum)]
+pub enum ColorChoice {
+    #[default]
+    Auto,
+    Always,
+    Never,
+}
+
+impl Args {
+    pub fn context_lines(&self) -> (usize, usize) {
+        match self.context {
+            Some(lines) => (
+                lines.max(self.before_context),
+                lines.max(self.after_context),
+            ),
+            None => (self.before_context, self.after_context),
         }
+    }
 
-        if let Some(list) = args.genres {
-            filter.include_many(list.into_iter().map(GenreFilter::new).collect());
+    /// Book style for the core formatter (OSIS is written by [`Passage::to_osis`] instead)
+    pub fn format_options(&self) -> FormatOptions {
+        FormatOptions {
+            book: match self.format {
+                ReferenceFormat::Name => BookStyle::Name,
+                ReferenceFormat::Abbreviation => BookStyle::Abbreviation,
+                ReferenceFormat::Osis => BookStyle::Osis,
+            },
+            ..FormatOptions::default()
         }
+    }
 
-        if let Some(list) = args.books {
-            filter.include_many(list.into_iter().map(BookFilter::new).collect());
-        }
-
-        if let Some(list) = args.exclude_testaments {
-            filter.exclude_many(list);
-        }
-
-        if let Some(list) = args.exclude_genres {
-            filter.exclude_many(list.into_iter().map(GenreFilter::new).collect());
-        }
-
-        if let Some(list) = args.exclude_books {
-            filter.exclude_many(list.into_iter().map(BookFilter::new).collect());
-        }
-
-        if let Some(list) = args.inside {
-            for value in list {
-                filter.filter_inside(&value)?;
+    pub fn matcher(&self) -> AnyResult<BibleMatcher> {
+        let data = match &self.config {
+            Some(path) => {
+                let input: BibleDataInput = serde_json::from_str(&fs::read_to_string(path)?)
+                    .map_err(|e| format!("{}: {e}", path.display()))?;
+                BibleData::new(input)?
             }
+            None => BibleData::default(),
+        };
+        let mut filter = BibleFilter::new(data);
+        filter.include_many(self.testaments.iter().copied())?;
+        filter.include_many(self.genres.iter().map(GenreFilter::new))?;
+        filter.include_many(self.books.iter().map(BookFilter::new))?;
+        filter.exclude_many(self.exclude_testaments.iter().copied())?;
+        filter.exclude_many(self.exclude_genres.iter().map(GenreFilter::new))?;
+        filter.exclude_many(self.exclude_books.iter().map(BookFilter::new))?;
+        for passage in &self.inside {
+            filter.filter_inside(passage)?;
         }
-
-        if let Some(list) = args.outside {
-            for value in list {
-                filter.filter_outside(&value)?;
-            }
+        for passage in &self.outside {
+            filter.filter_outside(passage)?;
         }
 
         let matcher = filter.create_matcher();
         let books = matcher.data().books();
-        let context = if let Some(book) = &args.context_book {
-            let book = books
-                .search(book)
-                .ok_or_else(|| format!("Unknown book {book:?}"))?;
-            Some(BookContext::Book(book))
-        } else if let Some(pattern) = &args.context_heading {
-            Some(BookContext::headings(books, pattern)?)
-        } else {
-            None
+        let context = match (&self.context_book, &self.context_heading) {
+            (Some(book), _) => Some(BookContext::Book(
+                books
+                    .search(book)
+                    .ok_or_else(|| format!("unknown book {book:?}"))?,
+            )),
+            (None, Some(pattern)) => Some(BookContext::headings(books, pattern)?),
+            (None, None) => None,
         };
         Ok(match context {
             Some(context) => matcher.with_context(context),

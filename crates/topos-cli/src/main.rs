@@ -1,26 +1,67 @@
+use std::{process::ExitCode, sync::Arc};
+
 use clap::Parser;
-use topos_lib::matcher::bible_matcher::BibleMatcher;
 
-use crate::{args::Args, inputs::InputType};
+use crate::{
+    args::Args,
+    output::Printer,
+    search::{Input, search},
+};
 
-pub mod args;
-pub mod inputs;
-pub mod matches;
-pub mod outputs;
+mod args;
+mod output;
+mod search;
 
-pub fn main() {
-    let args = Args::parse();
-    let input = InputType::new(args.input.clone());
-    let output = args.mode;
-
-    let matcher = match BibleMatcher::try_from(args) {
-        Ok(matcher) => matcher,
+/// Like ripgrep: 0 when something matched, 1 when nothing did, 2 on errors
+fn main() -> ExitCode {
+    let mut args = Args::parse();
+    let matcher = match args.matcher() {
+        Ok(matcher) => Arc::new(matcher),
         Err(err) => {
             eprintln!("topos: {err}");
-            std::process::exit(2);
+            return ExitCode::from(2);
+        }
+    };
+    let input = match Input::new(std::mem::take(&mut args.paths), args.text.take()) {
+        Ok(input) => input,
+        Err(err) => {
+            eprintln!("topos: {err}");
+            return ExitCode::from(2);
         }
     };
 
-    let results = input.search(matcher.clone());
-    output.write(&matcher, results);
+    let mut printer = Printer::new(&args, matcher.data().clone());
+    let results = search(matcher, input);
+    let mut files: Vec<_> = vec![];
+    let (mut found, mut failed) = (false, false);
+    for result in results {
+        match result {
+            Ok(file) if args.sort => files.push(file),
+            Ok(file) => {
+                found |= !file.hits.is_empty();
+                printer.file(&file);
+            }
+            Err((path, err)) => {
+                failed = true;
+                match path {
+                    Some(path) => eprintln!("topos: {}: {err}", path.display()),
+                    None => eprintln!("topos: {err}"),
+                }
+            }
+        }
+    }
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    for file in &files {
+        found |= !file.hits.is_empty();
+        printer.file(file);
+    }
+    printer.finish();
+
+    if failed {
+        ExitCode::from(2)
+    } else if found {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(1)
+    }
 }
