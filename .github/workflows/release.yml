@@ -161,10 +161,12 @@ jobs:
     permissions:
       id-token: write
     steps:
+      # No registry-url: it writes a placeholder token, which npm would send instead of using
+      # trusted publishing (OIDC). Trusted publishing needs npm 11.5.1 or later.
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@latest && npm --version
       - uses: actions/download-artifact@v5
         with:
           name: npm-package
