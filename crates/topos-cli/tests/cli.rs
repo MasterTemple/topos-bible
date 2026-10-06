@@ -99,6 +99,35 @@ fn json_lines() {
         (value["line"].as_u64(), value["column"].as_u64()),
         (Some(1), Some(3))
     );
+
+    // UTF-16 positions, book data, and segments (for editors and the Obsidian plugin).
+    // `é` and the spaces are 1 UTF-16 unit each, and `📖` is 2
+    let text = "é 📖 Jn 3:16-18; 5\nnext Rom 8:28";
+    let output = topos(&["--text", text, "-m", "json"], None);
+    let lines: Vec<serde_json::Value> = stdout(&output)
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(lines[0]["book_id"], 43);
+    assert_eq!(lines[0]["book"], "John");
+    assert_eq!(
+        (
+            lines[0]["start_utf16"].as_u64(),
+            lines[0]["end_utf16"].as_u64()
+        ),
+        (Some(5), Some(18))
+    );
+    assert_eq!(lines[0]["utf16_column"], 6);
+    assert_eq!(lines[0]["line_text"], "é 📖 Jn 3:16-18; 5");
+    assert_eq!(
+        lines[0]["segments"],
+        serde_json::json!([
+            { "tag": "Verses", "start": { "chapter": 3, "verse": 16 }, "end": { "chapter": 3, "verse": 18 } },
+            { "tag": "Chapters", "start": 5, "end": null },
+        ])
+    );
+    assert_eq!(lines[1]["start_utf16"], 24);
+    assert_eq!(lines[1]["line_text"], "next Rom 8:28");
 }
 
 #[test]
