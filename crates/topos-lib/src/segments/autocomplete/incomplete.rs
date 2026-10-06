@@ -122,11 +122,10 @@ impl IncompleteSegment {
             Self::ChapterOrVerse { start: _ } => {
                 if let Some(prev) = prev {
                     let next_verse = match prev.ending_verse() {
-                        Some(cur) => cur + 1,
+                        Some(cur) => cur.saturating_add(1),
                         None => 1,
                     };
                     let current_chapter = prev.ending_chapter();
-                    let _next_chapter = current_chapter + 1;
 
                     (next_verse..=chapter_verses.get_last_verse(current_chapter)?)
                         .map(|v| Segment::chapter_verse(current_chapter, v))
@@ -141,12 +140,12 @@ impl IncompleteSegment {
                 if let Some(prev) = prev {
                     let is_chapter = prev.ending_verse().is_some();
                     if is_chapter {
-                        (start + 1..=last_chapter)
+                        (start.saturating_add(1)..=last_chapter)
                             .map(|c| Segment::full_chapter_range(start, c))
                             .collect_vec()
                     } else {
                         let next_verse = match prev.ending_verse() {
-                            Some(cur) => cur + 1,
+                            Some(cur) => cur.saturating_add(1),
                             None => 1,
                         };
                         let current_chapter = prev.ending_chapter();
@@ -156,7 +155,7 @@ impl IncompleteSegment {
                             .collect_vec()
                     }
                 } else {
-                    (start + 1..=last_chapter)
+                    (start.saturating_add(1)..=last_chapter)
                         .map(|c| Segment::full_chapter_range(start, c))
                         .collect_vec()
                 }
@@ -174,10 +173,11 @@ impl IncompleteSegment {
                 start_verse,
                 end: _,
             } => {
-                let verses = (start_verse + 1..=chapter_verses.get_last_verse(start_chapter)?)
+                let verses = (start_verse.saturating_add(1)
+                    ..=chapter_verses.get_last_verse(start_chapter)?)
                     .map(|v| Segment::chapter_verse_range(start_chapter, start_verse, v))
                     .collect_vec();
-                let chapters = (start_chapter + 1..=last_chapter)
+                let chapters = (start_chapter.saturating_add(1)..=last_chapter)
                     .map(|c| Segment::chapter_range(start_chapter, start_verse, c, 1))
                     .collect_vec();
                 verses.into_iter().chain(chapters).collect()

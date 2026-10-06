@@ -1,0 +1,22 @@
+[package]
+name = "topos-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+topos-lib = { path = "../crates/topos-lib" }
+
+# Keep this out of the main workspace (run with `cargo fuzz run search`)
+[workspace]
+
+[[bin]]
+name = "search"
+path = "fuzz_targets/search.rs"
+test = false
+doc = false
+bench = false
