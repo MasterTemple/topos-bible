@@ -43,12 +43,13 @@ while the server runs, without a restart). They take the same keys, at the top l
 can also be a whole object, like `psg-fmt`. Settings that can't be used are reported as a
 warning, and the previous ones stay.
 
-## Neovim (0.11+)
+## Neovim
 
-[`editors/nvim.lua`](./editors/nvim.lua) sets everything up. Copy it into your config, or
-`dofile` it. It also turns on inlay hints, and opens the code actions' results like
-go-to-references: in Telescope's picker if Telescope is installed, otherwise in the quickfix
-list.
+The [topos-bible.nvim](../../README.md#neovim) plugin sets up the server, builds it, opens the
+code actions' results in Telescope (or the quickfix list), and adds search commands and pickers.
+See `:help topos-bible`.
+
+Without the plugin (Neovim 0.11+):
 
 ```lua
 vim.lsp.config('topos', {
@@ -58,17 +59,14 @@ vim.lsp.config('topos', {
   init_options = { ['psg-fmt'] = { join_adjacent = true }, ['inlay-hints'] = 'always' },
 })
 vim.lsp.enable('topos')
--- ...and the `topos.search` command handler from editors/nvim.lua
 ```
 
-Go to references (`grr`, or Telescope's `lsp_references`) and the code actions (`gra`) then work
-as usual. References also show up in `vim.lsp.buf.document_symbol()` (or Telescope's
-`lsp_document_symbols`), and completion works with any LSP completion plugin.
+Go to references and completion then work. The code actions need a `vim.lsp.commands['topos.search']`
+handler to show their results (see below; the plugin's is in `lua/topos/init.lua`).
 
-### Why the code actions need a handler
+## Code actions in other editors
 
 LSP has no standard way for a server to open the editor's references list. The code actions
 run the `topos.search` command, which returns the matching locations
 (`workspace/executeCommand` with `{ "mode": "explicit-overlap" | "any-overlap" |
-"exact-overlap" | "inside", "passage": "John 3:16" }`), and the handler in `editors/nvim.lua`
-shows them. Other editors can call the command the same way.
+"exact-overlap" | "inside", "passage": "John 3:16" }`); the editor shows them.

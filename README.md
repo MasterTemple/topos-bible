@@ -16,6 +16,39 @@ npm install topos-bible
 pip install topos-bible
 ```
 
+## Neovim
+
+**topos-bible.nvim** (this repository) runs the language server and searches your notes, with
+Telescope pickers. With [lazy.nvim](https://lazy.folke.io):
+
+```lua
+{
+  'MasterTemple/topos-bible',
+  name = 'topos-bible.nvim',
+  main = 'topos',
+  -- Builds topos-lsp and the topos CLI from this checkout (needs Rust: https://rustup.rs)
+  build = 'cargo build --release -p topos-lsp -p topos-bible-cli',
+  dependencies = { 'nvim-telescope/telescope.nvim' }, -- optional
+  ft = { 'markdown', 'text' },
+  cmd = { 'ToposSearch', 'ToposQuery', 'ToposExplicitOverlap', 'ToposAnyOverlap',
+          'ToposExactOverlap', 'ToposInside', 'ToposExcludeOverlap', 'ToposBuild' },
+  opts = {},
+}
+```
+
+- **Language server**: completion, hover, inlay hints, symbols, and diagnostics; go to
+  references (`grr`) lists the references that are exactly the one under the cursor, and the
+  code actions (`gra`) search for it by explicit overlap, any overlap, exact overlap, or inside it
+- **Commands**: `:ToposSearch` (every reference), `:ToposQuery -g Wisdom` (the CLI's options,
+  completed with Tab), and `:ToposExplicitOverlap John 3:16`, `:ToposAnyOverlap`,
+  `:ToposExactOverlap`, `:ToposInside`, `:ToposExcludeOverlap` (the reference under the cursor
+  by default)
+- **Telescope**: `:Telescope topos`, plus a picker per search; without Telescope, results open
+  in the quickfix list
+
+The plugin and the CLI share `~/.config/topos/config.toml`. See `:help topos-bible`, and
+`:checkhealth topos` if something doesn't work. `tests/nvim/run.sh` tests it in headless Neovim.
+
 ## Crates
 
 | Crate (folder) | What it is |
