@@ -19,6 +19,7 @@ test("the sidebar renders filtered, grouped results", async () => {
      import { SearchStore } from ${src("view/store.ts")};
      import { ReferenceIndex } from ${src("core/search.ts")};
      import { DEFAULT_SETTINGS } from ${src("core/settings.ts")};
+     import { linkUrl, siteName } from ${src("core/links.ts")};
      import { NO_FILTERS } from ${src("core/filters.ts")};
 
      export function render(filters, groupBy, queries = [], context = 0) {
@@ -29,6 +30,8 @@ test("the sidebar renders filtered, grouped results", async () => {
        const plugin = {
          topos, index, indexVersion: 1, indexing: false,
          settings: { ...DEFAULT_SETTINGS, queries },
+         referenceUrl: (passage) => linkUrl(DEFAULT_SETTINGS.linkTemplate, passage),
+         linkSite: () => siteName(DEFAULT_SETTINGS.linkTemplate),
          search: new SearchStore({ filters: { ...NO_FILTERS, ...filters }, groupBy, context }),
          subscribeIndex: () => () => {},
          app: {

@@ -1,9 +1,9 @@
-import { App, Notice, Platform, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, type DropdownComponent, Platform, PluginSettingTab, Setting } from "obsidian";
 import { BookStyle } from "topos-bible";
 import { DEFAULT_FORMAT, written, type FormatSettings } from "./core/format.ts";
 import { parseQuery } from "./core/query.ts";
 import type { BookCompletion } from "./core/completions.ts";
-import { TRANSLATIONS, type Translation } from "./core/literalWord.ts";
+import { FILTERS, linkUrl, PLACEHOLDERS, SITES, templateError } from "./core/links.ts";
 import { bookStyle, type StyleName } from "./core/settings.ts";
 import type ToposPlugin from "./main.ts";
 
@@ -40,20 +40,10 @@ export class ToposSettingTab extends PluginSettingTab {
           }),
       );
 
-    new Setting(containerEl).setName("Literal Word").setHeading();
-    new Setting(containerEl)
-      .setName("Translation")
-      .setDesc("References open at app.literalword.com in this translation.")
-      .addDropdown((d) => {
-        for (const t of TRANSLATIONS) d.addOption(t, t ? t.toUpperCase() : "Literal Word's default");
-        d.setValue(settings.translation).onChange((value) => {
-          settings.translation = value as Translation;
-          void save();
-        });
-      });
+    this.links(containerEl);
     new Setting(containerEl)
       .setName("Link references in the editor")
-      .setDesc("Underline references while editing, and open them in Literal Word when clicked.")
+      .setDesc("Underline references while editing, and open their links when clicked.")
       .addToggle((t) =>
         t.setValue(settings.linkInEditor).onChange((value) => {
           settings.linkInEditor = value;
@@ -190,6 +180,63 @@ export class ToposSettingTab extends PluginSettingTab {
    * How references are written (the CLI's --psg-fmt fields), with a preview: completions, the
    * sidebar, the dialogs, and "Normalize references" all use it
    */
+  /** Where references open: a site, a template of your own, or nowhere */
+  private links(containerEl: HTMLElement): void {
+    const settings = this.plugin.settings;
+    const choice = (template: string) =>
+      !template.trim() ? "none" : (SITES.find((site) => site.template === template)?.id ?? "custom");
+    new Setting(containerEl)
+      .setName("Links")
+      .setHeading()
+      .setDesc(
+        `A link template is an address with placeholders: ${Object.keys(PLACEHOLDERS)
+          .map((name) => `{${name}}`)
+          .join(" ")}. Filters change a value: {book|${Object.keys(FILTERS).join("|")}}. ` +
+          "A part in [ ] is left out when a placeholder in it has no value, like {verse} for a whole chapter.",
+      );
+    let sites: DropdownComponent | undefined;
+    new Setting(containerEl)
+      .setName("Open references in")
+      .setDesc("Where clicking a reference, the sidebar's ↗ button, and reading view links go.")
+      .addDropdown((d) => {
+        sites = d;
+        for (const site of SITES) d.addOption(site.id, site.name);
+        d.addOption("custom", "A link template");
+        d.addOption("none", "Nowhere (no links)");
+        d.setValue(choice(settings.linkTemplate)).onChange((value) => {
+          const site = SITES.find((s) => s.id === value);
+          if (site) settings.linkTemplate = site.template;
+          if (value === "none") settings.linkTemplate = "";
+          if (value === "custom" && !settings.linkTemplate.trim()) settings.linkTemplate = "https://";
+          void this.plugin.saveSettings();
+          this.display();
+        });
+      });
+    if (!settings.linkTemplate.trim()) return;
+    const template = new Setting(containerEl).setName("Link template");
+    const preview = () => {
+      const error = templateError(settings.linkTemplate);
+      const examples = ["John 3:16-18", "Psalm 23"].map((reference) => {
+        const passage = this.plugin.topos.parse(reference, BookStyle.Name);
+        return (passage && linkUrl(settings.linkTemplate, passage)) ?? `no link for ${reference}`;
+      });
+      template.setDesc(error ? `Can't be used: ${error}` : `Preview: ${examples.join("   ")}`);
+      template.descEl.toggleClass("topos-query-error", error !== null);
+    };
+    template.addText((t) => {
+      t.inputEl.addClass("topos-query-input");
+      t.setPlaceholder("https://example.com/{book.id}/{chapter}[/{verse}]")
+        .setValue(settings.linkTemplate)
+        .onChange((value) => {
+          settings.linkTemplate = value;
+          sites?.setValue(choice(value));
+          preview();
+          void this.plugin.saveSettings();
+        });
+    });
+    preview();
+  }
+
   private formatSettings(containerEl: HTMLElement): void {
     const { settings } = this.plugin;
     const format = settings.format;

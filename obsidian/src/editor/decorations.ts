@@ -8,11 +8,10 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import { OffsetUnit } from "topos-bible";
-import { literalWordUrl } from "../core/literalWord.ts";
 import type ToposPlugin from "../main.ts";
 
 /**
- * Underlines references in the visible part of the editor, and opens them in Literal Word on
+ * Underlines references in the visible part of the editor, and opens their links on
  * click (Ctrl/Cmd-click by default, so a plain click still places the cursor).
  */
 export function referenceDecorations(plugin: ToposPlugin) {
@@ -38,7 +37,7 @@ export function referenceDecorations(plugin: ToposPlugin) {
         const end = view.state.doc.lineAt(to).to;
         const text = view.state.doc.sliceString(start, end);
         for (const m of plugin.topos.search(text, OffsetUnit.Utf16)) {
-          const url = literalWordUrl(m.passage, plugin.settings.translation);
+          const url = plugin.referenceUrl(m.passage);
           const mark = Decoration.mark({
             class: "topos-reference",
             attributes: {

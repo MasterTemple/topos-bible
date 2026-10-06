@@ -35,15 +35,15 @@ verse) or grouped by book, which the CLI can't do.
   complete when they start with a capital letter or a number.
 - **Clickable references**: references in the editor (live preview and source) and in reading
   view are underlined. Clicking (Ctrl/Cmd-click in the editor, so editing still works) opens
-  the verse in Literal Word.
-- **Context menu** on a reference: open in Literal Word, copy as OSIS, find it in the vault.
+  its link (Literal Word by default; see Links).
+- **Context menu** on a reference: open its link, copy as OSIS, find it in the vault.
 
 ### Commands
 
 - Open verse search
 - Search references in the current file
 - Find references overlapping the one under the cursor (opens the sidebar with that filter)
-- Open the reference under the cursor in Literal Word
+- Open the reference under the cursor in the browser
 - Copy the reference under the cursor as OSIS
 - Insert a verse reference (a dialog with autocomplete)
 - Go to a reference: type a passage, pick one of the vault's matching references, jump there
@@ -54,16 +54,21 @@ verse) or grouped by book, which the CLI can't do.
 The sidebar's passage filters, the book filter, and the insert and go-to dialogs all use the
 same reference autocomplete as the editor.
 
-### Literal Word
+### Links
 
-Deep links are `https://app.literalword.com/[translation/]<book 1-66>/<chapter>[/<verse>]`
-([docs](https://app.literalword.com/deep-links)). Literal Word doesn't support ranges, so a
-reference opens at its first verse, or at the chapter for whole chapters. The translation
-(NASB, LSB, ESV, NKJV, KJV, or Literal Word's default) is a setting.
+A link template (`src/core/links.ts`) turns a reference into an address:
+`https://biblehub.com/{book.biblehub}/{chapter}[-{verse}].htm`. Placeholders are the book's
+name, abbreviation, OSIS id, number, USFM code, and BibleHub name, the first chapter and verse
+(and the end of the first range), and the whole reference written out or as OSIS; filters
+(`{book|lower|kebab}`) change them, and a `[ ]` part is left out when a placeholder in it has no
+value. Literal Word ([deep links](https://app.literalword.com/deep-links)), BibleHub,
+BibleGateway, and YouVersion are built in; links can also be turned off. Most sites open one verse
+or chapter, so a reference opens at its first verse. The plugin README lists the placeholders.
+Settings from before templates (a Literal Word translation) become the matching template.
 
 ### Settings
 
-Reference style; Literal Word translation; whether editor clicks need Ctrl/Cmd; underline
+Reference style; where references open (a site, a link template, or nowhere); whether editor clicks need Ctrl/Cmd; underline
 references in the editor and reading view; autocomplete on/off, book-name completion
 (off, capitalized, always), and how many suggestions; files and folders to exclude from search.
 
@@ -73,7 +78,7 @@ references in the editor and reading view; autocomplete on/off, book-name comple
   (no network, works on mobile).
 - **Offsets**: everything uses UTF-16 offsets (`OffsetUnit.Utf16`), which is what CodeMirror
   and JavaScript strings use, so matches map straight to editor positions.
-- **Pure logic is separate from Obsidian** (`src/core/`: filters, Literal Word links, search
+- **Pure logic is separate from Obsidian** (`src/core/`: filters, link templates, search
   results, sorting), so it is unit tested with Node; the Obsidian glue stays thin.
 - **Editor decorations** only search the visible lines and update as you scroll or type.
 - **Indexing never blocks the editor**: the vault is searched in a Web Worker with its own copy of

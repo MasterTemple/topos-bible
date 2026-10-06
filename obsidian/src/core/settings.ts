@@ -1,6 +1,6 @@
 import { BookStyle } from "topos-bible";
 import type { BookCompletion } from "./completions.ts";
-import type { Translation } from "./literalWord.ts";
+import { SITES } from "./links.ts";
 import { DEFAULT_FORMAT, type FormatSettings } from "./format.ts";
 import type { SavedQuery } from "./query.ts";
 import type { SortOrder } from "./sort.ts";
@@ -10,13 +10,13 @@ export type StyleName = "name" | "abbreviation" | "osis";
 export interface ToposSettings {
   /** How references are written by autocomplete, normalizing, and the sidebar */
   style: StyleName;
-  /** Literal Word translation ("" uses Literal Word's default) */
-  translation: Translation;
+  /** Where references open: a link template (see links.ts), or "" for no links */
+  linkTemplate: string;
   /** Underline references in the editor and make them clickable */
   linkInEditor: boolean;
   /** Turn references into links in reading view */
   linkInReading: boolean;
-  /** In the editor, only open Literal Word with Ctrl/Cmd-click */
+  /** In the editor, only open references with Ctrl/Cmd-click */
   clickNeedsModifier: boolean;
   /** Suggest chapters, verses, and books while typing */
   autocomplete: boolean;
@@ -48,7 +48,7 @@ export interface ToposSettings {
 
 export const DEFAULT_SETTINGS: ToposSettings = {
   style: "name",
-  translation: "",
+  linkTemplate: SITES[0]!.template,
   linkInEditor: true,
   linkInReading: true,
   clickNeedsModifier: true,

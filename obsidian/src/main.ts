@@ -14,7 +14,7 @@ import { OutdatedCliError } from "./core/cli.ts";
 import { DEFAULT_FORMAT } from "./core/format.ts";
 import { migrateQuery, parseQuery, type SavedQuery } from "./core/query.ts";
 import { NO_FILTERS } from "./core/filters.ts";
-import { literalWordUrl } from "./core/literalWord.ts";
+import { linkUrl, siteName, templateFromTranslation, type LinkBook } from "./core/links.ts";
 import { applyReplacements, normalizeReferences, referenceAt } from "./core/references.ts";
 import { ReferenceIndex, searchText, type Hit } from "./core/search.ts";
 import { referenceDecorations } from "./editor/decorations.ts";
@@ -99,7 +99,10 @@ export default class ToposPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    const saved = ((await this.loadData()) ?? {}) as Partial<ToposSettings> & { joinAdjacent?: boolean };
+    const saved = ((await this.loadData()) ?? {}) as Partial<ToposSettings> & {
+      joinAdjacent?: boolean;
+      translation?: string;
+    };
     this.settings = { ...DEFAULT_SETTINGS, ...saved };
     // Format fields added later get their defaults; an earlier joinAdjacent setting carries over
     this.settings.format = {
@@ -108,6 +111,11 @@ export default class ToposPlugin extends Plugin {
       ...saved.format,
     };
     delete (this.settings as { joinAdjacent?: boolean }).joinAdjacent;
+    // Before link templates, references opened in Literal Word in a chosen translation
+    if (saved.linkTemplate === undefined && typeof saved.translation === "string") {
+      this.settings.linkTemplate = templateFromTranslation(saved.translation);
+    }
+    delete (this.settings as { translation?: string }).translation;
     this.settings.queries = (this.settings.queries ?? []).filter((q) => q && typeof q.name === "string");
     // Saved searches from before 0.4.0 used -o for any overlap
     if ((this.settings.queryFormat ?? 1) < 2) {
@@ -363,10 +371,25 @@ export default class ToposPlugin extends Plugin {
     }
   }
 
-  openInLiteralWord(passage: Passage): void {
-    const url = literalWordUrl(passage, this.settings.translation);
+  /** Each book's names, for links */
+  private linkBooks: Map<number, LinkBook> | null = null;
+
+  /** The link for a passage, from the link template; null when links are off or it has none */
+  referenceUrl(passage: Passage): string | null {
+    this.linkBooks ??= new Map(this.topos.books().map((book) => [book.id, book]));
+    return linkUrl(this.settings.linkTemplate, passage, this.linkBooks.get(passage.bookId));
+  }
+
+  /** Where references open, for menus and tooltips: `BibleHub` */
+  linkSite(): string {
+    return siteName(this.settings.linkTemplate);
+  }
+
+  openReference(passage: Passage): void {
+    const url = this.referenceUrl(passage);
     if (url) window.open(url, "_blank");
-    else new Notice("Literal Word only has the 66 books of the Bible.");
+    else if (!this.settings.linkTemplate.trim()) new Notice("Links are turned off in the Topos settings.");
+    else new Notice(`${this.linkSite()} has no link for ${passage.reference}.`);
   }
 
   /** The reference under the cursor */
@@ -427,11 +450,11 @@ export default class ToposPlugin extends Plugin {
     });
     this.addCommand({
       id: "open-literal-word",
-      name: "Open the reference under the cursor in Literal Word",
+      name: "Open the reference under the cursor in the browser",
       editorCheckCallback: (checking, editor) => {
         const passage = this.referenceAtCursor(editor);
         if (!passage) return false;
-        if (!checking) this.openInLiteralWord(passage);
+        if (!checking) this.openReference(passage);
         return true;
       },
     });
@@ -458,9 +481,9 @@ export default class ToposPlugin extends Plugin {
     menu.addSeparator();
     menu.addItem((item) =>
       item
-        .setTitle(`Open ${passage.reference} in Literal Word`)
+        .setTitle(`Open ${passage.reference} in ${this.linkSite()}`)
         .setIcon("external-link")
-        .onClick(() => this.openInLiteralWord(passage)),
+        .onClick(() => this.openReference(passage)),
     );
     menu.addItem((item) =>
       item

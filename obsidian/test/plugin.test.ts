@@ -280,6 +280,32 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   reset.click();
   assert.equal(plugin.settings.format.joinAdjacent, false);
 
+  // Links: a site, a template of your own, or none
+  assert.equal(setting("Open references in").controls[0].value, "literalword");
+  setting("Open references in").controls[0].change("biblehub");
+  assert.equal(
+    setting("Link template").desc,
+    "Preview: https://biblehub.com/john/3-16.htm   https://biblehub.com/psalms/23.htm",
+  );
+  const john = plugin.topos.parse("Jn 3:16", 0);
+  setting("Link template").controls[0].change("https://x.app/{book.usfm}/{chapters}");
+  assert.equal(setting("Link template").desc, "Can't be used: unknown placeholder {chapters}");
+  assert.equal(plugin.referenceUrl(john), null);
+  setting("Link template").controls[0].change("https://x.app/{book.usfm}/{chapter}");
+  assert.equal(plugin.referenceUrl(john), "https://x.app/JHN/3");
+  assert.equal(plugin.linkSite(), "x.app");
+  assert.equal(setting("Open references in").controls[0].value, "custom");
+  setting("Open references in").controls[0].change("none");
+  assert.equal(plugin.settings.linkTemplate, "");
+  assert.equal(setting("Link template"), undefined);
+  assert.equal(plugin.referenceUrl(john), null);
+
+  // A Literal Word translation from before link templates becomes a template
+  plugin.loadData = async () => ({ translation: "esv" });
+  await plugin.loadSettings();
+  assert.equal(plugin.settings.linkTemplate, "https://app.literalword.com/esv/{book.id}/{chapter}[/{verse}]");
+  assert.equal("translation" in plugin.settings, false);
+
   // An earlier joinAdjacent setting moves into the format
   plugin.loadData = async () => ({ joinAdjacent: true });
   await plugin.loadSettings();

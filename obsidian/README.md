@@ -1,7 +1,8 @@
 # Topos Bible for Obsidian
 
 Find, search, filter, and autocomplete Bible references in your vault, and open them in
-[Literal Word](https://app.literalword.com). Built on [topos-bible](../README.md) (Rust compiled
+[Literal Word](https://app.literalword.com), BibleHub, BibleGateway, YouVersion, or any site with
+a link template. Built on [topos-bible](../README.md) (Rust compiled
 to WebAssembly, embedded in the plugin, so it works offline and on mobile). The design is in
 [doc/obsidian-plugin.md](../doc/obsidian-plugin.md).
 
@@ -36,7 +37,7 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
   text works as a CLI named query (`~/.config/topos/queries.toml`, `topos -q NAME`). Saved searches
   from before 0.4.0, when `-o` meant any overlap, are rewritten once to keep their meaning
 - Each result shows its line with the reference highlighted; click to jump there, or ↗ to open
-  it in Literal Word
+  its link
 - Results update as notes change
 
 **In the editor**
@@ -44,10 +45,9 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
 - Autocomplete while typing: chapters after a book (`John ` → `John 1`…), verses after a colon,
   range ends after a dash, and book names (`1 Co` → `1 Corinthians`). Book names only complete
   for capitalized words by default, so ordinary prose isn't interrupted
-- References are underlined; Ctrl/Cmd-click opens them in Literal Word (a setting allows plain
-  clicks)
-- Right-click a reference: open in Literal Word, find references to those verses, copy as OSIS
-- In reading view, references are links to Literal Word
+- References are underlined; Ctrl/Cmd-click opens their links (a setting allows plain clicks)
+- Right-click a reference: open its link, find references to those verses, copy as OSIS
+- In reading view, references are links
 
 **Commands**
 
@@ -59,12 +59,12 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
 | Go to a reference in the vault | Type a passage, pick a note that references it |
 | Insert a verse reference | A dialog with autocomplete; books and chapters keep it open to refine |
 | Find references to the verses under the cursor | The sidebar, filtered to overlapping references |
-| Open the reference under the cursor in Literal Word | |
+| Open the reference under the cursor in the browser | Its link (see [Links](#links)) |
 | Copy the reference under the cursor as OSIS | `John.3.16-John.3.18` |
 | Normalize references in the selection or note | `jn 3:16` → `John 3:16`, in the chosen style |
 
-**Settings**: reference style (`John 3:16`, `Jn 3:16`, or `John.3.16`), Literal Word translation
-(NASB, LSB, ESV, NKJV, KJV, or its default), editor and reading-view links, whether editor clicks
+**Settings**: reference style (`John 3:16`, `Jn 3:16`, or `John.3.16`), where references open
+(see [Links](#links)), editor and reading-view links, whether editor clicks
 need Ctrl/Cmd, autocomplete and book-name completion, number of suggestions, the reference format
 (the CLI's `--psg-fmt` fields: separators, joining adjacent verses, the chapter in single-chapter
 books, with a preview; used by completions, the sidebar, the dialogs, and normalizing), file
@@ -89,8 +89,45 @@ enough to have `--ext` and to report UTF-16 positions in its JSON output; with a
 built-in engine. Notes you edit are always indexed by the built-in engine. Like ripgrep, the CLI
 skips files ignored by a `.gitignore`.
 
-Literal Word links open one verse or chapter (it doesn't support ranges), so a reference opens
-at its first verse.
+## Links
+
+References open in Literal Word by default. The settings offer BibleHub, BibleGateway, and
+YouVersion, no links at all, or a link template of your own, with a preview as you type:
+
+| Site | Template |
+|---|---|
+| Literal Word | `https://app.literalword.com/{book.id}/{chapter}[/{verse}]` |
+| BibleHub | `https://biblehub.com/{book.biblehub}/{chapter}[-{verse}].htm` |
+| BibleGateway | `https://www.biblegateway.com/passage/?search={reference}` |
+| YouVersion | `https://www.bible.com/bible/59/{book.usfm}.{chapter}[.{verse}][-{end_verse}]` |
+
+Edit one to choose a translation: `https://app.literalword.com/esv/...`, `...?search={reference}&version=NIV`,
+or YouVersion's number for it (59 is the ESV, 111 the NIV, 1 the KJV).
+
+Placeholders, for 1 Corinthians 13:4-7 (values are URL-encoded):
+
+| Placeholder | Value |
+|---|---|
+| `{book}`, `{book.name}` | `1 Corinthians` |
+| `{book.abbreviation}` | `1 Cor` |
+| `{book.osis}` | `1Cor` |
+| `{book.id}` | `46` (1-66) |
+| `{book.usfm}` | `1CO` (YouVersion's codes) |
+| `{book.biblehub}` | `1_corinthians` (BibleHub's names: `psalms`, `songs`) |
+| `{chapter}`, `{verse}` | `13`, `4`: where the reference starts (no verse for a whole chapter) |
+| `{end_verse}` | `7`: the end of the first range, when it is in one chapter |
+| `{end_chapter}` | The last chapter of the first part, when it spans chapters (`Gen 1-2` → `2`) |
+| `{reference}` | `1 Corinthians 13:4-7`, the whole reference |
+| `{osis}` | `1Cor.13.4-1Cor.13.7`, the whole reference |
+
+Filters change a value before it goes in: `{book|lower|kebab}` is `1-corinthians`. They are
+`lower`, `upper`, `snake` (spaces to `_`), `kebab` (spaces to `-`), and `compact` (no spaces).
+
+A part in `[ ]` is left out when a placeholder in it has no value, so `{chapter}[/{verse}]` is
+`3/16` for John 3:16 and `3` for John 3. A placeholder with no value outside `[ ]` means no link
+(`{book.usfm}` for a book outside the 66, from custom data). Most sites open one verse or
+chapter, so a reference like `John 3:16; 4:1` opens at its first verse; `{reference}` and
+`{osis}` carry all of it.
 
 ## Build and install
 
@@ -120,5 +157,5 @@ includes these bindings, the dependency can point at the npm version instead.
 - `npm run typecheck`
 
 `src/indexers/` has the Web Worker (`worker.ts`, bundled separately and embedded in `main.js` by
-`esbuild.config.mjs`) and the CLI runner. `src/core/` has no Obsidian imports (filters, search index, sorting, completions, Literal Word
-links, settings data), so it is tested directly; the rest connects it to Obsidian.
+`esbuild.config.mjs`) and the CLI runner. `src/core/` has no Obsidian imports (filters, search index, sorting, completions, link
+templates, settings data), so it is tested directly; the rest connects it to Obsidian.

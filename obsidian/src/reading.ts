@@ -1,12 +1,11 @@
 import type { MarkdownPostProcessor } from "obsidian";
 import { OffsetUnit } from "topos-bible";
-import { literalWordUrl } from "./core/literalWord.ts";
 import type ToposPlugin from "./main.ts";
 
 /** Elements whose text is never linked */
 const SKIP = new Set(["A", "CODE", "PRE", "SCRIPT", "STYLE"]);
 
-/** Turns references in reading view into links to Literal Word */
+/** Turns references in reading view into links (from the link template) */
 export function linkReferences(plugin: ToposPlugin): MarkdownPostProcessor {
   return (el) => {
     if (!plugin.settings.linkInReading) return;
@@ -28,7 +27,7 @@ export function linkReferences(plugin: ToposPlugin): MarkdownPostProcessor {
       const fragment = document.createDocumentFragment();
       let last = 0;
       for (const m of matches) {
-        const url = literalWordUrl(m.passage, plugin.settings.translation);
+        const url = plugin.referenceUrl(m.passage);
         if (!url) continue;
         fragment.append(text.slice(last, m.start));
         const link = createEl("a", {

@@ -78,6 +78,6 @@ The plugin and the CLI share `~/.config/topos/config.toml`. See `:help topos-bib
 | [`topos-bible-cli`](./crates/topos-cli/README.md) (`topos-cli`) | `topos`, a ripgrep-style search tool |
 | [`topos-lsp`](./crates/topos-lsp/README.md) | A language server: completion, hover, and document symbols |
 | [`topos-ffi`](./crates/topos-ffi) | Bindings for TypeScript/WASM, Python, Swift, and Kotlin via [BoltFFI](https://boltffi.dev) |
-| [`obsidian`](./obsidian/README.md) | An Obsidian plugin: verse search with filters, autocomplete, and Literal Word links |
+| [`obsidian`](./obsidian/README.md) | An Obsidian plugin: verse search with filters, autocomplete, and links to Bible sites |
 
 See [ROADMAP.md](./ROADMAP.md) for what is planned and [doc/architecture.md](./doc/architecture.md) for how it fits together.

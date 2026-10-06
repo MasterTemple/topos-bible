@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { compileFilters, isEmpty, keep, NO_FILTERS, type Filters, type Testament } from "../core/filters.ts";
-import { literalWordUrl } from "../core/literalWord.ts";
 import { formatQuery, parseQuery } from "../core/query.ts";
 import { written } from "../core/format.ts";
 import type { Hit } from "../core/search.ts";
@@ -461,7 +460,7 @@ function HitRow({
 }) {
   const from = hit.column - 1;
   const to = Math.min(hit.lineText.length, from + (hit.end - hit.start));
-  const url = literalWordUrl(hit.passage, plugin.settings.translation);
+  const url = plugin.referenceUrl(hit.passage);
   return (
     <div className={`topos-hit${context > 0 ? " has-context" : ""}`} onClick={() => void plugin.openHit(hit)}>
       <div className="topos-hit-head">
@@ -473,7 +472,7 @@ function HitRow({
         {url && (
           <button
             className="topos-lw"
-            title="Open in Literal Word"
+            title={`Open in ${plugin.linkSite()}`}
             onClick={(e) => {
               e.stopPropagation();
               window.open(url, "_blank");

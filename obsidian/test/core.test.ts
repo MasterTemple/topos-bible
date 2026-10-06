@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BookStyle, Topos } from "topos-bible";
 import { compileFilters, keep, NO_FILTERS, type Filters } from "../src/core/filters.ts";
-import { literalWordUrl } from "../src/core/literalWord.ts";
+import { linkUrl, siteName, SITES, templateError, templateFromTranslation } from "../src/core/links.ts";
 import {
   applyReplacements,
   normalizeReferences,
@@ -15,10 +15,55 @@ import { groupHits, sortHits } from "../src/core/sort.ts";
 const topos = Topos.new();
 const parse = (reference: string) => topos.parse(reference, BookStyle.Name)!;
 
-test("Literal Word links open the first verse or chapter", () => {
-  assert.equal(literalWordUrl(parse("John 3:16-18")), "https://app.literalword.com/43/3/16");
-  assert.equal(literalWordUrl(parse("Ps 23"), "esv"), "https://app.literalword.com/esv/19/23");
-  assert.equal(literalWordUrl(parse("Rom 8-9")), "https://app.literalword.com/45/8");
+const books = new Map(topos.books().map((book) => [book.id, book]));
+const link = (template: string, reference: string) => {
+  const passage = parse(reference);
+  return linkUrl(template, passage, books.get(passage.bookId));
+};
+const site = (id: string) => SITES.find((s) => s.id === id)!.template;
+
+test("each site's links open the first verse or chapter", () => {
+  const lw = site("literalword");
+  assert.equal(link(lw, "John 3:16-18"), "https://app.literalword.com/43/3/16");
+  assert.equal(link(lw, "Rom 8-9"), "https://app.literalword.com/45/8");
+  assert.equal(link(templateFromTranslation("esv"), "Ps 23"), "https://app.literalword.com/esv/19/23");
+  assert.equal(templateFromTranslation(""), lw);
+
+  const hub = site("biblehub");
+  assert.equal(link(hub, "1 Cor 13:4-7"), "https://biblehub.com/1_corinthians/13-4.htm");
+  assert.equal(link(hub, "Ps 23"), "https://biblehub.com/psalms/23.htm");
+  assert.equal(link(hub, "Song 2:1"), "https://biblehub.com/songs/2-1.htm");
+
+  const gateway = site("biblegateway");
+  assert.equal(
+    link(gateway, "jn 3:16-18; 4"),
+    "https://www.biblegateway.com/passage/?search=John%203%3A16-18%3B%204",
+  );
+
+  const youversion = site("youversion");
+  assert.equal(link(youversion, "John 3:16-18"), "https://www.bible.com/bible/59/JHN.3.16-18");
+  assert.equal(link(youversion, "1 John 4"), "https://www.bible.com/bible/59/1JN.4");
+  // A range across chapters opens at its first verse
+  assert.equal(link(youversion, "Phil 3:20-4:1"), "https://www.bible.com/bible/59/PHP.3.20");
+});
+
+test("link templates: placeholders, filters, and optional parts", () => {
+  const template = "https://x.app/{book.abbreviation|lower|kebab}/{book.osis}/{chapter}[:{verse}][-{end_verse}][/to/{end_chapter}]?q={osis}";
+  assert.equal(link(template, "1 Cor 13:4-7"), "https://x.app/1-cor/1Cor/13:4-7?q=1Cor.13.4-1Cor.13.7");
+  assert.equal(link(template, "Gen 1-2"), "https://x.app/gn/Gen/1/to/2?q=Gen.1-Gen.2");
+  assert.equal(link("https://x.app/{book|upper|compact}/{verse}", "John 3"), null);
+  assert.equal(link("", "John 3"), null);
+  assert.equal(link("https://x.app/{chapters}", "John 3"), null);
+
+  assert.equal(templateError(site("youversion")), null);
+  assert.equal(templateError("https://x.app/{chapters}"), "unknown placeholder {chapters}");
+  assert.equal(templateError("{book|title}"), "unknown filter |title");
+  assert.equal(templateError("{chapter}[/{verse}"), "a [ has no ]");
+  assert.equal(templateError("[[{verse}]]"), "[ ... ] can't be nested");
+  assert.equal(templateError("{chapter"), "a { has no }");
+
+  assert.equal(siteName(site("biblehub")), "BibleHub");
+  assert.equal(siteName("https://some-bible.app/v/{book.id}/{chapter}"), "some-bible.app");
 });
 
 test("search hits carry UTF-16 positions and their line", () => {

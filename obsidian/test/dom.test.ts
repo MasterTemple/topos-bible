@@ -23,6 +23,7 @@ async function loadApp() {
      import { SearchStore } from ${src("view/store.ts")};
      import { ReferenceIndex } from ${src("core/search.ts")};
      import { DEFAULT_SETTINGS } from ${src("core/settings.ts")};
+     import { linkUrl, siteName } from ${src("core/links.ts")};
      export { act };
      export function mount(container, notes, state = {}) {
        const topos = Topos.new();
@@ -31,6 +32,8 @@ async function loadApp() {
        const plugin = {
          topos, index, indexVersion: 1, indexing: false,
          settings: DEFAULT_SETTINGS,
+         referenceUrl: (passage) => linkUrl(DEFAULT_SETTINGS.linkTemplate, passage),
+         linkSite: () => siteName(DEFAULT_SETTINGS.linkTemplate),
          search: new SearchStore(state),
          subscribeIndex: () => () => {},
          app: {
