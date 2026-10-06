@@ -5,9 +5,12 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::segments::{
-    grammar::roman,
-    passage::{Passage, Segments},
+use crate::{
+    error::{ToposError, ToposResult},
+    segments::{
+        grammar::roman,
+        passage::{Passage, Segments},
+    },
 };
 
 /// This is not guaranteed to be a valid key, I just am using a unique type
@@ -157,7 +160,7 @@ impl Default for Books {
 impl Books {
     /// - You only want to use this when you have custom data
     /// - If you would like English book names, please just use [`Default::default()`]
-    pub fn new(data: BooksInput) -> Result<Self, String> {
+    pub fn new(data: BooksInput) -> ToposResult<Self> {
         let mut abbreviations_to_book_id = BTreeMap::new();
         let mut book_id_to_name = BTreeMap::new();
         let mut book_id_to_abbreviation = BTreeMap::new();
@@ -174,7 +177,7 @@ impl Books {
         }
 
         let regexes = BookRegexes::new(abbreviations_to_book_id.keys())
-            .map_err(|e| format!("Failed to compile the book regex.\n{e}"))?;
+            .map_err(|e| ToposError::InvalidData(format!("book names do not form a regex: {e}")))?;
 
         Ok(Books {
             input_to_book_id: abbreviations_to_book_id,
@@ -212,7 +215,7 @@ impl Books {
 
 static DEFAULT_BOOKS: Lazy<Books> = Lazy::new(|| {
     let data = BooksInput::default();
-    Books::new(data).expect("The default provided books data should always compile")
+    Books::new(data).expect("the default book data is valid")
 });
 
 /**
@@ -287,8 +290,6 @@ pub struct BooksInput(Vec<Book>);
 
 impl Default for BooksInput {
     fn default() -> Self {
-        serde_json::from_str(DEFAULT_BOOKS_JSON)
-            .map_err(|_| "Could not parse default book file".to_string())
-            .unwrap()
+        serde_json::from_str(DEFAULT_BOOKS_JSON).expect("the default book data is valid JSON")
     }
 }

@@ -192,8 +192,6 @@ pub struct GenresInput(Vec<GenreInput>);
 
 impl Default for GenresInput {
     fn default() -> Self {
-        serde_json::from_str(DEFAULT_GENRES_JSON)
-            .map_err(|_| "Could not parse default genre file".to_string())
-            .unwrap()
+        serde_json::from_str(DEFAULT_GENRES_JSON).expect("the default genre data is valid JSON")
     }
 }

@@ -1,14 +1,17 @@
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 
-use crate::segments::{
-    passage::Segments,
-    units::{
-        chapter_range::ChapterRange, chapter_verse::ChapterVerse,
-        chapter_verse_range::ChapterVerseRange, full_chapter::FullChapter,
-        full_chapter_range::FullChapterRange, full_chapter_verse_range::FullChapterVerseRange,
+use crate::{
+    error::ToposError,
+    segments::{
+        passage::Segments,
+        units::{
+            chapter_range::ChapterRange, chapter_verse::ChapterVerse,
+            chapter_verse_range::ChapterVerseRange, full_chapter::FullChapter,
+            full_chapter_range::FullChapterRange, full_chapter_verse_range::FullChapterVerseRange,
+        },
+        verse_bounds::VerseBounds,
     },
-    verse_bounds::VerseBounds,
 };
 
 /// Remember, these correspond to
@@ -232,24 +235,20 @@ impl Display for Segment {
 }
 
 impl Segment {
-    pub fn parse(input: &str) -> Result<Self, String> {
+    /// Parses exactly one segment
+    pub fn parse(input: &str) -> Result<Self, ToposError> {
         input.parse::<Self>()
     }
 }
 
 impl std::str::FromStr for Segment {
-    type Err = String;
+    type Err = ToposError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let segments =
-            Segments::parse(s).ok_or_else(|| "Could not parse any segments.".to_string())?;
-        if segments.is_empty() {
-            Err(String::from("No segments found"))?
-        }
-        if segments.len() == 1 {
-            Ok(segments[0])
-        } else {
-            Err(String::from("Multiple segments found"))?
+        let segments = Segments::parse(s).ok_or(ToposError::NoSegments)?;
+        match segments.as_slice() {
+            [segment] => Ok(*segment),
+            _ => Err(ToposError::MultipleSegments(segments.len())),
         }
     }
 }

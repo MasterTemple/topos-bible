@@ -1,8 +1,11 @@
-use crate::segments::{
-    segment::{ChapterlessFormat, Segment},
-    units::chapter_verse_range::ChapterVerseRange,
-    units::parse::{ParsableSegment, SegmentParseMethods},
-    verse_bounds::VerseBounds,
+use crate::{
+    error::ToposError,
+    segments::{
+        segment::{ChapterlessFormat, Segment},
+        units::chapter_verse_range::ChapterVerseRange,
+        units::parse::{ParsableSegment, SegmentParseMethods},
+        verse_bounds::VerseBounds,
+    },
 };
 
 use super::{full_chapter::FullChapter, range_pair::RangePair};
@@ -78,7 +81,7 @@ impl<'de> Deserialize<'de> for FullChapterRange {
 }
 
 impl FromStr for FullChapterRange {
-    type Err = String;
+    type Err = ToposError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse(s)
@@ -137,7 +140,7 @@ impl From<FullChapterRange> for Segment {
 }
 
 impl TryFrom<Segment> for FullChapterRange {
-    type Error = String;
+    type Error = ToposError;
 
     fn try_from(value: Segment) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -154,9 +157,10 @@ impl TryFrom<Segment> for FullChapterRange {
                 FullChapterRange::new(full_chapter.chapter, full_chapter.chapter)
             }
             Segment::FullChapterRange(full_chapter_range) => full_chapter_range,
-            Segment::FullChapterVerseRange(_) => {
-                Err("Cannot coerce FullChapterVerseRange into FullChapterRange".to_string())?
-            }
+            Segment::FullChapterVerseRange(_) => Err(ToposError::Coerce {
+                from: "FullChapterVerseRange",
+                to: "FullChapterRange",
+            })?,
         })
     }
 }
@@ -164,7 +168,7 @@ impl TryFrom<Segment> for FullChapterRange {
 impl ParsableSegment for FullChapterRange {
     const EXPECTED_FORMAT: &'static str = "{}-{}";
 
-    fn parse_strict(input: &str) -> Result<Self, String> {
+    fn parse_strict(input: &str) -> Result<Self, ToposError> {
         let chars = &mut input.chars().peekable();
 
         let start_chapter = FullChapterRange::take_number(chars)?;

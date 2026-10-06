@@ -1,7 +1,10 @@
-use crate::segments::{
-    segment::{ChapterlessFormat, Segment},
-    units::parse::{ParsableSegment, SegmentParseMethods},
-    verse_bounds::VerseBounds,
+use crate::{
+    error::ToposError,
+    segments::{
+        segment::{ChapterlessFormat, Segment},
+        units::parse::{ParsableSegment, SegmentParseMethods},
+        verse_bounds::VerseBounds,
+    },
 };
 use serde::{Deserialize, Serialize, de::Visitor};
 use std::{
@@ -77,7 +80,7 @@ impl<'de> Deserialize<'de> for ChapterVerse {
 }
 
 impl FromStr for ChapterVerse {
-    type Err = String;
+    type Err = ToposError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse(s)
@@ -115,26 +118,31 @@ impl From<ChapterVerse> for Segment {
 }
 
 impl TryFrom<Segment> for ChapterVerse {
-    type Error = String;
+    type Error = ToposError;
 
     fn try_from(value: Segment) -> Result<Self, Self::Error> {
         Ok(match value {
             Segment::ChapterVerse(chapter_verse) => chapter_verse,
-            Segment::ChapterVerseRange(_) => {
-                Err("Cannot coerce ChapterVerseRange into ChapterVerse".to_string())?
-            }
-            Segment::ChapterRange(_) => {
-                Err("Cannot coerce ChapterRange into ChapterVerse".to_string())?
-            }
-            Segment::FullChapter(_) => {
-                Err("Cannot coerce FullChapter into ChapterVerse".to_string())?
-            }
-            Segment::FullChapterRange(_) => {
-                Err("Cannot coerce FullChapterRange into ChapterVerse".to_string())?
-            }
-            Segment::FullChapterVerseRange(_) => {
-                Err("Cannot coerce FullChapterVerseRange into ChapterVerse".to_string())?
-            }
+            Segment::ChapterVerseRange(_) => Err(ToposError::Coerce {
+                from: "ChapterVerseRange",
+                to: "ChapterVerse",
+            })?,
+            Segment::ChapterRange(_) => Err(ToposError::Coerce {
+                from: "ChapterRange",
+                to: "ChapterVerse",
+            })?,
+            Segment::FullChapter(_) => Err(ToposError::Coerce {
+                from: "FullChapter",
+                to: "ChapterVerse",
+            })?,
+            Segment::FullChapterRange(_) => Err(ToposError::Coerce {
+                from: "FullChapterRange",
+                to: "ChapterVerse",
+            })?,
+            Segment::FullChapterVerseRange(_) => Err(ToposError::Coerce {
+                from: "FullChapterVerseRange",
+                to: "ChapterVerse",
+            })?,
         })
     }
 }
@@ -142,7 +150,7 @@ impl TryFrom<Segment> for ChapterVerse {
 impl ParsableSegment for ChapterVerse {
     const EXPECTED_FORMAT: &'static str = "{}:{}";
 
-    fn parse_strict(input: &str) -> Result<Self, String> {
+    fn parse_strict(input: &str) -> Result<Self, ToposError> {
         let chars = &mut input.chars().peekable();
 
         let chapter = ChapterVerse::take_number(chars)?;

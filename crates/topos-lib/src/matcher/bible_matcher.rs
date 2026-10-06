@@ -69,7 +69,7 @@ pub enum MatchError {
     #[error("PDF: {0}")]
     PDF(#[from] PDFMatchError),
     #[error("{0}")]
-    Unknown(Box<dyn std::error::Error>),
+    Unknown(Box<dyn std::error::Error + Send + Sync>),
 }
 
 /**

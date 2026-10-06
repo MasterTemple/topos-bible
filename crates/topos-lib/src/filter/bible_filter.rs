@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::{
     data::{bible_data::BibleData, books::BookId},
+    error::{ToposError, ToposResult},
     matcher::{bible_matcher::BibleMatcher, matches::ComplexFilter},
     segments::Passage,
 };
@@ -105,24 +106,24 @@ impl BibleFilter {
     }
 
     /// Only keep matches that overlap this passage (`Err` if it cannot be parsed)
-    pub fn filter_inside(&mut self, passage: &str) -> Result<(), String> {
+    pub fn filter_inside(&mut self, passage: &str) -> ToposResult<()> {
         let psg = self.parse_passage(passage)?;
         self.complex_filter.inside(psg);
         Ok(())
     }
 
     /// Drop matches that overlap this passage (`Err` if it cannot be parsed)
-    pub fn filter_outside(&mut self, passage: &str) -> Result<(), String> {
+    pub fn filter_outside(&mut self, passage: &str) -> ToposResult<()> {
         let psg = self.parse_passage(passage)?;
         self.complex_filter.outside(psg);
         Ok(())
     }
 
-    fn parse_passage(&self, passage: &str) -> Result<Passage, String> {
+    fn parse_passage(&self, passage: &str) -> ToposResult<Passage> {
         self.data
             .books()
             .parse(passage)
-            .ok_or_else(|| format!("Could not parse the passage {passage:?}"))
+            .ok_or_else(|| ToposError::InvalidPassage(passage.to_string()))
     }
 
     pub fn create_matcher(mut self) -> BibleMatcher {

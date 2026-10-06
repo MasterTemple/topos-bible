@@ -20,7 +20,7 @@ impl<'a> InputAutoCompleter<'a> {
     pub fn suggest(&self, input: &str) -> Option<CompletionOutput> {
         let book_regex = self.matcher.data().books().book_regex();
         let cap = book_regex.captures_iter(input).last()?;
-        let book_match = cap.get(1).unwrap();
+        let book_match = cap.get(1)?;
         let book_id = self.matcher.data().books().search(book_match.as_str())?;
 
         // Same grammar as search: the last segment is the one still being typed

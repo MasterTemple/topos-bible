@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use itertools::Itertools;
 
+use crate::error::ToposError;
 use crate::{data::books::BookId, filter::bible_filter::IsFilter};
 
 #[derive(Copy, Clone, Debug)]
@@ -34,13 +35,13 @@ impl IsFilter for TestamentFilter {
 }
 
 impl FromStr for TestamentFilter {
-    type Err = String;
+    type Err = ToposError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s.trim().to_lowercase().as_str() {
             "n" | "nt" | "new" | "new testament" => Self::New,
             "o" | "ot" | "old" | "old testament" => Self::Old,
-            _ => Err("Invalid Testament")?,
+            _ => Err(ToposError::UnknownTestament(s.to_string()))?,
         })
     }
 }

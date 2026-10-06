@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     data::books::BookId,
+    error::ToposError,
     segments::{
         grammar::{SegmentList, SegmentNode},
         resolve::Resolver,
@@ -134,10 +135,10 @@ impl Segments {
 }
 
 impl std::str::FromStr for Segments {
-    type Err = String;
+    type Err = ToposError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::parse(s).ok_or_else(|| String::from("Failed to parse segments"))
+        Self::parse(s).ok_or(ToposError::NoSegments)
     }
 }
 

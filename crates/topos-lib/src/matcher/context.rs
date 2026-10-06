@@ -12,7 +12,7 @@ use crate::{
 
 /// The start of a bare reference: at least `chapter:verse`
 static BARE_REFERENCE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?-u:\b)\d{1,3}[ \t]*:[ \t]*\d").unwrap());
+    LazyLock::new(|| Regex::new(r"(?-u:\b)\d{1,3}[ \t]*:[ \t]*\d").expect("valid regex"));
 
 /**
 Which book a reference without a book name (`1:1-5`) belongs to

@@ -3,8 +3,9 @@ use std::{borrow::Cow, ops::Range, sync::LazyLock};
 use regex::Regex;
 
 /// A hyphen (or soft hyphen) that splits a word across lines, as in justified text
-static HYPHENATION: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"[-\u{2010}\u{AD}][ \t]*\r?\n[ \t]*|\u{AD}").unwrap());
+static HYPHENATION: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"[-\u{2010}\u{AD}][ \t]*\r?\n[ \t]*|\u{AD}").expect("valid regex")
+});
 
 /**
 The text that is actually searched, with a map back to byte offsets in the original

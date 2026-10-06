@@ -68,7 +68,6 @@ static DEFAULT_CHAPTER_VERSES_JSON: &str = include_str!("./default_chapter_verse
 impl Default for BookChapterVersesInput {
     fn default() -> Self {
         serde_json::from_str(DEFAULT_CHAPTER_VERSES_JSON)
-            .map_err(|_| "Could not parse default chapter verses file".to_string())
-            .unwrap()
+            .expect("the default chapter and verse data is valid JSON")
     }
 }
