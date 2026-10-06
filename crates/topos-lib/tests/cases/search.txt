@@ -1,4 +1,5 @@
 # Search cases: `input => expected references`, separated by ` | `, written as `Book segments`.
+# - `\n` in an input stands for a line break
 # - Nothing after `=>` means no references should be found
 # - A leading `?` marks a known failure: it is reported but does not fail the test
 
@@ -76,3 +77,11 @@ Mark 5 => Mark 5
 John 3:16ff => John 3:16-36
 John 3:16f. => John 3:16-17
 see John 3:16 ff. and cf. Rom 5:8 => John 3:16-36 | Romans 5:8
+
+# Words split across lines in justified text (issue #11)
+see Ephe-\nsians 2:8 => Ephesians 2:8
+see Deu­teronomy 6:4 => Deuteronomy 6:4
+John 3:16-\n18 => John 3:16-18
+
+# A blank line ends a reference
+Matthew 6, 24.\n\n143 => Matthew 6,24

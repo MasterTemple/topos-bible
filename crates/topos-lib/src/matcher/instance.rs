@@ -1,4 +1,5 @@
-use line_col::LineColLookup;
+use std::ops::Range;
+
 use regex::Match;
 
 use crate::{
@@ -10,35 +11,6 @@ use crate::{
         resolve::Resolver,
     },
 };
-
-// #[derive(Copy, Clone, Debug)]
-// pub struct Position {
-//     pub line: usize,
-//     pub column: usize,
-// }
-//
-// impl Position {
-//     pub fn new(line: usize, column: usize) -> Self {
-//         Self { line, column }
-//     }
-//     pub fn new_pair((line, column): (usize, usize)) -> Self {
-//         Self::new(line, column)
-//     }
-// }
-//
-// #[derive(Copy, Clone, Debug)]
-// pub struct Location {
-//     pub start: Position,
-//     pub end: Position,
-// }
-//
-// impl Location {
-//     pub fn new(lookup: &LineColLookup, start: usize, end: usize) -> Self {
-//         let start = Position::new_pair(lookup.get(start));
-//         let end = Position::new_pair(lookup.get(end));
-//         Self { start, end }
-//     }
-// }
 
 /**
 - This is the minimal amount of data needed for a match in order to do complex filtering
@@ -94,19 +66,31 @@ impl<L> BibleMatch<L> {
     }
 }
 
-impl BibleMatch {
-    pub fn try_match<'a>(
-        lookup: &LineColLookup,
-        data: &'a BibleData,
-        input: &str,
-        cur: Match<'a>,
+/// A passage found in text, before its location is computed
+#[derive(Clone, Debug)]
+pub struct FoundPassage {
+    /// Byte range of the book name and segments in the searched text
+    pub bytes: Range<usize>,
+    pub psg: Passage,
+}
+
+impl FoundPassage {
+    /**
+    Parses the passage that starts with the book name `cur`
+    - `next_start` is where the next book name starts, which ends this passage's segments
+      (that is how `John 1:1, 3 John 5` becomes `John 1:1` and `3 John 5`)
+    */
+    pub fn find(
+        data: &BibleData,
+        text: &str,
+        cur: Match<'_>,
         next_start: Option<usize>,
     ) -> Option<Self> {
         let book_id = data.books().search(cur.as_str())?;
 
         let segment_window = match next_start {
-            Some(next_start) => &input[cur.end()..next_start],
-            None => &input[cur.end()..],
+            Some(next_start) => &text[cur.end()..next_start],
+            None => &text[cur.end()..],
         };
 
         let list = SegmentList::parse(segment_window);
@@ -122,11 +106,11 @@ impl BibleMatch {
         if !has_verse && data.books().is_ambiguous(cur.as_str()) {
             return None;
         }
-        // Only the text that resolved is part of the match
-        let end = cur.end() + resolved.end;
-        let location = LineColLocation::new(lookup, cur.start(), end);
-        let segments = resolved.segments;
 
-        Some(BibleMatch::new(location, book_id, segments))
+        Some(Self {
+            // Only the text that resolved is part of the match
+            bytes: cur.start()..cur.end() + resolved.end,
+            psg: resolved.segments.with_book(book_id),
+        })
     }
 }

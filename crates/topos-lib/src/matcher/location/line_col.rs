@@ -1,9 +1,9 @@
 use line_col::LineColLookup;
-use regex::Match;
 
 use crate::matcher::{
     bible_matcher::{BibleMatcher, MatchResult, Matcher},
-    instance::BibleMatch,
+    instance::{BibleMatch, FoundPassage},
+    text::SearchText,
 };
 
 #[derive(Copy, Clone, Debug)]
@@ -60,25 +60,22 @@ impl Matcher for LineColLocation {
         input: Self::Input<'a>,
     ) -> MatchResult<Vec<BibleMatch<Self>>> {
         let mut filtered = matcher.filter();
-
-        let mut prev: Option<Match<'_>> = None;
+        let text = SearchText::new(input);
         let lookup = LineColLookup::new(input);
-        // basically execute behind by 1 iteration (so I can see the start of the next match)
-        for cur in matcher.data().books().candidates(input) {
-            if let Some(prev) = prev
-                && let Some(m) =
-                    BibleMatch::try_match(&lookup, matcher.data(), input, prev, Some(cur.start()))
-            {
-                filtered.try_add(m);
-            }
-            prev = Some(cur);
-        }
 
-        // handle last one
-        if let Some(prev) = prev
-            && let Some(m) = BibleMatch::try_match(&lookup, matcher.data(), input, prev, None)
-        {
-            filtered.try_add(m);
+        let mut candidates = matcher.data().books().candidates(text.as_str()).peekable();
+        while let Some(cur) = candidates.next() {
+            let next_start = candidates.peek().map(|next| next.start());
+            let Some(found) = FoundPassage::find(matcher.data(), text.as_str(), cur, next_start)
+            else {
+                continue;
+            };
+            let bytes = text.original_range(found.bytes);
+            let location = LineColLocation::new(&lookup, bytes.start, bytes.end);
+            filtered.try_add(BibleMatch {
+                location,
+                psg: found.psg,
+            });
         }
 
         let matches = filtered.matches();

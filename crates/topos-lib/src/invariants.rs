@@ -106,6 +106,12 @@ mod tests {
         "\u{301}",
         "and ",
         "I ",
+        "-\n",
+        "\u{AD}",
+        "Ephe",
+        "sians ",
+        "ff",
+        " f",
     ];
 
     /// A tiny xorshift generator, so the test is reproducible without dependencies

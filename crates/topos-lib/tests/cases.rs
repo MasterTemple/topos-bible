@@ -4,7 +4,7 @@ use topos_lib::matcher::{BibleMatcher, location::line_col::LineColLocation};
 
 struct Case<'a> {
     line: usize,
-    input: &'a str,
+    input: String,
     expected: Vec<&'a str>,
     known_failure: bool,
 }
@@ -28,7 +28,8 @@ fn cases(text: &str) -> Vec<Case<'_>> {
                 .collect();
             Case {
                 line: idx + 1,
-                input,
+                // `\n` in a case stands for a line break
+                input: input.replace("\\n", "\n"),
                 expected,
                 known_failure,
             }
@@ -45,7 +46,7 @@ fn search_cases() {
 
     for case in cases(include_str!("cases/search.txt")) {
         let actual: Vec<String> = matcher
-            .search::<LineColLocation>(case.input)
+            .search::<LineColLocation>(&case.input)
             .unwrap()
             .into_iter()
             .map(|m| {
