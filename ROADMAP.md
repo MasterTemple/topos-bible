@@ -41,8 +41,8 @@ The phases are in order, and each one leaves the repo working.
 
 ## Phase 3: Crate split and formats
 
-- [ ] Split `topos` (core) from `topos-formats` (feature-gated adapters behind a `SourceFormat` trait)
-- [ ] Generalize match location [#9](https://github.com/MasterTemple/topos/issues/9): plain text, HTML, SRT (multi-line cues), VTT, PDF (merge `topos-pdf`), EPUB, JSON, XML
+- [x] Split the core (`topos-lib`) from `topos-formats` (feature-gated adapters behind a `Format` trait)
+- [x] Generalize match location [#9](https://github.com/MasterTemple/topos/issues/9): plain text, HTML, SRT (multi-line cues), WebVTT, SBV, PDF (MuPDF 0.8; `topos-pdf` removed), EPUB, JSON, XML
 
 ## Phase 4: Formatting, interop, autocomplete
 

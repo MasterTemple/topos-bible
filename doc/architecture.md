@@ -6,15 +6,15 @@ The design that the [roadmap](../ROADMAP.md) works toward. The goals are one gra
 
 ```
 crates/
-  topos/           core: data, lexer/parser, resolver, matcher, autocomplete, formatting, OSIS
-                   deps: regex or aho-corasick, serde, thiserror (nothing native)
-  topos-formats/   format adapters behind features: html, srt, vtt, epub, pdf (mupdf), json
-  topos-cli/       ripgrep-style binary (depends on topos + topos-formats)
-  topos-ffi/       one BoltFFI façade over `topos` (TS/WASM, Swift, Kotlin)
-  topos-py/        PyO3, only if BoltFFI can't target Python; a thin wrapper over the same façade
+  topos-lib/       core: data, grammar, resolver, matcher, autocomplete, formatting, OSIS
+                   deps: regex, serde, thiserror (nothing native)
+  topos-formats/   format adapters behind features: html, srt (also WebVTT and SBV), epub,
+                   json, xml, and pdf (MuPDF, opt-in)
+  topos-cli/       ripgrep-style binary (depends on topos-lib + topos-formats)
+  topos-ffi/       one BoltFFI façade over topos-lib (TypeScript/WASM, Python, Swift, Kotlin)
 ```
 
-Delete `topos-parser`, `topos-pdf` (fold it into `topos-formats/pdf`) and `topos-ts` (replaced by `topos-ffi`).
+`topos-parser` and `topos-pdf` are gone. The PyO3, wasm-bindgen and BoltFFI test crates get replaced by `topos-ffi`.
 
 ## Pipeline
 
@@ -82,24 +82,26 @@ Keep versification (`chapter_verses`) as its own swappable dataset, with KJV as 
 
 ## Formats (`topos-formats`)
 
-Every format is an adapter with the same shape, which HTML, PDF and SRT already follow informally:
+Each location type implements `Format`. It searches the document's text with `BibleMatcher::search`, then maps each match's byte range back into the document:
 
 ```rust
-pub trait SourceFormat {
-    type Location;
-    fn text(&self) -> &str;                                 // plain text that the matcher searches
-    fn locate(&self, span: Range<usize>) -> Self::Location; // map a byte span back to the source
+pub trait Format: Sized {
+    type Input<'a>;   // document text, or a path for EPUB
+    fn search(matcher: &BibleMatcher, input: Self::Input<'_>)
+        -> Result<Vec<BibleMatch<Self>>, FormatError>;
 }
+// matcher.search_format::<SRTLocation>(srt)
 ```
 
 | Format | Location |
 |---|---|
-| Plain text | line and column (byte, char, UTF-16) |
-| HTML | text fragment and selection |
-| SRT / VTT | cue id and timestamps (cues are multi-line) |
-| PDF | page and rects |
-| EPUB | CFI |
-| JSON / XML | JSON pointer or XPath, plus an offset within the string |
+| Plain text (core) | byte range, plus line and column (byte, char, UTF-16) |
+| HTML | text fragment and line/column |
+| SRT / WebVTT / SBV | first cue id, its start time, and the last cue's end time |
+| PDF | page and one rectangle per line (built from MuPDF glyphs) |
+| EPUB | start and end CFI |
+| JSON | JSON Pointer to the string, plus a range within it |
+| XML | path of the deepest element containing the match, plus a range in its text |
 
 ## Autocomplete
 
@@ -136,7 +138,7 @@ impl Topos {
 
 ## FFI façade
 
-Bindings only see plain, owned types and one opaque object:
+Bindings only see plain, owned types and one opaque object. BoltFFI covers Python too, so one crate serves every language:
 
 ```rust
 #[export] pub struct Topos { … }             // owns BibleData + options; built once
