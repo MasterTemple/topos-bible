@@ -5,9 +5,10 @@ use crate::{
     data::books::BookId,
     error::ToposError,
     segments::{
+        formatter::FormatOptions,
         grammar::{SegmentList, SegmentNode},
         resolve::Resolver,
-        segment::{ChapterlessFormat, Segment},
+        segment::Segment,
         verse_bounds::VerseBounds,
     },
 };
@@ -85,48 +86,6 @@ impl Segments {
 }
 
 impl Segments {
-    /// Writes segments compactly, dropping the chapter wherever the result still parses back the
-    /// same way (see [`Resolver`] for those rules)
-    pub fn format(&self, verse_separator: &str, chapter_separator: &str) -> String {
-        let mut output = String::new();
-        let mut prev: Option<&Segment> = None;
-        for seg in self.iter() {
-            match prev {
-                None => output.push_str(&seg.to_string()),
-                Some(prev) if Self::continues(prev, seg) => {
-                    output.push_str(verse_separator);
-                    output.push_str(&seg.chapterless_format());
-                }
-                Some(_) => {
-                    output.push_str(chapter_separator);
-                    output.push_str(&seg.to_string());
-                }
-            }
-            prev = Some(seg);
-        }
-        output
-    }
-
-    /// Whether `seg` can be written without its chapter after `prev`
-    fn continues(prev: &Segment, seg: &Segment) -> bool {
-        match prev.ending_verse() {
-            // After a verse, a bare number is a verse in the same chapter
-            Some(_) => {
-                seg.starting_chapter() == prev.ending_chapter()
-                    && matches!(
-                        seg,
-                        Segment::ChapterVerse(_)
-                            | Segment::ChapterVerseRange(_)
-                            | Segment::ChapterRange(_)
-                    )
-            }
-            // After whole chapters, a bare number is another chapter
-            None => matches!(seg, Segment::FullChapter(_) | Segment::FullChapterRange(_)),
-        }
-    }
-}
-
-impl Segments {
     /// Parses as many segments as possible from the start of the input, ignoring the rest
     pub fn parse(segment_window: &str) -> Option<Self> {
         let list = SegmentList::parse(segment_window);
@@ -144,7 +103,7 @@ impl std::str::FromStr for Segments {
 
 impl std::fmt::Display for Segments {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format(",", "; "))
+        write!(f, "{}", FormatOptions::default().segments(self))
     }
 }
 

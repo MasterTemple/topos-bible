@@ -195,27 +195,6 @@ impl Segment {
     }
 }
 
-pub trait ChapterlessFormat {
-    fn chapterless_format(&self) -> String;
-}
-
-impl ChapterlessFormat for Segment {
-    fn chapterless_format(&self) -> String {
-        match self {
-            Segment::ChapterVerse(chapter_verse) => chapter_verse.chapterless_format(),
-            Segment::ChapterVerseRange(chapter_verse_range) => {
-                chapter_verse_range.chapterless_format()
-            }
-            Segment::ChapterRange(chapter_range) => chapter_range.chapterless_format(),
-            Segment::FullChapter(full_chapter) => full_chapter.chapterless_format(),
-            Segment::FullChapterRange(full_chapter_range) => {
-                full_chapter_range.chapterless_format()
-            }
-            Segment::FullChapterVerseRange(v) => v.chapterless_format(),
-        }
-    }
-}
-
 // Formatting
 impl Display for Segment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

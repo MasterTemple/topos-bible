@@ -1,7 +1,7 @@
 use crate::{
     error::ToposError,
     segments::{
-        segment::{ChapterlessFormat, Segment},
+        segment::Segment,
         units::chapter_verse_range::ChapterVerseRange,
         units::parse::{ParsableSegment, SegmentParseMethods},
         verse_bounds::VerseBounds,
@@ -44,19 +44,6 @@ impl Display for ChapterRange {
                 f,
                 "{}:{}-{}:{}",
                 self.start.chapter, self.start.verse, self.end.chapter, self.end.verse
-            )
-        }
-    }
-}
-
-impl ChapterlessFormat for ChapterRange {
-    fn chapterless_format(&self) -> String {
-        if let Some(cvr) = self.as_chapter_verse_range() {
-            cvr.chapterless_format()
-        } else {
-            format!(
-                "{}-{}:{}",
-                self.start.verse, self.end.chapter, self.end.verse
             )
         }
     }

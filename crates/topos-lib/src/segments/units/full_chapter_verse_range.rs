@@ -1,7 +1,7 @@
 use crate::{
     error::ToposError,
     segments::{
-        segment::{ChapterlessFormat, Segment},
+        segment::Segment,
         units::chapter_verse::ChapterVerse,
         units::parse::{ParsableSegment, SegmentParseMethods},
         verse_bounds::VerseBounds,
@@ -21,12 +21,6 @@ pub struct FullChapterVerseRange {
 impl Display for FullChapterVerseRange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}-{}:{}", self.start, self.end.chapter, self.end.verse)
-    }
-}
-
-impl ChapterlessFormat for FullChapterVerseRange {
-    fn chapterless_format(&self) -> String {
-        format!("{}:{}", self.end.chapter, self.end.verse)
     }
 }
 
