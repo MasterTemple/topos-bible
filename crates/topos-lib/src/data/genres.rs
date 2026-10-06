@@ -190,10 +190,10 @@ Example:
 */
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GenreInput {
-    title: String,
-    abbreviations: Vec<String>,
-    books: Option<Vec<String>>,
-    subcategories: Option<Vec<String>>,
+    pub(crate) title: String,
+    pub(crate) abbreviations: Vec<String>,
+    pub(crate) books: Option<Vec<String>>,
+    pub(crate) subcategories: Option<Vec<String>>,
 }
 
 // static DEFAULT_GENRES_JSON: &'static str = include_str!(concat!(
@@ -204,7 +204,7 @@ pub struct GenreInput {
 static DEFAULT_GENRES_JSON: &str = include_str!("./default_genres.json");
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct GenresInput(Vec<GenreInput>);
+pub struct GenresInput(pub(crate) Vec<GenreInput>);
 
 impl Default for GenresInput {
     fn default() -> Self {

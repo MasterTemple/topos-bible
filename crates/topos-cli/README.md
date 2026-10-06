@@ -190,7 +190,40 @@ color = "always"
 cache = true
 exclude-book = ["Song of Solomon"]
 data = "~/bible/custom.json"   # custom books, genres, or chapter and verse counts
+merge-data = ["~/bible/more-names.json"]
+remove-data = "~/bible/fewer-names.json"
 ```
+
+## Custom data
+
+`--data FILE` replaces the built-in books, genres, or chapter and verse counts (whichever parts
+the file has). To change only a few things, keep the defaults and use either of these, or both.
+They can be repeated and set in `config.toml`:
+
+- `--merge-data FILE` adds names and values. A book is found by its `id`, or else by any of its
+  names. A book that isn't found is added, so it needs an `id`. Renaming a book keeps its old
+  name as an abbreviation, and chapter counts replace the book's.
+- `--remove-data FILE` removes values. A book or genre listed with nothing else is removed
+  entirely, otherwise just the values listed are removed.
+
+The files use the `--data` format with every field optional. Values already there aren't added
+twice, and every name must still mean exactly one book (`"gen"` for John is an error).
+
+```jsonc
+// more-names.json
+{
+  "books": [
+    { "book": "John", "abbreviations": ["jhn"] },
+    { "id": 67, "book": "Tobit", "abbreviation": "Tob", "abbreviations": ["tb"] }
+  ],
+  "genres": [{ "title": "Apocrypha", "books": ["Tobit"] }],
+  "chapter_verses": { "Tobit": [22, 14, 17, 21, 22, 18, 16, 21, 6, 13, 18, 22, 18, 15] }
+}
+// fewer-names.json: "song" no longer matches; Jude isn't a book
+{ "books": [{ "book": "Song of Solomon", "abbreviations": ["song"] }, { "book": "Jude" }] }
+```
+
+The order is `--data` (or the defaults), then each `--merge-data`, then each `--remove-data`.
 
 ## Named queries
 
@@ -212,6 +245,41 @@ topos --list-queries
 `-q` is replaced by the query's options where it appears, so queries can use other queries, and
 `config.toml` can set a default one (`query = "paul"`). The file is read even with `--no-config`.
 The Obsidian plugin's saved searches use the same syntax.
+
+## Cache
+
+The default `config.toml` turns the cache on (`cache = true`); `--no-cache` skips it for one
+run, and `--cache` turns it on without a config. It keeps each file's references between runs,
+until the file changes (its size or modification time). Results are stored **before filtering**, so
+one run serves every later search of the same files, whatever its filters. On a vault with 2,000
+EPUBs and notes:
+
+| | Time |
+|---|---|
+| First run | 5.7 s |
+| Again, with the same or any other filters (`--nt`, `-b John`, `-o "Romans 8"`) | 0.1–0.16 s |
+
+- Only `--data`, `--context-book`, `--context-heading`, and the version get a separate cache
+- Each file has a small binary entry in `~/.cache/topos` (or `$XDG_CACHE_HOME/topos`) that
+  records which books it mentions, so files that can't match the filters are skipped
+- Entries for deleted files are removed now and then, as are caches unused for a month;
+  `topos --clear-cache` deletes everything
+
+## Completing references
+
+`--complete TEXT` prints the completions for a partly typed reference, one per line, for scripts
+and editors; `--list-books` (the same as `--complete ""`) prints every book:
+
+```sh
+topos --complete "John 3:"        # John 3:1 ... John 3:36
+topos --complete "jn 3:16-"       # John 3:16-17, John 3:16-18, ...
+topos --list-books -f abbreviation --nt
+topos --complete "jn 3:" -f osis  # John.3.1 ...
+topos --complete "Rom 8" -m json  # {"text":"Romans 8","label":"Romans 8","kind":"chapter"}
+```
+
+`-f` sets the book style, the book and passage filters narrow the list, and `-m json` prints
+each completion's text, label, and kind (book, chapter, or verse).
 
 ## Shell completions
 
@@ -302,6 +370,12 @@ Options:
       --data <DATA>
           A JSON file with custom books, genres, or chapter and verse counts
 
+      --merge-data <PATH>
+          A JSON file (like --data, every field optional) whose names and values are added to the data, keeping the defaults: new abbreviations, books, genres, or chapter counts
+
+      --remove-data <PATH>
+          A JSON file (like --data, every field optional) whose values are removed from the data: a book or genre listed alone is removed entirely, otherwise just the values listed
+
   -q, --query <NAME>
           Use a named query from ~/.config/topos/queries.toml (its options go where this is)
 
@@ -364,11 +438,22 @@ Options:
           Print results sorted by path (waits for the whole search)
 
       --cache
-          Reuse results for files that have not changed since the last search with the same options
+          Reuse results for files that have not changed (stored unfiltered, so any filters can use them)
+
+      --no-cache
+          Don't use the cache, even if the config turns it on
+
+      --complete [<TEXT>]
+          Print the completions for a partly typed reference, one per line, and exit: books for "" (or nothing), then chapters, verses, and range ends ("John 3:" gives John 3:1, ...). Uses -f for the book style and the book filters; -m json prints objects
+
+      --list-books
+          Print every book, one per line, and exit (the same as `--complete ""`)
+
+      --clear-cache
+          Delete the cache (in ~/.cache/topos) and exit
 
       --ext <EXT>
-          Only search files with these extensions when walking directories (e.g. md,txt); files
-          named on the command line are always searched
+          Only search files with these extensions when walking directories (e.g. md,txt); files named on the command line are always searched
 
   -h, --help
           Print help (see a summary with '-h')

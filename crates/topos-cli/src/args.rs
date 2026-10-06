@@ -5,7 +5,10 @@ use crate::complete;
 use clap::{Parser, ValueEnum, ValueHint};
 use clap_complete::engine::ArgValueCompleter;
 use topos_lib::{
-    data::bible_data::{BibleData, BibleDataInput},
+    data::{
+        bible_data::{BibleData, BibleDataInput},
+        patch::DataPatch,
+    },
     error::AnyResult,
     filter::{
         bible_filter::BibleFilter,
@@ -99,6 +102,16 @@ pub struct Args {
     #[arg(long, value_hint = ValueHint::FilePath)]
     pub data: Option<PathBuf>,
 
+    /// A JSON file (like --data, every field optional) whose names and values are added to the
+    /// data, keeping the defaults: new abbreviations, books, genres, or chapter counts
+    #[arg(long, value_name = "PATH", value_hint = ValueHint::FilePath)]
+    pub merge_data: Vec<PathBuf>,
+
+    /// A JSON file (like --data, every field optional) whose values are removed from the data: a
+    /// book or genre listed alone is removed entirely, otherwise just the values listed
+    #[arg(long, value_name = "PATH", value_hint = ValueHint::FilePath)]
+    pub remove_data: Vec<PathBuf>,
+
     /// Use a named query from ~/.config/topos/queries.toml (its options go where this is)
     #[arg(long, short = 'q', value_name = "NAME", add = ArgValueCompleter::new(complete::queries))]
     pub query: Vec<String>,
@@ -147,9 +160,33 @@ pub struct Args {
     #[arg(long)]
     pub sort: bool,
 
-    /// Reuse results for files that have not changed since the last search with the same options
-    #[arg(long)]
+    /// Reuse results for files that have not changed (stored unfiltered, so any filters can use them)
+    #[arg(long, overrides_with = "no_cache")]
     pub cache: bool,
+
+    /// Don't use the cache, even if the config turns it on
+    #[arg(long, overrides_with = "cache")]
+    pub no_cache: bool,
+
+    /// Print the completions for a partly typed reference, one per line, and exit: books for ""
+    /// (or nothing), then chapters, verses, and range ends ("John 3:" gives John 3:1, ...).
+    /// Uses -f for the book style and the book filters; -m json prints objects
+    #[arg(
+        long,
+        value_name = "TEXT",
+        num_args = 0..=1,
+        default_missing_value = "",
+        add = ArgValueCompleter::new(complete::passages)
+    )]
+    pub complete: Option<String>,
+
+    /// Print every book, one per line, and exit (the same as `--complete ""`)
+    #[arg(long)]
+    pub list_books: bool,
+
+    /// Delete the cache (in ~/.cache/topos) and exit
+    #[arg(long)]
+    pub clear_cache: bool,
 
     /// Only search files with these extensions when walking directories (e.g. md,txt); files
     /// named on the command line are always searched
@@ -201,21 +238,26 @@ pub enum ColorChoice {
 }
 
 impl Args {
-    /// Every option that changes which references are found (for the cache)
+    /// Every option that changes which references are found before filtering (for the cache,
+    /// which stores unfiltered results, so filters are left out)
     pub fn fingerprint(&self) -> String {
-        let data = self
-            .data
-            .as_ref()
-            .and_then(|path| fs::read_to_string(path).ok());
+        let contents = |paths: &[PathBuf]| -> Vec<Option<String>> {
+            paths
+                .iter()
+                .map(|path| fs::read_to_string(path).ok())
+                .collect()
+        };
+        let data = contents(self.data.as_slice());
+        let merge = contents(&self.merge_data);
+        let remove = contents(&self.remove_data);
         format!(
             "{:?}",
             (
-                (&self.testaments, self.nt, self.ot, &self.exclude_testaments),
-                (&self.genres, &self.exclude_genres),
-                (&self.books, &self.exclude_books),
-                (&self.inside, &self.overlaps, &self.outside),
-                (&self.context_book, &self.context_heading),
+                &self.context_book,
+                &self.context_heading,
                 data,
+                merge,
+                remove
             )
         )
     }
@@ -242,15 +284,34 @@ impl Args {
         }
     }
 
-    pub fn matcher(&self) -> AnyResult<BibleMatcher> {
-        let data = match &self.data {
-            Some(path) => {
-                let input: BibleDataInput = serde_json::from_str(&fs::read_to_string(path)?)
-                    .map_err(|e| format!("{}: {e}", path.display()))?;
-                BibleData::new(input)?
-            }
-            None => BibleData::default(),
+    /// `--data` (or the defaults), then each `--merge-data`, then each `--remove-data`
+    fn data(&self) -> AnyResult<BibleData> {
+        fn read<T: serde::de::DeserializeOwned>(path: &PathBuf) -> AnyResult<T> {
+            let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+            Ok(serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?)
+        }
+        if self.data.is_none() && self.merge_data.is_empty() && self.remove_data.is_empty() {
+            return Ok(BibleData::default());
+        }
+        let mut input = match &self.data {
+            Some(path) => read::<BibleDataInput>(path)?,
+            None => BibleDataInput::defaults(),
         };
+        for path in &self.merge_data {
+            input
+                .merge(read::<DataPatch>(path)?)
+                .map_err(|e| format!("{}: {e}", path.display()))?;
+        }
+        for path in &self.remove_data {
+            input
+                .remove(read::<DataPatch>(path)?)
+                .map_err(|e| format!("{}: {e}", path.display()))?;
+        }
+        Ok(BibleData::new(input)?)
+    }
+
+    pub fn matcher(&self) -> AnyResult<BibleMatcher> {
+        let data = self.data()?;
         let mut filter = BibleFilter::new(data);
         filter.include_many(self.testaments.iter().copied())?;
         if self.nt {

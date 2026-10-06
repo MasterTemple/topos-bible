@@ -29,6 +29,7 @@ fn topos_with_config(config: Option<&str>, args: &[&str], stdin: Option<&str>) -
     let mut child = Command::new(env!("CARGO_BIN_EXE_topos"))
         .args(args)
         .env("XDG_CONFIG_HOME", &home)
+        .env("XDG_CACHE_HOME", home.join("cache"))
         .stdin(if stdin.is_some() {
             Stdio::piped()
         } else {
@@ -144,15 +145,15 @@ fn exit_codes() {
 
 #[test]
 fn cache_reuses_and_refreshes_results() {
-    let dir = std::env::temp_dir().join(format!("topos-cache-test-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
+    let dir = scratch("cache-test");
     std::fs::create_dir_all(dir.join("docs")).unwrap();
     let file = dir.join("docs/a.txt");
     std::fs::write(&file, "See John 3:16\n").unwrap();
 
-    let run = || {
+    let run = |args: &[&str]| {
         let output = Command::new(env!("CARGO_BIN_EXE_topos"))
             .args(["--cache", "-m", "quickfix"])
+            .args(args)
             .arg(&file)
             .env("XDG_CACHE_HOME", dir.join("cache"))
             .env("XDG_CONFIG_HOME", dir.join("config"))
@@ -161,17 +162,40 @@ fn cache_reuses_and_refreshes_results() {
             .unwrap();
         String::from_utf8(output.stdout).unwrap()
     };
-    let first = run();
+    let first = run(&[]);
     assert!(first.ends_with(":1:5: John 3:16\n"), "{first}");
-    assert_eq!(
-        std::fs::read_dir(dir.join("cache/topos")).unwrap().count(),
-        1
-    );
-    assert_eq!(run(), first);
+    assert_eq!(run(&[]), first);
 
-    // A changed file is searched again (the size changes, so the mtime resolution does not matter)
+    // Change the text but keep the size and modification time: a cached result shows the old
+    // reference, which proves that other filters reuse the cached (unfiltered) results
+    let modified = std::fs::metadata(&file).unwrap().modified().unwrap();
+    std::fs::write(&file, "See Ruth 3:16\n").unwrap();
+    std::fs::File::options()
+        .write(true)
+        .open(&file)
+        .unwrap()
+        .set_modified(modified)
+        .unwrap();
+    assert!(run(&["--nt"]).ends_with(":1:5: John 3:16\n"));
+    assert!(run(&["-o", "John 3"]).ends_with(":1:5: John 3:16\n"));
+    // Filters that rule the file out (by its books) find nothing
+    assert_eq!(run(&["--ot"]), "");
+    assert_eq!(run(&["-b", "Genesis"]), "");
+
+    // A changed size or time searches the file again
     std::fs::write(&file, "Now Romans 8:28 instead\n").unwrap();
-    assert!(run().ends_with(":1:5: Romans 8:28\n"));
+    assert!(run(&[]).ends_with(":1:5: Romans 8:28\n"));
+    assert!(run(&["--nt"]).ends_with(":1:5: Romans 8:28\n"));
+
+    // --clear-cache deletes it
+    let cache = dir.join("cache/topos");
+    assert!(cache.exists());
+    Command::new(env!("CARGO_BIN_EXE_topos"))
+        .arg("--clear-cache")
+        .env("XDG_CACHE_HOME", dir.join("cache"))
+        .output()
+        .unwrap();
+    assert!(!cache.exists());
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -329,6 +353,8 @@ fn named_queries() {
         Command::new(env!("CARGO_BIN_EXE_topos"))
             .args(args)
             .env("XDG_CONFIG_HOME", &home)
+            .env("XDG_CACHE_HOME", home.join("cache"))
+            .env("XDG_CACHE_HOME", home.join("cache"))
             .stdin(Stdio::null())
             .output()
             .unwrap()
@@ -369,6 +395,8 @@ fn first_run_writes_default_files() {
         Command::new(env!("CARGO_BIN_EXE_topos"))
             .args(args)
             .env("XDG_CONFIG_HOME", &home)
+            .env("XDG_CACHE_HOME", home.join("cache"))
+            .env("XDG_CACHE_HOME", home.join("cache"))
             .stdin(Stdio::null())
             .output()
             .unwrap()
@@ -387,7 +415,9 @@ fn first_run_writes_default_files() {
     ]);
     assert_eq!(stdout(&first), ":1:15: Romans 8:28\n");
     let config = std::fs::read_to_string(home.join("topos/config.toml")).unwrap();
-    assert!(config.contains("# cache = true"), "{config}");
+    // The default config turns the cache on
+    assert!(config.contains("\ncache = true"), "{config}");
+    assert!(home.join("cache/topos").exists());
     assert_eq!(
         stdout(&run(&["--list-queries"])),
         "pauline\t--nt -g 'Pauline Epistles'\n"
@@ -411,6 +441,7 @@ fn complete(words: &[&str], config_home: &std::path::Path) -> Vec<String> {
         .env("_CLAP_COMPLETE_COMP_TYPE", "9")
         .env("_CLAP_COMPLETE_SPACE", "true")
         .env("XDG_CONFIG_HOME", config_home)
+        .env("XDG_CACHE_HOME", config_home.join("cache"))
         .stdin(Stdio::null())
         .output()
         .unwrap();
@@ -462,5 +493,128 @@ fn shell_completions() {
     let script = String::from_utf8(script.stdout).unwrap();
     assert!(script.contains("compopt -o filenames"), "{script}");
     assert!(script.contains("complete -o nospace"), "{script}");
+    let _ = std::fs::remove_dir_all(&home);
+}
+
+#[test]
+fn no_cache_overrides_the_config() {
+    let home = scratch("no-cache");
+    std::fs::create_dir_all(home.join("topos")).unwrap();
+    std::fs::write(home.join("topos/config.toml"), "cache = true\n").unwrap();
+    std::fs::write(home.join("a.txt"), "John 3:16\n").unwrap();
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_topos"))
+            .arg(home.join("a.txt"))
+            .args(args)
+            .env("XDG_CONFIG_HOME", &home)
+            .env("XDG_CACHE_HOME", home.join("cache"))
+            .stdin(Stdio::null())
+            .output()
+            .unwrap()
+    };
+    run(&["--no-cache"]);
+    assert!(!home.join("cache/topos").exists());
+    // The last of --cache and --no-cache wins
+    run(&["--no-cache", "--cache"]);
+    assert!(home.join("cache/topos").exists());
+    let _ = std::fs::remove_dir_all(&home);
+}
+
+#[test]
+fn complete_and_list_books() {
+    let lines = |args: &[&str]| -> Vec<String> {
+        let mut all = vec!["--no-config"];
+        all.extend(args);
+        stdout(&topos(&all, None))
+            .lines()
+            .map(str::to_string)
+            .collect()
+    };
+    let books = lines(&["--complete"]);
+    assert_eq!(books.len(), 66);
+    assert_eq!(books[0], "Genesis");
+    assert_eq!(lines(&["--complete", ""]), books);
+    assert_eq!(lines(&["--list-books"]), books);
+    assert_eq!(
+        lines(&["--list-books", "-f", "abbreviation"])[..2],
+        ["Gn", "Ex"]
+    );
+    assert_eq!(lines(&["--list-books", "-f", "osis"])[65], "Rev");
+    assert_eq!(lines(&["--list-books", "--nt"]).len(), 27);
+
+    let verses = lines(&["--complete", "John 3:"]);
+    assert_eq!(verses.len(), 36);
+    assert_eq!(verses[15], "John 3:16");
+    assert_eq!(
+        lines(&["--complete", "jn 3:16-"])[..2],
+        ["John 3:16-17", "John 3:16-18"]
+    );
+    assert_eq!(lines(&["--complete", "jn 3:", "-f", "osis"])[0], "John.3.1");
+    assert_eq!(
+        lines(&["--complete", "jn 3:", "-f", "abbreviation"])[0],
+        "Jn 3:1"
+    );
+    assert_eq!(
+        lines(&["--complete", "John 3:", "-o", "John 3:16-17"]),
+        ["John 3:16", "John 3:17"]
+    );
+    assert_eq!(
+        lines(&["--complete", "Rom 8", "-m", "json"]),
+        [r#"{"text":"Romans 8","label":"Romans 8","kind":"chapter"}"#]
+    );
+}
+
+#[test]
+fn merge_and_remove_data() {
+    let home = scratch("merge-data");
+    std::fs::create_dir_all(home.join("topos")).unwrap();
+    std::fs::write(
+        home.join("merge.json"),
+        r#"{ "books": [{ "book": "John", "abbreviations": ["jhn"] }, { "id": 67, "book": "Tobit", "abbreviation": "Tob" }] }"#,
+    )
+    .unwrap();
+    std::fs::write(
+        home.join("remove.json"),
+        r#"{ "books": [{ "book": "Jude" }, { "book": "Romans", "abbreviations": ["rom"] }] }"#,
+    )
+    .unwrap();
+    // Both can be set in config.toml (a list or one path)
+    let config = format!(
+        "merge-data = [{:?}]\nremove-data = {:?}\nmode = \"quickfix\"\n",
+        home.join("merge.json"),
+        home.join("remove.json")
+    );
+    std::fs::write(home.join("topos/config.toml"), config).unwrap();
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_topos"))
+            .args(args)
+            .env("XDG_CONFIG_HOME", &home)
+            .env("XDG_CACHE_HOME", home.join("cache"))
+            .stdin(Stdio::null())
+            .output()
+            .unwrap()
+    };
+    let text = "Jhn 3:16, Tobit 1:1, Jude 5, Rom 8:28, Romans 8:28, Gen 1:1";
+    let found = stdout(&run(&["--text", text]));
+    assert_eq!(
+        found, ":1:1: John 3:16\n:1:11: Tobit 1:1\n:1:40: Romans 8:28\n:1:53: Genesis 1:1\n",
+        "{found}"
+    );
+    assert_eq!(stdout(&run(&["--list-books"])).lines().count(), 66);
+
+    // A name for two books is an error that says which file and name
+    std::fs::write(
+        home.join("bad.json"),
+        r#"{ "books": [{ "book": "John", "abbreviations": ["gen"] }] }"#,
+    )
+    .unwrap();
+    let bad_path = home.join("bad.json");
+    let bad = run(&["--text", "x", "--merge-data", bad_path.to_str().unwrap()]);
+    assert_eq!(bad.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&bad.stderr);
+    assert!(
+        stderr.contains("bad.json") && stderr.contains("`gen` would mean both"),
+        "{stderr}"
+    );
     let _ = std::fs::remove_dir_all(&home);
 }

@@ -3,10 +3,10 @@ use std::{process::ExitCode, sync::Arc};
 use clap::{CommandFactory, Parser};
 
 use crate::{
-    args::Args,
+    args::{Args, OutputMode},
     cache::Cache,
     output::Printer,
-    search::{Input, Searcher, search},
+    search::{CachedSearch, Input, Searcher, search},
 };
 
 mod args;
@@ -39,6 +39,15 @@ fn main() -> ExitCode {
         }
     };
     let mut args = Args::parse_from(argv);
+    if args.clear_cache {
+        return match cache::clear() {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(err) => {
+                eprintln!("topos: could not delete the cache: {err}");
+                ExitCode::from(2)
+            }
+        };
+    }
     if args.list_queries {
         return match queries::load() {
             Ok(queries) => {
@@ -62,6 +71,18 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    // Before reading the input, since these never search
+    if let Some(text) = args.complete.take().or(args.list_books.then(String::new)) {
+        let json = args.mode == OutputMode::Json;
+        for suggestion in complete::suggestions(&matcher, &text, &args.format_options()) {
+            if json {
+                println!("{}", serde_json::to_string(&suggestion).unwrap_or_default());
+            } else {
+                println!("{}", suggestion.text);
+            }
+        }
+        return ExitCode::SUCCESS;
+    }
     let input = match Input::new(std::mem::take(&mut args.paths), args.text.take()) {
         Ok(input) => input,
         Err(err) => {
@@ -72,12 +93,14 @@ fn main() -> ExitCode {
 
     let mut printer = Printer::new(&args, matcher.data().clone());
     let (before, after) = args.context_lines();
+    let cached = args
+        .cache
+        .then(|| Cache::open(&args.fingerprint()))
+        .flatten()
+        .map(|cache| CachedSearch::new(cache, &matcher));
     let searcher = Arc::new(Searcher {
         matcher,
-        cache: args
-            .cache
-            .then(|| Cache::open(&args.fingerprint()))
-            .flatten(),
+        cached,
         needs_text: before + after > 0 || printer.needs_text(),
         extensions: args
             .extensions
@@ -111,10 +134,8 @@ fn main() -> ExitCode {
         printer.file(file);
     }
     printer.finish();
-    if let Some(cache) = &searcher.cache
-        && let Err(err) = cache.save()
-    {
-        eprintln!("topos: could not save the cache: {err}");
+    if let Some(cached) = &searcher.cached {
+        cached.cache.finish();
     }
 
     if failed {

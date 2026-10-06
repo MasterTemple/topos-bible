@@ -23,6 +23,7 @@ toml = "1.1"
 serde_json = { workspace = true }
 shlex = "1"
 clap_complete = { version = "4.6.11", features = ["unstable-dynamic"] }
+postcard = { version = "1", features = ["use-std"] }
 
 [features]
 # Search PDFs (builds MuPDF)

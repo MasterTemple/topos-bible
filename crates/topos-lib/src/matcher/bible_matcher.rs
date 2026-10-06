@@ -1,5 +1,7 @@
+use std::collections::BTreeSet;
+
 use crate::{
-    data::bible_data::BibleData,
+    data::{bible_data::BibleData, books::BookId},
     filter::bible_filter::BibleFilter,
     matcher::{
         context::BookContext,
@@ -8,6 +10,7 @@ use crate::{
         matches::{ComplexFilter, FilteredBibleMatches},
         text::SearchText,
     },
+    segments::Passage,
 };
 
 #[derive(Clone, Debug)]
@@ -44,6 +47,31 @@ impl BibleMatcher {
 
     pub fn filter(&self) -> FilteredBibleMatches<'_> {
         self.complex_filter.as_filter(&self.data)
+    }
+
+    /**
+    The same matcher without its book and passage filters (keeping the data and book context)
+    - Filters only drop matches after they are found, so filtering this matcher's results with
+      [`Self::keeps`] gives exactly what this matcher finds. The CLI caches unfiltered results
+      this way and filters them per search
+    */
+    pub fn without_filters(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            complex_filter: ComplexFilter::default(),
+            context: self.context.clone(),
+        }
+    }
+
+    /// Whether this matcher's filters keep a passage
+    pub fn keeps(&self, psg: &Passage) -> bool {
+        self.complex_filter.keep(psg, &self.data)
+    }
+
+    /// The only books a kept match can be in ([`None`] for any book), to skip text that
+    /// mentions none of them
+    pub fn possible_books(&self) -> Option<BTreeSet<BookId>> {
+        self.complex_filter.possible_books()
     }
 }
 
