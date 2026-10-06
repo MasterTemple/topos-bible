@@ -10,6 +10,9 @@ import { bookStyle, type StyleName } from "../core/settings.ts";
 import { Chips, NameInput, ReferenceInput } from "./inputs.tsx";
 import type { Scope } from "./store.ts";
 
+/** The saved-search list's entry that clears the filters */
+const CLEAR = "\u0000clear";
+
 /** How many results render before "Show more", so huge vaults stay responsive */
 const PAGE = 300;
 
@@ -148,6 +151,11 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
             <select
               value={active?.name ?? ""}
               onChange={(e) => {
+                if (e.target.value === CLEAR) {
+                  plugin.search.set({ filters: NO_FILTERS, scope: "vault", folder: "" });
+                  setShown(PAGE);
+                  return;
+                }
                 const saved = savedQueries.find((q) => q.name === e.target.value);
                 if (!saved) return;
                 plugin.applyQuery(saved);
@@ -156,8 +164,12 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
               }}
               aria-label="Saved searches"
             >
-              <option value="" disabled>
-                {savedQueries.length === 0 ? "No saved searches" : active ? "" : "Saved searches…"}
+              {/* The prompt shows when no saved search matches; picking it does nothing */}
+              <option value="" disabled hidden>
+                {savedQueries.length === 0 ? "No saved searches" : "Saved searches…"}
+              </option>
+              <option value={CLEAR} disabled={activeFilters === 0 && state.scope === "vault"}>
+                New search (clear filters)
               </option>
               {savedQueries.map((saved) => (
                 <option key={saved.name} value={saved.name} title={saved.query}>

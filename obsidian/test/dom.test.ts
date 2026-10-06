@@ -103,13 +103,25 @@ test("the sidebar's inputs and context lines work in a DOM", async () => {
     // Type a reference and press Enter: it becomes a chip and filters the results
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
     await act(async () => {
-      setter.call(input, "John 3");
+      setter.call(input, "jn 3");
       input.dispatchEvent(new window.Event("input", { bubbles: true }) as never);
     });
     assert.match(container.querySelector(".topos-dropdown li")!.textContent!, /Add "John 3"/);
     await key("Enter");
     assert.deepEqual(plugin.search.get().filters.overlaps, ["John 3"]);
     assert.match(text(), /1 reference in 1 note/);
+
+    // "New search" in the saved-search list clears the filters
+    const select = container.querySelector<HTMLSelectElement>('select[aria-label="Saved searches"]')!;
+    const clear = [...select.options].find((o) => o.textContent!.startsWith("New search"))!;
+    assert.equal(clear.disabled, false);
+    await act(async () => {
+      select.value = clear.value;
+      select.dispatchEvent(new window.Event("change", { bubbles: true }) as never);
+    });
+    assert.deepEqual(plugin.search.get().filters.overlaps, []);
+    assert.match(text(), /2 references in 2 notes/);
+    await act(async () => plugin.search.set({ filters: { ...plugin.search.get().filters, overlaps: ["John 3"] } }));
 
     // Middle-click removes the chip
     const chip = [...container.querySelectorAll(".topos-chip")].find((c) => c.textContent!.startsWith("John 3"))!;

@@ -213,6 +213,27 @@ topos --list-queries
 `config.toml` can set a default one (`query = "paul"`). The file is read even with `--no-config`.
 The Obsidian plugin's saved searches use the same syntax.
 
+## Shell completions
+
+Tab completes options and their values: modes and formats, book and genre names (`-b jn` offers
+Jonah and John; `-b "1 Co` gives `"1 Corinthians"`), testaments, your named queries, references
+for `-i`/`-o`/`--outside` (books, then chapters, verses, and range ends, like the editor plugins),
+and paths. `topos` computes them itself when Tab is pressed, so they always match the installed
+version and your `queries.toml`.
+
+```sh
+# bash: load on demand
+COMPLETE=bash topos > ~/.local/share/bash-completion/completions/topos
+# or in ~/.bashrc
+source <(COMPLETE=bash topos)
+
+# zsh (~/.zshrc), fish (~/.config/fish/config.fish), elvish, powershell
+source <(COMPLETE=zsh topos)
+COMPLETE=fish topos | source
+```
+
+Quote references (`-o "John 3:16"`): bash splits words at `:`.
+
 ## File types
 
 - `.pdf` (with the `pdf` feature) reports the page, and `.epub` reports a CFI

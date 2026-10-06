@@ -399,3 +399,68 @@ fn first_run_writes_default_files() {
     assert_eq!(stdout(&run(&["--list-queries"])), "mine\t-b John\n");
     let _ = std::fs::remove_dir_all(&home);
 }
+
+/// Asks topos for completions the way bash's registration does
+fn complete(words: &[&str], config_home: &std::path::Path) -> Vec<String> {
+    let output = Command::new(env!("CARGO_BIN_EXE_topos"))
+        .arg("--")
+        .args(words)
+        .env("COMPLETE", "bash")
+        .env("_CLAP_IFS", "\n")
+        .env("_CLAP_COMPLETE_INDEX", (words.len() - 1).to_string())
+        .env("_CLAP_COMPLETE_COMP_TYPE", "9")
+        .env("_CLAP_COMPLETE_SPACE", "true")
+        .env("XDG_CONFIG_HOME", config_home)
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    String::from_utf8(output.stdout)
+        .unwrap()
+        .lines()
+        .map(str::to_string)
+        .collect()
+}
+
+#[test]
+fn shell_completions() {
+    let home = scratch("complete");
+    std::fs::create_dir_all(home.join("topos")).unwrap();
+    std::fs::write(home.join("topos/queries.toml"), "paul = '-g pauline'\n").unwrap();
+    let c = |words: &[&str]| complete(words, &home);
+
+    assert_eq!(
+        c(&["topos", "-m", ""]),
+        [
+            "auto",
+            "grouped",
+            "quickfix",
+            "table",
+            "json",
+            "count",
+            "total-count"
+        ]
+    );
+    assert_eq!(c(&["topos", "-b", "1 co"]), ["1 Corinthians"]);
+    // What bash passes for an unquoted word keeps its backslashes
+    assert_eq!(
+        c(&["topos", "--exclude-book", "song\\ of"]),
+        ["Song of Solomon"]
+    );
+    assert_eq!(c(&["topos", "-b", "jn"]), ["Jonah", "John"]);
+    assert!(c(&["topos", "-g", ""]).contains(&"Pauline Epistles".to_string()));
+    assert_eq!(c(&["topos", "-t", ""]), ["old", "new"]);
+    assert_eq!(c(&["topos", "-q", ""]), ["paul"]);
+    assert_eq!(c(&["topos", "-o", "Ps 119:"]).len(), 176);
+    assert_eq!(c(&["topos", "-i", "rom 8"]), ["Romans 8"]);
+    assert!(c(&["topos", "--ex"]).contains(&"--exclude-book".to_string()));
+
+    // The registration script lets readline quote candidates
+    let script = Command::new(env!("CARGO_BIN_EXE_topos"))
+        .env("COMPLETE", "bash")
+        .output()
+        .unwrap();
+    let script = String::from_utf8(script.stdout).unwrap();
+    assert!(script.contains("compopt -o filenames"), "{script}");
+    assert!(script.contains("complete -o nospace"), "{script}");
+    let _ = std::fs::remove_dir_all(&home);
+}

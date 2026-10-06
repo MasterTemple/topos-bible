@@ -1,6 +1,6 @@
 use std::{process::ExitCode, sync::Arc};
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 
 use crate::{
     args::Args,
@@ -11,6 +11,7 @@ use crate::{
 
 mod args;
 mod cache;
+mod complete;
 mod config;
 mod output;
 mod queries;
@@ -18,6 +19,17 @@ mod search;
 
 /// Like ripgrep: 0 when something matched, 1 when nothing did, 2 on errors
 fn main() -> ExitCode {
+    // `COMPLETE=bash topos` prints the registration script; see complete::write_bash_registration
+    if std::env::var_os("COMPLETE").is_some_and(|shell| shell == "bash")
+        && std::env::args_os().len() == 1
+    {
+        return match complete::write_bash_registration(&mut std::io::stdout()) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(_) => ExitCode::FAILURE,
+        };
+    }
+    // Answers the shell when Tab is pressed (COMPLETE=<shell> is set), then exits
+    clap_complete::CompleteEnv::with_factory(Args::command).complete();
     let argv = match config::with_defaults(std::env::args_os().collect()).and_then(queries::expand)
     {
         Ok(argv) => argv,

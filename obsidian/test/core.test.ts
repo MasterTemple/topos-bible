@@ -199,6 +199,9 @@ test("reference inputs list every book, then add or complete what is typed", asy
   const range = describe("John 3:16-");
   assert.equal(range[0], "John 3:16-17");
   assert.equal(range.at(-1), "add John 3:16");
+  // What's added is the formatted reference
+  assert.deepEqual(describe("jn 3:16").slice(0, 1), ["add John 3:16"]);
+  assert.deepEqual(describe("rom 8").slice(0, 1), ["add Romans 8"]);
   // Every verse of Psalm 119
   assert.equal(describe("Ps 119:").filter((c: string) => !c.startsWith("add")).length, 176);
 });

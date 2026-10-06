@@ -83,8 +83,8 @@ export function referenceChoices(topos: Topos, style: BookStyle, value: string, 
     .filter((c) => applyCompletion(value.slice(0, caret), c) + value.slice(caret) !== value);
   const choices: Choice[] = completions.map((completion) => ({ kind: "complete", completion }));
   if (!passage) return choices;
-  // "John 3:16-" adds John 3:16, without the dangling dash
-  const add: Choice = { kind: "add", reference: value.trim().replace(/[\s:\-–—,.;]+$/, "") };
+  // The chip gets the reference written out in the chosen style: `jn 3:16-` adds John 3:16
+  const add: Choice = { kind: "add", reference: passage.reference };
   return /[:\-–—,.;]\s*$/.test(value) ? [...choices, add] : [add, ...choices];
 }
 
