@@ -76,6 +76,23 @@ test("testaments narrow genres and books, and contradictions are explained", () 
   assert.deepEqual(filtered({ testaments: ["new"], excludeTestaments: ["new"] }, text), []);
 });
 
+test("passage filters that can't match anything are explained", () => {
+  const conflict = (filters: Partial<Filters>) => compileFilters(topos, { ...NO_FILTERS, ...filters }).conflict;
+  assert.equal(
+    conflict({ books: ["Genesis"], inside: ["Romans 8"] }),
+    "Romans 8 is in books that aren't searched, so nothing can match",
+  );
+  assert.equal(conflict({ testaments: ["new"], overlaps: ["Ps 23", "Gen 1"] }), "Ps 23, Gen 1 are in books that aren't searched, so nothing can match");
+  assert.equal(conflict({ books: ["Genesis"], inside: ["Romans 8", "Gen 1"] }), null);
+  assert.equal(
+    conflict({ inside: ["John 3:16"], overlaps: ["John 3:1-5"], outside: ["John 3"] }),
+    "John 3:16, John 3:1-5 are within the outside passages (John 3), so nothing can match",
+  );
+  assert.equal(conflict({ overlaps: ["John 3-4"], outside: ["John 3"] }), null);
+  // Genres and books add up, so a book outside the genres is not a conflict
+  assert.equal(conflict({ genres: ["Pauline Epistles"], books: ["Genesis"] }), null);
+});
+
 test("unknown names are reported, not silently dropped", () => {
   const filter = compileFilters(topos, { ...NO_FILTERS, books: ["Jhon"], inside: ["nope"] });
   assert.deepEqual(filter.errors, ['Unknown book "Jhon"', 'Not a reference: "nope"']);

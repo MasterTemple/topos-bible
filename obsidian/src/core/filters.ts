@@ -105,21 +105,33 @@ export function compileFilters(topos: Topos, filters: Filters): CompiledFilter {
     );
   }
 
+  const inside = passages(filters.inside);
+  const overlaps = passages(filters.overlaps);
+  const outside = passages(filters.outside);
+
   let conflict: string | null = null;
+  const list = (names: string[]) => `${names.join(", ")} ${names.length === 1 ? "is" : "are"}`;
   if (scope && included && included.size > 0 && ![...included].some((id) => scope.has(id))) {
     const testaments = filters.testaments.map((t) => (t === "old" ? "Old" : "New")).join(" and ");
-    const names = [...filters.genres, ...filters.books].join(", ");
-    conflict = `${names} ${filters.genres.length + filters.books.length === 1 ? "is" : "are"} not in the ${testaments} Testament${filters.testaments.length === 1 ? "" : "s"}, so nothing can match`;
+    conflict = `${list([...filters.genres, ...filters.books])} not in the ${testaments} Testament${filters.testaments.length === 1 ? "" : "s"}, so nothing can match`;
+  } else {
+    // The inside and overlapping passages, with what was typed (unparsed ones are already errors)
+    const named = [...filters.inside, ...filters.overlaps].flatMap((text) => {
+      const passage = topos.parse(text, 0);
+      return passage ? [{ text, passage }] : [];
+    });
+    const searched = named.filter(({ passage }) => !books || books.has(passage.bookId));
+    if (named.length > 0 && searched.length === 0) {
+      conflict = `${list(named.map((p) => p.text))} in books that aren't searched, so nothing can match`;
+    } else if (
+      searched.length > 0 &&
+      searched.every(({ passage }) => outside.some((o) => topos.contains(o, passage)))
+    ) {
+      conflict = `${list(searched.map((p) => p.text))} within the outside passages (${filters.outside.join(", ")}), so nothing can match`;
+    }
   }
 
-  return {
-    books,
-    conflict,
-    inside: passages(filters.inside),
-    overlaps: passages(filters.overlaps),
-    outside: passages(filters.outside),
-    errors,
-  };
+  return { books, conflict, inside, overlaps, outside, errors };
 }
 
 /** Whether a found passage passes the filter */

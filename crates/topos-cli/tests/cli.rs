@@ -307,6 +307,13 @@ fn testaments_narrow_genres() {
     let ot = topos(&["--text", text, "--ot", "-g", "Pauline Epistles"], None);
     assert_eq!(ot.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&ot.stderr).contains("nothing can match"));
+
+    let passages = topos(&["--text", text, "-b", "Genesis", "-i", "Romans 8"], None);
+    assert_eq!(passages.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&passages.stderr)
+            .contains("Romans 8 is in books that aren't searched, so nothing can match")
+    );
 }
 
 #[test]

@@ -260,11 +260,6 @@ impl Args {
         filter.exclude_many(self.exclude_testaments.iter().copied())?;
         filter.exclude_many(self.exclude_genres.iter().map(GenreFilter::new))?;
         filter.exclude_many(self.exclude_books.iter().map(BookFilter::new))?;
-        if filter.is_contradictory() {
-            eprintln!(
-                "topos: warning: no included genre or book is in the included testaments, so nothing can match"
-            );
-        }
         for passage in &self.inside {
             filter.filter_inside(passage)?;
         }
@@ -275,6 +270,9 @@ impl Args {
             filter.filter_outside(passage)?;
         }
 
+        if let Some(reason) = filter.contradiction() {
+            eprintln!("topos: warning: {reason}, so nothing can match");
+        }
         let matcher = filter.create_matcher();
         let books = matcher.data().books();
         let context = match (&self.context_book, &self.context_heading) {

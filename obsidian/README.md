@@ -14,8 +14,8 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
   and book, each included or excluded, like `-t`, `-g`, `-b`, and `--exclude-*`. A testament
   narrows the rest (NT + Pauline Epistles is Paul's letters), included genres and books add up
   (Pentateuch + Revelation), and exclusions always win. The header shows how many filters are on
-  and how many books they leave, and warns when they contradict each other (OT + Pauline
-  Epistles)
+  and how many books they leave, and warns when they contradict each other: OT + Pauline
+  Epistles, Books: Genesis with Inside: Romans 8, or Inside: John 3:16 with Outside: John 3
 - Filter by passage: **Inside** (entirely within, like `-i`), **Overlapping** (shares a verse,
   like `-o`), and **Outside** (`--outside`), each with as many passages as you like
 - Every filter input lists its options as soon as you click it (every book, then every chapter,

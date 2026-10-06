@@ -168,8 +168,10 @@ topos --exclude-testament new -m table
 
 - Including a testament limits the search to it (`--nt -g Gospels` is the four Gospels)
 - Included genres and books add up (`-g Pentateuch -b Revelation` is six books)
-- Including genres or books outside the included testaments (`--ot -g "Pauline Epistles"`)
-  matches nothing, with a warning
+- Filters that can't match anything print a warning: genres or books outside the included
+  testaments (`--ot -g "Pauline Epistles"`), `-i`/`-o` passages only in books that aren't searched
+  (`-b Genesis -i "Romans 8"`), or only within `--outside` passages (`-i "John 3:16" --outside
+  "John 3"`)
 - Exclusions always win, so a book can be excluded from an included genre
 - `-m count` prints matches per file; `--total-count` prints one total across all files
 - `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches

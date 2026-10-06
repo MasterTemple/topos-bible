@@ -62,6 +62,10 @@ pub struct BibleFilter {
     /// The books to search, kept up to date as filters are pushed
     ids: BTreeSet<BookId>,
     complex_filter: ComplexFilter,
+    /// `--inside` and `--overlaps` passages as given, to explain contradictions
+    included_passages: Vec<(String, Passage)>,
+    /// `--outside` passages as given
+    outside_passages: Vec<(String, Passage)>,
 }
 
 impl BibleFilter {
@@ -74,6 +78,8 @@ impl BibleFilter {
             excluded: BTreeSet::new(),
             ids,
             complex_filter: ComplexFilter::default(),
+            included_passages: vec![],
+            outside_passages: vec![],
         }
     }
 
@@ -97,13 +103,66 @@ impl BibleFilter {
         Ok(())
     }
 
-    /// Whether the included testaments, genres, and books have no book in common, like `OT` and
-    /// `Pauline Epistles` (exclusions emptying the search don't count; that is what they ask for)
+    /// Whether the filters contradict each other, so nothing can match (see [`Self::contradiction`])
     pub fn is_contradictory(&self) -> bool {
-        match (&self.scope, &self.included) {
-            (Some(scope), Some(included)) => scope.is_disjoint(included),
-            _ => false,
+        self.contradiction().is_some()
+    }
+
+    /// Why nothing can match, when inclusions contradict each other or the exclusions (exclusions
+    /// emptying the search don't count; that is what they ask for):
+    ///
+    /// - the included genres and books are outside the included testaments (`OT` and
+    ///   `Pauline Epistles`)
+    /// - every inside or overlapping passage is in a book that isn't searched (`-b Genesis -i
+    ///   "Romans 8"`)
+    /// - every inside or overlapping passage is within an outside passage (`-i "John 3:16"
+    ///   --outside "John 3"`)
+    pub fn contradiction(&self) -> Option<String> {
+        if let (Some(scope), Some(included)) = (&self.scope, &self.included)
+            && scope.is_disjoint(included)
+        {
+            return Some("no included genre or book is in the included testaments".into());
         }
+        if self.included_passages.is_empty() {
+            return None;
+        }
+        let names = |passages: &[&(String, Passage)]| {
+            let names = passages
+                .iter()
+                .map(|(text, _)| text.as_str())
+                .collect::<Vec<_>>();
+            let verb = if names.len() == 1 { "is" } else { "are" };
+            (names.join(", "), verb)
+        };
+        let searched: Vec<_> = self
+            .included_passages
+            .iter()
+            .filter(|(_, psg)| self.ids.contains(&psg.book))
+            .collect();
+        if searched.is_empty() {
+            let all: Vec<_> = self.included_passages.iter().collect();
+            let (names, verb) = names(&all);
+            return Some(format!("{names} {verb} in books that aren't searched"));
+        }
+        let covered = searched.iter().all(|(_, psg)| {
+            let versification = self.data.chapter_verses().get_chapter_verses(&psg.book);
+            self.outside_passages
+                .iter()
+                .any(|(_, outside)| outside.contains_passage(psg, versification))
+        });
+        if covered {
+            let (names, verb) = names(&searched);
+            let outside = self
+                .outside_passages
+                .iter()
+                .map(|(text, _)| text.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Some(format!(
+                "{names} {verb} within the outside passages ({outside})"
+            ));
+        }
+        None
     }
 
     pub fn with<T: IsFilter>(mut self, op: Operation<T>) -> ToposResult<BibleFilter> {
@@ -140,6 +199,8 @@ impl BibleFilter {
     /// Keep matches entirely inside this passage (`Err` if it cannot be parsed)
     pub fn filter_inside(&mut self, passage: &str) -> ToposResult<()> {
         let psg = self.parse_passage(passage)?;
+        self.included_passages
+            .push((passage.to_string(), psg.clone()));
         self.complex_filter.inside(psg);
         Ok(())
     }
@@ -147,6 +208,8 @@ impl BibleFilter {
     /// Keep matches that share any verse with this passage (`Err` if it cannot be parsed)
     pub fn filter_overlaps(&mut self, passage: &str) -> ToposResult<()> {
         let psg = self.parse_passage(passage)?;
+        self.included_passages
+            .push((passage.to_string(), psg.clone()));
         self.complex_filter.overlaps(psg);
         Ok(())
     }
@@ -154,6 +217,8 @@ impl BibleFilter {
     /// Drop matches that overlap this passage (`Err` if it cannot be parsed)
     pub fn filter_outside(&mut self, passage: &str) -> ToposResult<()> {
         let psg = self.parse_passage(passage)?;
+        self.outside_passages
+            .push((passage.to_string(), psg.clone()));
         self.complex_filter.outside(psg);
         Ok(())
     }
@@ -258,6 +323,34 @@ mod tests {
         assert_eq!(books(&filter), [1, 2, 3, 4, 5, 66]);
         filter.include(TestamentFilter::Old).unwrap();
         assert_eq!(books(&filter), [1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn contradictory_passages() {
+        let mut filter = BibleFilter::default();
+        filter.include(BookFilter::new("Genesis")).unwrap();
+        filter.filter_inside("Romans 8").unwrap();
+        assert_eq!(
+            filter.contradiction().as_deref(),
+            Some("Romans 8 is in books that aren't searched")
+        );
+        // One passage in a searched book is enough
+        filter.filter_overlaps("Gen 1").unwrap();
+        assert_eq!(filter.contradiction(), None);
+
+        let mut filter = BibleFilter::default();
+        filter.filter_inside("John 3:16").unwrap();
+        filter.filter_overlaps("John 3:1-5").unwrap();
+        filter.filter_outside("John 3").unwrap();
+        assert_eq!(
+            filter.contradiction().as_deref(),
+            Some("John 3:16, John 3:1-5 are within the outside passages (John 3)")
+        );
+        // Partly outside still leaves something to find
+        let mut filter = BibleFilter::default();
+        filter.filter_overlaps("John 3-4").unwrap();
+        filter.filter_outside("John 3").unwrap();
+        assert_eq!(filter.contradiction(), None);
     }
 
     #[test]
