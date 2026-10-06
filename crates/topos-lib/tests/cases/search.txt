@@ -1,0 +1,58 @@
+# Search cases: `input => expected references`, separated by ` | `, written as `Book segments`.
+# - Nothing after `=>` means no references should be found
+# - A leading `?` marks a known failure: it is reported but does not fail the test
+
+# Basics
+John 3:16 => John 3:16
+Jn 3:16 => John 3:16
+Jn. 3:16 => John 3:16
+jn 3.16 => John 3:16
+Romans 8:28-30 => Romans 8:28-30
+Romans 8:28–9:1 => Romans 8:28-9:1
+Psalm 119:176 => Psalms 119:176
+Genesis 1 => Genesis 1
+Genesis 1-3 => Genesis 1-3
+Hello there, nothing here => 
+
+# Multiple segments (written back in the shortest form that parses the same way)
+John 5:1-3,5,7-9,12-6:6,7:7-8:8 => John 5:1-3,5,7-9,12-6:6; 7:7-8:8
+John 3:16, 18 => John 3:16,18
+John 3:16; 4:1 => John 3:16; 4:1
+
+# Books ending one window and starting the next
+John 1:1, 3 John 5 => John 1:1 | 3 John 1:5
+Even John 1:1-4, 1 John 2:1-10 => John 1:1-4 | 1 John 2:1-10
+John 1:2-3 and Ephesians 4:28 => John 1:2-3 | Ephesians 4:28
+
+# Text after a reference is ignored
+John 3:16. For God so loved => John 3:16
+Read John 3: it is good => John 3
+John 3:16 is great => John 3:16
+
+# Older formats
+Matth. x, 8 => Matthew 10:8
+
+# Chapters until a verse is seen, then verses until a `;`
+John 1, 3 => John 1,3
+John 1-2, 4-5 => John 1-2,4-5
+John 1, 3:16, 18 => John 1; 3:16,18
+John 3:16; 4 => John 3:16; 4
+
+# Single-chapter books treat a bare number as a verse
+Jude 5 => Jude 1:5
+3 John 5-8 => 3 John 1:5-8
+Jude 1:5 => Jude 1:5
+
+# Validation against versification
+Mark 25 => 
+John 3:99 => 
+Mar 25, 2025 => 
+Mark 16, 25 => Mark 16
+
+# Book filtering and names inside other names
+1 John 2:1 => 1 John 2:1
+Song of Songs 2:1 => Song of Solomon 2:1
+
+# Roman numerals and words
+Romans 8:28, civil => Romans 8:28
+John 3:16, I think => John 3:16

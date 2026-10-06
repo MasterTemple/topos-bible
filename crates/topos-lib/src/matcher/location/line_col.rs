@@ -64,7 +64,12 @@ impl Matcher for LineColLocation {
         let mut prev: Option<Match<'_>> = None;
         let lookup = LineColLookup::new(input);
         // basically execute behind by 1 iteration (so I can see the start of the next match)
-        for cur in matcher.filtered_books.captures_iter(input) {
+        for cur in matcher
+            .data()
+            .books()
+            .candidate_regex()
+            .captures_iter(input)
+        {
             // this is just the book name
             let cur = cur.get(1).unwrap();
             if let Some(prev) = prev
@@ -97,7 +102,13 @@ impl Matcher for LineColLocation {
         let mut filtered = matcher.filter();
         let lookup = LineColLookup::new(input);
 
-        let first = matcher.filtered_books.captures_iter(input).next()?.get(1)?;
+        let first = matcher
+            .data()
+            .books()
+            .candidate_regex()
+            .captures_iter(input)
+            .next()?
+            .get(1)?;
 
         filtered.try_add(BibleMatch::try_match(
             &lookup,

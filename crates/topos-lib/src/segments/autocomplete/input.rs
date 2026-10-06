@@ -1,5 +1,3 @@
-use regex::Regex;
-
 use crate::{
     matcher::bible_matcher::BibleMatcher,
     segments::{
@@ -11,22 +9,17 @@ use crate::{
 
 pub struct InputAutoCompleter<'a> {
     matcher: &'a BibleMatcher,
-    book_regex: Regex,
-    // bcv: BookChapterVerses
 }
 
 impl<'a> InputAutoCompleter<'a> {
     pub fn new(matcher: &'a BibleMatcher) -> Self {
-        let book_regex = matcher.data().create_book_regex().unwrap();
-        Self {
-            matcher,
-            book_regex,
-        }
+        Self { matcher }
     }
 
     /// - This assumes your cursor is at the end of the input
     pub fn suggest(&self, input: &str) -> Option<CompletionOutput> {
-        let cap = self.book_regex.captures_iter(input).last()?;
+        let book_regex = self.matcher.data().books().book_regex();
+        let cap = book_regex.captures_iter(input).last()?;
         let book_match = cap.get(1).unwrap();
         let book_id = self.matcher.data().books().search(book_match.as_str())?;
 

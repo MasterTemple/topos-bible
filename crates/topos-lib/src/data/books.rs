@@ -40,8 +40,32 @@ pub struct Books {
     book_id_to_name: BTreeMap<BookId, String>,
     /// map of book id to abbreviation (for display)
     book_id_to_abbreviation: BTreeMap<BookId, String>,
-    /// match any book; used to parse complex filters
-    passage_regex: Regex,
+    regexes: BookRegexes,
+}
+
+/// Every regex alternates over all book names, escaped and longest first, so `1 John` wins over
+/// `John` and `Song of Songs` over `Song`
+#[derive(Clone, Debug)]
+struct BookRegexes {
+    /// A book followed by a chapter (a digit or Roman numeral), for searching text
+    candidate: Regex,
+    /// A book on its own, for autocomplete
+    book: Regex,
+    /// A book and everything after it, for parsing a single passage
+    passage: Regex,
+}
+
+impl BookRegexes {
+    fn new<'a>(keys: impl Iterator<Item = &'a String>) -> Result<Self, regex::Error> {
+        let mut keys: Vec<&String> = keys.collect();
+        keys.sort_by_key(|k| std::cmp::Reverse(k.chars().count()));
+        let books = keys.into_iter().map(|k| regex::escape(k)).join("|");
+        Ok(Self {
+            candidate: Regex::new(&format!(r"(?i)\b((?:{books})\.?)\s*[0-9ivxlc]"))?,
+            book: Regex::new(&format!(r"(?i)\b((?:{books})\b\.?)"))?,
+            passage: Regex::new(&format!(r"(?i)\b((?:{books}))\b\.?(.*)"))?,
+        })
+    }
 }
 
 impl Books {
@@ -60,6 +84,10 @@ impl Books {
     pub fn iter_keys_and_ids(&self) -> impl Iterator<Item = (&String, &BookId)> {
         self.key_to_id().iter()
     }
+    /// Every book id, in order
+    pub fn ids(&self) -> impl Iterator<Item = BookId> + '_ {
+        self.id_to_name().keys().copied()
+    }
     pub fn search(&self, name: &str) -> Option<BookId> {
         let name = Self::normalize_book_name(name);
         self.key_to_id().get(&name).cloned()
@@ -69,6 +97,19 @@ impl Books {
     }
     pub fn get_abbrev(&self, id: BookId) -> Option<&String> {
         self.id_to_abbrev().get(&id)
+    }
+
+    /**
+    - Matches a book name followed by the start of a chapter (the chapter character is consumed)
+    - Group 1 is the book name, including a trailing `.`
+    */
+    pub fn candidate_regex(&self) -> &Regex {
+        &self.regexes.candidate
+    }
+
+    /// Matches a book name on its own; group 1 is the book name, including a trailing `.`
+    pub fn book_regex(&self) -> &Regex {
+        &self.regexes.book
     }
 }
 
@@ -95,24 +136,19 @@ impl Books {
             }
         }
 
-        let books_pattern: String = abbreviations_to_book_id.keys().join("|");
-
-        let passage_regex = Regex::new(format!(r"\b((?:)(?i){books_pattern})\b\.?(.*)").as_str())
-            .map_err(|e| {
-            format!("Failed to compile book_regex because of bad user input.\n{e}")
-        })?;
+        let regexes = BookRegexes::new(abbreviations_to_book_id.keys())
+            .map_err(|e| format!("Failed to compile the book regex.\n{e}"))?;
 
         Ok(Books {
-            // book_regex,
             input_to_book_id: abbreviations_to_book_id,
             book_id_to_name,
             book_id_to_abbreviation,
-            passage_regex,
+            regexes,
         })
     }
 
     pub fn parse(&self, input: &str) -> Option<Passage> {
-        let m = &self.passage_regex.captures_iter(input).next()?;
+        let m = &self.regexes.passage.captures_iter(input).next()?;
         let book = m.get(1)?.as_str();
         let book = self.search(book)?;
         let segments = m.get(2)?.as_str();

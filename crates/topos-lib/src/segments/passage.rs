@@ -5,6 +5,7 @@ use crate::{
     data::books::BookId,
     segments::{
         grammar::{SegmentList, SegmentNode},
+        resolve::Resolver,
         segment::{ChapterlessFormat, Segment},
         verse_bounds::VerseBounds,
     },
@@ -83,26 +84,44 @@ impl Segments {
 }
 
 impl Segments {
-    pub fn format(&self, verse_seperator: &str, chapter_seperator: &str) -> String {
-        let mut prev_chapter = None;
+    /// Writes segments compactly, dropping the chapter wherever the result still parses back the
+    /// same way (see [`Resolver`] for those rules)
+    pub fn format(&self, verse_separator: &str, chapter_separator: &str) -> String {
         let mut output = String::new();
+        let mut prev: Option<&Segment> = None;
         for seg in self.iter() {
-            let is_cross_chapter_segment = seg.starting_chapter() != seg.ending_chapter();
-            let current_chapter = seg.ending_chapter();
-            if let Some(chapter) = prev_chapter {
-                if is_cross_chapter_segment || chapter == current_chapter {
-                    output.push_str(verse_seperator);
+            match prev {
+                None => output.push_str(&seg.to_string()),
+                Some(prev) if Self::continues(prev, seg) => {
+                    output.push_str(verse_separator);
                     output.push_str(&seg.chapterless_format());
-                } else {
-                    output.push_str(chapter_seperator);
+                }
+                Some(_) => {
+                    output.push_str(chapter_separator);
                     output.push_str(&seg.to_string());
                 }
-            } else {
-                output.push_str(&seg.to_string());
             }
-            prev_chapter = Some(current_chapter);
+            prev = Some(seg);
         }
         output
+    }
+
+    /// Whether `seg` can be written without its chapter after `prev`
+    fn continues(prev: &Segment, seg: &Segment) -> bool {
+        match prev.ending_verse() {
+            // After a verse, a bare number is a verse in the same chapter
+            Some(_) => {
+                seg.starting_chapter() == prev.ending_chapter()
+                    && matches!(
+                        seg,
+                        Segment::ChapterVerse(_)
+                            | Segment::ChapterVerseRange(_)
+                            | Segment::ChapterRange(_)
+                    )
+            }
+            // After whole chapters, a bare number is another chapter
+            None => matches!(seg, Segment::FullChapter(_) | Segment::FullChapterRange(_)),
+        }
     }
 }
 
@@ -135,49 +154,9 @@ impl From<&SegmentList> for Segments {
 }
 
 impl Segments {
-    /**
-    Resolves parsed nodes into chapters and verses
-    - Dangling parts (the `:` in `1:`) are ignored
-    - A number without an explicit chapter belongs to the chapter the previous segment ended in
-    */
+    /// Resolves parsed nodes without book data (see [`Resolver`] for the rules)
     pub fn from_nodes(nodes: &[SegmentNode]) -> Self {
-        let mut segments = Segments::new();
-        for node in nodes {
-            let start = node.start.value;
-            let prev_chapter = segments.last().map(|prev| prev.ending_chapter());
-            let new = match (node.start_verse_value(), node.end_value()) {
-                // `1:2-3:4`
-                (Some(start_verse), Some((end_chapter, Some(end_verse)))) => {
-                    Segment::chapter_range(start, start_verse, end_chapter, end_verse)
-                }
-                // `1:2-3`
-                (Some(start_verse), Some((end_verse, None))) => {
-                    Segment::chapter_verse_range(start, start_verse, end_verse)
-                }
-                // `1:2`
-                (Some(start_verse), None) => Segment::chapter_verse(start, start_verse),
-                (None, Some((end_chapter, Some(end_verse)))) => match prev_chapter {
-                    // `5:7, 12-6:6` (verse 12 of chapter 5 to 6:6)
-                    Some(chapter) => Segment::chapter_range(chapter, start, end_chapter, end_verse),
-                    // `1-2:3`
-                    None => Segment::chapter_range(start, 1, end_chapter, end_verse),
-                },
-                (None, Some((end, None))) => match prev_chapter {
-                    // `3:1, 4-5`
-                    Some(chapter) => Segment::chapter_verse_range(chapter, start, end),
-                    // `1-25`
-                    None => Segment::full_chapter_range(start, end),
-                },
-                (None, None) => match prev_chapter {
-                    // `1:1, 3`
-                    Some(chapter) => Segment::chapter_verse(chapter, start),
-                    // `1`
-                    None => Segment::full_chapter(start),
-                },
-            };
-            segments.push(new);
-        }
-        segments
+        Resolver::default().resolve(nodes).segments
     }
 }
 
@@ -197,7 +176,7 @@ mod tests {
         assert_eq!(parse("1:2-3:4"), [Segment::chapter_range(1, 2, 3, 4)]);
         assert_eq!(parse("1"), [Segment::full_chapter(1)]);
         assert_eq!(parse("1-2"), [Segment::full_chapter_range(1, 2)]);
-        assert_eq!(parse("i:ii"), [Segment::chapter_verse(1, 2)]);
+        assert_eq!(parse("ii:3"), [Segment::chapter_verse(2, 3)]);
     }
 
     #[test]
@@ -253,6 +232,28 @@ mod tests {
     fn segs_vec(input: &str) -> Vec<Segment> {
         // Resolve each comma-separated part on its own so bare numbers stay chapters
         input.split(", ").map(|s| parse(s)[0]).collect()
+    }
+
+    #[test]
+    fn display_round_trips() {
+        for (input, expected) in [
+            ("5:1-3,5,7-9,12-6:6,7:7-8:8", "5:1-3,5,7-9,12-6:6; 7:7-8:8"),
+            ("1, 3", "1,3"),
+            ("1-2, 4-5", "1-2,4-5"),
+            ("1, 3:16, 18", "1; 3:16,18"),
+            ("3:16; 4", "3:16; 4"),
+            ("1-2:3, 5", "1:1-2:3,5"),
+            ("1:1-2:5, 3:1", "1:1-2:5; 3:1"),
+        ] {
+            let segments = Segments::parse(input).unwrap();
+            let formatted = segments.to_string();
+            assert_eq!(formatted, expected, "{input}");
+            assert_eq!(
+                Segments::parse(&formatted).unwrap().0,
+                segments.0,
+                "{input}"
+            );
+        }
     }
 
     #[test]

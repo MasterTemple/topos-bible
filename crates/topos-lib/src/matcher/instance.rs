@@ -7,6 +7,7 @@ use crate::{
     segments::{
         grammar::SegmentList,
         passage::{Passage, Segments},
+        resolve::Resolver,
     },
 };
 
@@ -109,9 +110,13 @@ impl BibleMatch {
         };
 
         let list = SegmentList::parse(segment_window);
-        let end = cur.end() + list.complete_end()?;
+        let versification = data.chapter_verses().get_chapter_verses(&book_id);
+        let resolved = Resolver::for_book(versification).resolve(&list.nodes);
+        // Only the segments that resolved are part of the match
+        let last = resolved.used.checked_sub(1)?;
+        let end = cur.end() + list.nodes[last].complete_end();
         let location = LineColLocation::new(lookup, cur.start(), end);
-        let segments = Segments::from(&list);
+        let segments = resolved.segments;
 
         Some(BibleMatch::new(location, book_id, segments))
     }

@@ -1,5 +1,3 @@
-use regex::Regex;
-
 use crate::{
     data::bible_data::BibleData,
     filter::bible_filter::BibleFilter,
@@ -17,18 +15,15 @@ use crate::matcher::location::pdf::PDFMatchError;
 #[derive(Clone, Debug)]
 pub struct BibleMatcher {
     data: BibleData,
-    /// The books to **not** match on **aren't** in this RegEx, so I won't process unnecessary books
-    pub filtered_books: Regex,
-    /// These are so I can check if the matches overlap with these
+    /// Every book is always matched (so `1 John` is never mistaken for `John`), then filtered here
     complex_filter: ComplexFilter,
 }
 
 // TODO: I should have a search method for each type of Location
 impl BibleMatcher {
-    pub fn new(data: BibleData, filtered_books: Regex, complex_filter: ComplexFilter) -> Self {
+    pub fn new(data: BibleData, complex_filter: ComplexFilter) -> Self {
         Self {
             data,
-            filtered_books,
             complex_filter,
         }
     }
@@ -99,8 +94,6 @@ impl BibleMatcher {
 
 impl Default for BibleMatcher {
     fn default() -> Self {
-        BibleFilter::default()
-            .create_matcher()
-            .expect("The default provided matcher should always compile")
+        BibleFilter::default().create_matcher()
     }
 }

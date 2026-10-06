@@ -158,16 +158,16 @@ impl TryFrom<Args> for BibleMatcher {
 
         if let Some(list) = args.inside {
             for value in list {
-                filter.filter_inside(&value);
+                filter.filter_inside(&value)?;
             }
         }
 
         if let Some(list) = args.outside {
             for value in list {
-                filter.filter_outside(&value);
+                filter.filter_outside(&value)?;
             }
         }
 
-        Ok(filter.create_matcher()?)
+        Ok(filter.create_matcher())
     }
 }

@@ -109,6 +109,8 @@ One segment as written: `start(:start_verse)?(-end(:end_verse)?)?`
 */
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SegmentNode {
+    /// The `,` or `;` before this segment ([`None`] for the first one)
+    pub separator: Option<Delimiter>,
     pub start: Number,
     pub start_verse: Option<Part>,
     pub end: Option<Part>,
@@ -161,9 +163,8 @@ impl SegmentNode {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SegmentList {
     pub nodes: Vec<SegmentNode>,
-    /// `separators[i]` comes right after `nodes[i]`, so a trailing separator (`1:1,`) makes the
-    /// lengths equal
-    pub separators: Vec<Delimiter>,
+    /// A separator with no segment after it yet (`1:1,`)
+    pub trailing_separator: Option<Delimiter>,
 }
 
 impl SegmentList {
@@ -172,17 +173,19 @@ impl SegmentList {
         let mut tokens = Lexer::new(input).peekable();
         let mut list = Self::default();
 
+        let mut separator = None;
         while let Some(start) = take_number(&mut tokens) {
-            let node = parse_node(&mut tokens, start);
+            let node = parse_node(&mut tokens, separator, start);
             list.nodes.push(node);
             if !node.is_complete() {
-                break;
+                return list;
             }
-            match take_delimiter(&mut tokens, DelimiterKind::Segment) {
-                Some(separator) => list.separators.push(separator),
-                None => break,
+            separator = take_delimiter(&mut tokens, DelimiterKind::Segment);
+            if separator.is_none() {
+                return list;
             }
         }
+        list.trailing_separator = separator;
 
         list
     }
@@ -191,15 +194,12 @@ impl SegmentList {
         self.nodes.is_empty()
     }
 
-    pub fn has_trailing_separator(&self) -> bool {
-        !self.nodes.is_empty() && self.separators.len() == self.nodes.len()
-    }
-
     /// End of the last token, including dangling delimiters and a trailing separator
     pub fn end(&self) -> usize {
-        let node_end = self.nodes.last().map_or(0, SegmentNode::end);
-        let separator_end = self.separators.last().map_or(0, |s| s.span.end);
-        node_end.max(separator_end)
+        match self.trailing_separator {
+            Some(separator) => separator.span.end,
+            None => self.nodes.last().map_or(0, SegmentNode::end),
+        }
     }
 
     /// End of the complete reference, or [`None`] if nothing was parsed
@@ -214,7 +214,7 @@ impl SegmentList {
     - `John 1:1,` → (`[1:1]`, `None`): a new segment has not been started
     */
     pub fn split_incomplete(&self) -> (&[SegmentNode], Option<&SegmentNode>) {
-        if self.has_trailing_separator() {
+        if self.trailing_separator.is_some() {
             return (&self.nodes, None);
         }
         match self.nodes.split_last() {
@@ -244,8 +244,13 @@ fn take_part(tokens: &mut Peekable<Lexer<'_>>, kind: DelimiterKind) -> Option<Pa
     Some(Part { delimiter, number })
 }
 
-fn parse_node(tokens: &mut Peekable<Lexer<'_>>, start: Number) -> SegmentNode {
+fn parse_node(
+    tokens: &mut Peekable<Lexer<'_>>,
+    separator: Option<Delimiter>,
+    start: Number,
+) -> SegmentNode {
     let mut node = SegmentNode {
+        separator,
         start,
         start_verse: None,
         end: None,
@@ -287,7 +292,7 @@ mod tests {
                 s
             })
             .collect();
-        if list.has_trailing_separator() {
+        if list.trailing_separator.is_some() {
             out.push(String::from(","));
         }
         out

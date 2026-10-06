@@ -1,7 +1,12 @@
-use crate::{matcher::instance::BibleMatch, segments::passage::Passage};
+use std::collections::BTreeSet;
 
+use crate::{data::books::BookId, matcher::instance::BibleMatch, segments::passage::Passage};
+
+/// Decides which matches to keep, after every book has been matched
 #[derive(Clone, Debug, Default)]
 pub struct ComplexFilter {
+    /// [`None`] keeps every book
+    books: Option<BTreeSet<BookId>>,
     inside_of: Vec<Passage>,
     outside_of: Vec<Passage>,
 }
@@ -9,9 +14,15 @@ pub struct ComplexFilter {
 impl ComplexFilter {
     pub fn new(inside_of: Vec<Passage>, outside_of: Vec<Passage>) -> Self {
         Self {
+            books: None,
             inside_of,
             outside_of,
         }
+    }
+
+    /// Only keep matches in these books
+    pub fn books(&mut self, books: BTreeSet<BookId>) {
+        self.books = Some(books);
     }
 
     pub fn inside(&mut self, psg: Passage) {
@@ -23,6 +34,10 @@ impl ComplexFilter {
     }
 
     pub fn keep(&self, psg: &Passage) -> bool {
+        if self.books.as_ref().is_some_and(|b| !b.contains(&psg.book)) {
+            return false;
+        }
+
         let is_inside = self.inside_of.is_empty()
             || self
                 .inside_of

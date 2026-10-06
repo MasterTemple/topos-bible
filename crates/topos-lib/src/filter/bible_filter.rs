@@ -1,11 +1,9 @@
 use std::collections::BTreeSet;
 
-use itertools::Itertools;
-use regex::Regex;
-
 use crate::{
     data::{bible_data::BibleData, books::BookId},
     matcher::{bible_matcher::BibleMatcher, matches::ComplexFilter},
+    segments::Passage,
 };
 
 pub trait IsFilter {
@@ -48,7 +46,7 @@ pub struct BibleFilter {
 impl BibleFilter {
     pub fn new(data: BibleData) -> Self {
         // this should start full
-        let ids = (1..=66).map_into().collect();
+        let ids = data.books().ids().collect();
         let has_done_an_inclusion = false;
         let complex_filter = ComplexFilter::default();
         Self {
@@ -106,41 +104,30 @@ impl BibleFilter {
         &self.ids
     }
 
-    /**
-    The problem is that a RegEx isn't enough
-    I need to create/return a struct that contains that regex and the segment regex, so that
-    */
-    pub fn create_regex(&self) -> Result<Regex, String> {
-        let books_pattern: String = self
-            .data
+    /// Only keep matches that overlap this passage (`Err` if it cannot be parsed)
+    pub fn filter_inside(&mut self, passage: &str) -> Result<(), String> {
+        let psg = self.parse_passage(passage)?;
+        self.complex_filter.inside(psg);
+        Ok(())
+    }
+
+    /// Drop matches that overlap this passage (`Err` if it cannot be parsed)
+    pub fn filter_outside(&mut self, passage: &str) -> Result<(), String> {
+        let psg = self.parse_passage(passage)?;
+        self.complex_filter.outside(psg);
+        Ok(())
+    }
+
+    fn parse_passage(&self, passage: &str) -> Result<Passage, String> {
+        self.data
             .books()
-            .iter_keys_and_ids()
-            .filter_map(|(key, id)| self.ids.contains(id).then_some(key))
-            .join("|");
-
-        // let book_regex = Regex::new(format!(r"\b(((?:)(?i){books_pattern})[A-z]*)\.?").as_str())
-        // I am including a chapter number to reduce false positives on abbreviations
-        let book_regex = Regex::new(format!(r"\b(((?:)(?i){books_pattern})\.?)\s*\d").as_str())
-            .map_err(|e| format!("Failed to compile book_regex because of bad user input.\n{e}"))?;
-
-        Ok(book_regex)
+            .parse(passage)
+            .ok_or_else(|| format!("Could not parse the passage {passage:?}"))
     }
 
-    pub fn filter_inside(&mut self, passage: &str) {
-        if let Some(psg) = self.data.books().parse(passage) {
-            self.complex_filter.inside(psg);
-        }
-    }
-
-    pub fn filter_outside(&mut self, passage: &str) {
-        if let Some(psg) = self.data.books().parse(passage) {
-            self.complex_filter.outside(psg);
-        }
-    }
-
-    pub fn create_matcher(self) -> Result<BibleMatcher, String> {
-        let re = self.create_regex()?;
-        Ok(BibleMatcher::new(self.data, re, self.complex_filter))
+    pub fn create_matcher(mut self) -> BibleMatcher {
+        self.complex_filter.books(self.ids);
+        BibleMatcher::new(self.data, self.complex_filter)
     }
 }
 
@@ -150,21 +137,45 @@ impl Default for BibleFilter {
     }
 }
 
-// static DEFAULT_FILTER: Lazy<BibleFilter<'static>> = Lazy::new(|| BibleFilter::default());
-//
-// impl BibleFilter {
-//     pub fn base() -> &'static Self {
-//         &DEFAULT_FILTER
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
-    use crate::filter::bible_filter::BibleFilter;
+    use crate::{
+        filter::{bible_filter::BibleFilter, filters::book::BookFilter},
+        matcher::location::line_col::LineColLocation,
+    };
+
+    fn search(filter: BibleFilter, input: &str) -> Vec<String> {
+        let matcher = filter.create_matcher();
+        matcher
+            .search::<LineColLocation>(input)
+            .unwrap()
+            .into_iter()
+            .map(|m| {
+                let book = matcher.data().books().get_name(m.psg.book).unwrap();
+                format!("{book} {}", m.psg.segments)
+            })
+            .collect()
+    }
+
+    /// Issue #8: filtering for `John` used to match the `John` inside `1 John`
+    #[test]
+    fn book_filter_does_not_split_numbered_books() {
+        let mut filter = BibleFilter::default();
+        filter.include(BookFilter::new("John"));
+        assert_eq!(
+            search(filter, "1 John 2:1, John 3:16, 3 John 4"),
+            ["John 3:16"]
+        );
+    }
 
     #[test]
-    fn make_regex() {
-        let re = BibleFilter::default().create_regex().unwrap();
-        println!(r#"rg "{}""#, re.as_str());
+    fn inside_filter() {
+        let mut filter = BibleFilter::default();
+        filter.filter_inside("Romans 8").unwrap();
+        assert!(filter.filter_inside("not a passage").is_err());
+        assert_eq!(
+            search(filter, "Romans 8:28, Romans 9:1, John 8:1"),
+            ["Romans 8:28"]
+        );
     }
 }
