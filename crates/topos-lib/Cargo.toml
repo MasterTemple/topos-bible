@@ -6,12 +6,10 @@ edition = "2024"
 [dependencies]
 derive_more = { version = "2.0.1", features = ["deref", "deref_mut", "from", "into_iterator"] }
 line-col = "0.2.1"
-constcat = "0.6.1"
 
 # topos-parser = { path = "../topos-parser"}
 # chumsky = "0.10.1"
 chumsky = "0.12.0"
-from_nested_tuple = "0.1.2"
 
 # workspace dependencies
 once_cell = { workspace = true }
@@ -29,7 +27,7 @@ epub = "2.1.5"
 roxmltree = "0.21.1"
 
 [features]
-default = ["pdf"]
+default = []
 pdf = ["dep:mupdf"]
 
 

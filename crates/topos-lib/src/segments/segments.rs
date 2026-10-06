@@ -4,13 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     data::books::BookId,
     segments::{
-        parser::{
-            minimal::MinimalSegments,
-            verbose::{
-                VerboseFullSegment, VerboseSegments,
-                components::{DelimitedNumber, FrontPadded},
-            },
-        },
+        grammar::{SegmentList, SegmentNode},
         segment::{ChapterlessFormat, Segment},
         verse_bounds::VerseBounds,
     },
@@ -105,8 +99,10 @@ impl Segments {
 }
 
 impl Segments {
+    /// Parses as many segments as possible from the start of the input, ignoring the rest
     pub fn parse(segment_window: &str) -> Option<Self> {
-        MinimalSegments::parse(segment_window).map(Segments::from)
+        let list = SegmentList::parse(segment_window);
+        (!list.is_empty()).then(|| Segments::from(&list))
     }
 }
 
@@ -124,62 +120,52 @@ impl std::fmt::Display for Segments {
     }
 }
 
-impl From<MinimalSegments> for Segments {
-    fn from(value: MinimalSegments) -> Self {
+impl From<&SegmentList> for Segments {
+    fn from(list: &SegmentList) -> Self {
+        Segments::from_nodes(&list.nodes)
+    }
+}
+
+impl Segments {
+    /**
+    Resolves parsed nodes into chapters and verses
+    - Dangling parts (the `:` in `1:`) are ignored
+    - A number without an explicit chapter belongs to the chapter the previous segment ended in
+    */
+    pub fn from_nodes(nodes: &[SegmentNode]) -> Self {
         let mut segments = Segments::new();
-        for seg in value.segments {
-            let new = if let Some(start_verse) = seg.explicit_start_verse {
-                let start_chapter = seg.start;
-                if let Some(end) = seg.end {
-                    // `1:2-3:4`
-                    if let Some(end_verse) = end.1 {
-                        let end_chapter = end.0;
-                        Segment::chapter_range(start_chapter, start_verse, end_chapter, end_verse)
-                    }
-                    // `1:2-3`
-                    else {
-                        let end_verse = end.0;
-                        Segment::chapter_verse_range(start_chapter, start_verse, end_verse)
-                    }
+        for node in nodes {
+            let start = node.start.value;
+            let prev_chapter = segments.last().map(|prev| prev.ending_chapter());
+            let new = match (node.start_verse_value(), node.end_value()) {
+                // `1:2-3:4`
+                (Some(start_verse), Some((end_chapter, Some(end_verse)))) => {
+                    Segment::chapter_range(start, start_verse, end_chapter, end_verse)
+                }
+                // `1:2-3`
+                (Some(start_verse), Some((end_verse, None))) => {
+                    Segment::chapter_verse_range(start, start_verse, end_verse)
+                }
                 // `1:2`
-                } else {
-                    Segment::chapter_verse(start_chapter, start_verse)
-                }
-            } else {
-                if let Some(end) = seg.end {
-                    // `1:2-3:4`
-                    if let Some(end_verse) = end.1 {
-                        let start_chapter = seg.start;
-                        let end_chapter = end.0;
-                        Segment::chapter_range(start_chapter, 1, end_chapter, end_verse)
-                    } else {
-                        // `3:4-5`
-                        if let Some(prev) = segments.last() {
-                            let start_verse = seg.start;
-                            let end_verse = end.0;
-                            Segment::chapter_verse_range(
-                                prev.ending_chapter(),
-                                start_verse,
-                                end_verse,
-                            )
-                        }
-                        // `1-25`
-                        else {
-                            let start_chapter = seg.start;
-                            let end_chapter = end.0;
-                            Segment::full_chapter_range(start_chapter, end_chapter)
-                        }
-                    }
-                } else {
-                    // `1:1`
-                    if let Some(prev) = segments.last() {
-                        Segment::chapter_verse(prev.ending_chapter(), seg.start)
-                    }
+                (Some(start_verse), None) => Segment::chapter_verse(start, start_verse),
+                (None, Some((end_chapter, Some(end_verse)))) => match prev_chapter {
+                    // `5:7, 12-6:6` (verse 12 of chapter 5 to 6:6)
+                    Some(chapter) => Segment::chapter_range(chapter, start, end_chapter, end_verse),
+                    // `1-2:3`
+                    None => Segment::chapter_range(start, 1, end_chapter, end_verse),
+                },
+                (None, Some((end, None))) => match prev_chapter {
+                    // `3:1, 4-5`
+                    Some(chapter) => Segment::chapter_verse_range(chapter, start, end),
+                    // `1-25`
+                    None => Segment::full_chapter_range(start, end),
+                },
+                (None, None) => match prev_chapter {
+                    // `1:1, 3`
+                    Some(chapter) => Segment::chapter_verse(chapter, start),
                     // `1`
-                    else {
-                        Segment::full_chapter(seg.start)
-                    }
-                }
+                    None => Segment::full_chapter(start),
+                },
             };
             segments.push(new);
         }
@@ -187,76 +173,49 @@ impl From<MinimalSegments> for Segments {
     }
 }
 
-// impl From<VerboseSegments> for Segments {
-//     fn from(value: VerboseSegments) -> Self {
-//         let mut segments = Segments::new();
-//         for seg in value.segments {
-//             let VerboseFullSegment {
-//                 start,
-//                 explicit_start_verse,
-//                 end,
-//                 closing,
-//             } = seg.clone();
-//
-//             let new = if let Some(start_verse) =
-//                 explicit_start_verse.as_ref().map(FrontPadded::parsed_value)
-//             {
-//                 // let start_verse = value.parsed();
-//                 let start_chapter = start.parsed();
-//                 if let Some(end) = end {
-//                     // `1:2-3:4`
-//                     if let Some(end_verse) = end.1.as_ref().map(FrontPadded::parsed_value) {
-//                         let end_chapter = end.0.parsed_value();
-//                         Segment::chapter_range(start_chapter, start_verse, end_chapter, end_verse)
-//                     }
-//                     // `1:2-3`
-//                     else {
-//                         let end_verse = end.0.parsed_value();
-//                         Segment::chapter_verse_range(start_chapter, start_verse, end_verse)
-//                     }
-//                 // `1:2`
-//                 } else {
-//                     Segment::chapter_verse(start_chapter, start_verse)
-//                 }
-//             } else {
-//                 todo!()
-//                 // if let Some(end) = seg.end {
-//                 //     // `1:2-3:4`
-//                 //     if let Some(end_verse) = end.1 {
-//                 //         let start_chapter = seg.start;
-//                 //         let end_chapter = end.0;
-//                 //         Segment::chapter_range(start_chapter, 1, end_chapter, end_verse)
-//                 //     } else {
-//                 //         // `3:4-5`
-//                 //         if let Some(prev) = segments.last() {
-//                 //             let start_verse = seg.start;
-//                 //             let end_verse = end.0;
-//                 //             Segment::chapter_verse_range(
-//                 //                 prev.ending_chapter(),
-//                 //                 start_verse,
-//                 //                 end_verse,
-//                 //             )
-//                 //         }
-//                 //         // `1-25`
-//                 //         else {
-//                 //             let start_chapter = seg.start;
-//                 //             let end_chapter = end.0;
-//                 //             Segment::full_chapter_range(start_chapter, end_chapter)
-//                 //         }
-//                 //     }
-//                 // } else {
-//                 //     // `1:1`
-//                 //     if let Some(prev) = segments.last() {
-//                 //         Segment::chapter_verse(prev.ending_chapter(), seg.start)
-//                 //     }
-//                 //     // `1`
-//                 //     else {
-//                 //         Segment::full_chapter(seg.start)
-//                 //     }
-//                 // }
-//             };
-//             segments.push(new);
-//         }
-//         segments
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(input: &str) -> Vec<Segment> {
+        Segments::parse(input).unwrap().0
+    }
+
+    #[test]
+    fn resolves_each_kind() {
+        assert_eq!(parse("1:2"), [Segment::chapter_verse(1, 2)]);
+        assert_eq!(parse("1.2"), [Segment::chapter_verse(1, 2)]);
+        assert_eq!(parse("1:2-3"), [Segment::chapter_verse_range(1, 2, 3)]);
+        assert_eq!(parse("1:2-3:4"), [Segment::chapter_range(1, 2, 3, 4)]);
+        assert_eq!(parse("1"), [Segment::full_chapter(1)]);
+        assert_eq!(parse("1-2"), [Segment::full_chapter_range(1, 2)]);
+        assert_eq!(parse("i:ii"), [Segment::chapter_verse(1, 2)]);
+    }
+
+    #[test]
+    fn ignores_dangling_parts() {
+        assert_eq!(parse("3:"), [Segment::full_chapter(3)]);
+        assert_eq!(parse("1:1-"), [Segment::chapter_verse(1, 1)]);
+        assert_eq!(parse("1:1, "), [Segment::chapter_verse(1, 1)]);
+    }
+
+    #[test]
+    fn combined() {
+        assert_eq!(
+            parse("5:1-3,5,7-9,12-6:6,7:7-8:8"),
+            [
+                Segment::chapter_verse_range(5, 1, 3),
+                Segment::chapter_verse(5, 5),
+                Segment::chapter_verse_range(5, 7, 9),
+                Segment::chapter_range(5, 12, 6, 6),
+                Segment::chapter_range(7, 7, 8, 8),
+            ]
+        );
+    }
+
+    #[test]
+    fn nothing_to_parse() {
+        assert!(Segments::parse("").is_none());
+        assert!(Segments::parse("and then").is_none());
+    }
+}

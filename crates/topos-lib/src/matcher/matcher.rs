@@ -10,12 +10,15 @@ use crate::{
         instance::BibleMatch,
         location::{
             epub::EPUBMatchError, html::HTMLMatchError, line_col::LineColLocation,
-            pdf::PDFMatchError, srt::SRTMatchError,
+            srt::SRTMatchError,
         },
         matches::{ComplexFilter, FilteredBibleMatches},
     },
     segments::autocomplete::input::InputAutoCompleter,
 };
+
+#[cfg(feature = "pdf")]
+use crate::matcher::location::pdf::PDFMatchError;
 
 #[derive(Clone, Debug)]
 pub struct BibleMatcher {
@@ -59,6 +62,7 @@ pub enum MatchError {
     SRT(#[from] SRTMatchError),
     #[error("HTML: {0}")]
     HTML(#[from] HTMLMatchError),
+    #[cfg(feature = "pdf")]
     #[error("PDF: {0}")]
     PDF(#[from] PDFMatchError),
     #[error("{0}")]

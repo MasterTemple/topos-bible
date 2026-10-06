@@ -5,7 +5,7 @@ use crate::{
     data::{books::BookId, data::BibleData},
     matcher::location::line_col::LineColLocation,
     segments::{
-        parser::minimal::MinimalSegments,
+        grammar::SegmentList,
         segments::{Passage, Segments},
     },
 };
@@ -103,26 +103,15 @@ impl BibleMatch {
     ) -> Option<Self> {
         let book_id = data.books().search(cur.as_str())?;
 
-        let mut segment_window = if let Some(next_start) = next_start {
-            &input[cur.end()..next_start]
-        } else {
-            &input[cur.end()..]
+        let segment_window = match next_start {
+            Some(next_start) => &input[cur.end()..next_start],
+            None => &input[cur.end()..],
         };
 
-        // This adds an off-by-one error!!
-        // if segment_window.starts_with('.') {
-        //     segment_window = &segment_window[1..];
-        // }
-
-        let segment_input = MinimalSegments::parse(segment_window)?;
-        // eprintln!("{} vs {}", old_segment_input.len(), segment_input.len());
-
-        let start = cur.start();
-        let end = cur.end() + segment_input.len();
-        let location = LineColLocation::new(&lookup, start, end);
-
-        // let segments = Segments::parse(segment_input)?;
-        let segments = Segments::from(segment_input);
+        let list = SegmentList::parse(segment_window);
+        let end = cur.end() + list.complete_end()?;
+        let location = LineColLocation::new(lookup, cur.start(), end);
+        let segments = Segments::from(&list);
 
         Some(BibleMatch::new(location, book_id, segments))
     }

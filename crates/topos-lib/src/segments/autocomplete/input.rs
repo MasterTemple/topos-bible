@@ -1,15 +1,11 @@
-use constcat::concat;
-use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::{
-    data::chapter_verses::BookChapterVerses,
-    matcher::{instance::BibleMatch, matcher::BibleMatcher},
+    matcher::matcher::BibleMatcher,
     segments::{
-        autocomplete::{
-            full::parse_full_segments, incomplete::IncompleteSegment, output::CompletionOutput,
-        },
-        segments::{Passage, Segments},
+        autocomplete::{incomplete::IncompleteSegment, output::CompletionOutput},
+        grammar::SegmentList,
+        segments::Segments,
     },
 };
 
@@ -34,11 +30,16 @@ impl<'a> InputAutoCompleter<'a> {
         let book_match = cap.get(1).unwrap();
         let book_id = self.matcher.data().books().search(book_match.as_str())?;
 
+        // Same grammar as search: the last segment is the one still being typed
         let segments_input = &input[book_match.end()..];
-        let (mat, full_segments) = parse_full_segments(segments_input)?;
-
-        let incomplete_segments_input = &segments_input[mat.end()..];
-        let incomplete_segment = IncompleteSegment::new(incomplete_segments_input)?;
+        let list = SegmentList::parse(segments_input);
+        if !segments_input[list.end()..].trim().is_empty() {
+            // The cursor is not inside a reference
+            return None;
+        }
+        let (complete, incomplete) = list.split_incomplete();
+        let full_segments = Segments::from_nodes(complete);
+        let incomplete_segment = IncompleteSegment::from_node(incomplete)?;
 
         let chapter_verses = self
             .matcher
@@ -152,6 +153,45 @@ mod tests {
     //     }
     //     // completer.complete(&format!("Genesis 1:1-2,3:"));
     // }
+    /// Each suggestion as the full reference it would complete to
+    fn suggestions(input: &str) -> Option<Vec<String>> {
+        let matcher = BibleMatcher::default();
+        let result = matcher.completer().suggest(input)?;
+        Some(
+            result
+                .suggestions
+                .into_iter()
+                .map(|sug| result.segments.with_suggestion(sug).to_string())
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn suggests_from_the_shared_grammar() {
+        // Nothing typed yet: every chapter of Genesis
+        assert_eq!(suggestions("Genesis ").unwrap().len(), 50);
+        // `1:` suggests the 31 verses of chapter 1
+        let verses = suggestions("Gen. 1:").unwrap();
+        assert_eq!(verses.len(), 31);
+        assert_eq!(verses[0], "1:1");
+        // `1:1-` suggests verse ends, then chapter ends
+        let ranges = suggestions("Genesis 1:1-").unwrap();
+        assert_eq!(ranges[0], "1:1-2");
+        assert!(ranges.contains(&String::from("1:1-2:1")));
+        // Complete segments before the cursor are kept
+        let next = suggestions("Genesis 1:1, ").unwrap();
+        assert_eq!(next[0], "1:1,2");
+        // Same lexer as search, so Roman numerals and other dashes work here too
+        assert_eq!(suggestions("Genesis i:").unwrap().len(), 31);
+        assert_eq!(suggestions("Genesis 1:1–").unwrap()[0], "1:1-2");
+    }
+
+    #[test]
+    fn no_suggestions_outside_a_reference() {
+        assert!(suggestions("Genesis 1:1 and then").is_none());
+        assert!(suggestions("no book here").is_none());
+    }
+
     #[test]
     fn test_suggest() {
         let matcher = BibleMatcher::default();

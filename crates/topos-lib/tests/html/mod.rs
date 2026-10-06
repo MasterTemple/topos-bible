@@ -18,11 +18,9 @@ goToTextFragment("#:~:text=Rom.%2016:23")
 ```
 */
 #[test]
+#[ignore = "htmloc fragment generation takes minutes on this 3 MB fixture; run with --ignored"]
 fn tdp_html() -> AnyResult<()> {
-    // let html = include_str!("./The Dorean Principle.html");
-    let html = include_str!(
-        "/home/dgmastertemple/Downloads/tdp/The Dorean Principle - A Biblical Response to the Commercialization of Christianity.html"
-    );
+    let html = include_str!("./The Dorean Principle.html");
     let matcher = BibleMatcher::default();
     let results = matcher.search::<HTMLLocation>(html)?;
     dbg!(results);

@@ -33,7 +33,7 @@ impl BibleData {
             .map(|(key, id)| (key))
             .join("|");
 
-        let book_regex = Regex::new(format!(r"\b(((?:)(?i){books_pattern}))\b\.?").as_str())
+        let book_regex = Regex::new(format!(r"\b(((?:)(?i){books_pattern})\b\.?)").as_str())
             .map_err(|e| format!("Failed to compile book_regex because of bad user input.\n{e}"))?;
 
         Ok(book_regex)

@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use topos_lib::matcher::matcher::BibleMatcher;
+use topos_lib::matcher::{location::line_col::LineColLocation, matcher::BibleMatcher};
 
 /// Formats the sum of two numbers as string.
 #[pyfunction]
@@ -10,7 +10,7 @@ fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
 #[pyfunction]
 fn search(input: &str) -> PyResult<String> {
     let m = BibleMatcher::default();
-    let result = m.search(input);
+    let result = m.search::<LineColLocation>(input).unwrap_or_default();
     Ok(result
         .iter()
         .map(|r| {

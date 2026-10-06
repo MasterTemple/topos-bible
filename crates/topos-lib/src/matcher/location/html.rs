@@ -34,6 +34,10 @@ impl Into<Selection> for LineColLocation {
                 line: self.end.line,
                 column: self.end.column,
             },
+            bytes: htmloc::ByteIndex {
+                start: self.bytes.start,
+                end: self.bytes.end,
+            },
         }
     }
 }

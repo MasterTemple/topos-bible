@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use topos_lib::matcher::matcher::BibleMatcher;
+use topos_lib::matcher::{location::line_col::LineColLocation, matcher::BibleMatcher};
 use wasm_bindgen::prelude::*;
 
 static BIBLE: Lazy<BibleMatcher> = Lazy::new(|| BibleMatcher::default());
@@ -7,7 +7,8 @@ static BIBLE: Lazy<BibleMatcher> = Lazy::new(|| BibleMatcher::default());
 #[wasm_bindgen]
 pub fn search(input: &str) -> Vec<String> {
     let m = &*BIBLE;
-    m.search(input)
+    m.search::<LineColLocation>(input)
+        .unwrap_or_default()
         .iter()
         .map(|r| {
             let name = m.data().books().get_name(r.psg.book).unwrap();

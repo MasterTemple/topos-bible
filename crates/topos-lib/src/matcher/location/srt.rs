@@ -5,7 +5,6 @@ use chumsky::{
     prelude::*,
     text::{Char, digits, inline_whitespace, newline},
 };
-use from_nested_tuple::FromTuple;
 
 use crate::matcher::{
     location::{html::HTMLLocation, line_col::LineColLocation},
@@ -13,7 +12,7 @@ use crate::matcher::{
 };
 
 // TODO: Make this more general
-#[derive(Clone, Copy, Debug, FromTuple)]
+#[derive(Clone, Copy, Debug)]
 pub struct SRTLocation {
     id: u32,
     // TODO: Make this f32
@@ -21,12 +20,12 @@ pub struct SRTLocation {
     end: SRTTimeStamp,
 }
 
-#[derive(Clone, Debug, FromTuple)]
+#[derive(Clone, Debug)]
 pub struct SRTDocument<'a> {
     segments: Vec<Spanned<SRTSegment<'a>>>,
 }
 
-#[derive(Clone, Debug, FromTuple)]
+#[derive(Clone, Debug)]
 pub struct SRTSegment<'a> {
     id: u32,
     start: SRTTimeStamp,
@@ -34,7 +33,7 @@ pub struct SRTSegment<'a> {
     text: &'a str,
 }
 
-#[derive(Clone, Copy, Debug, FromTuple)]
+#[derive(Clone, Copy, Debug)]
 pub struct SRTTimeStamp {
     pub hours: u32,
     pub minutes: u32,
@@ -69,7 +68,12 @@ impl SRTTimeStamp {
             .then(num())
             .then_ignore(comma())
             .then(num())
-            .from_tuple()
+            .map(|(((hours, minutes), seconds), millis)| Self {
+                hours,
+                minutes,
+                seconds,
+                millis,
+            })
     }
 }
 
@@ -89,7 +93,12 @@ impl<'a> SRTSegment<'a> {
                     .to_slice(),
             )
             .then_ignore(newline())
-            .from_tuple()
+            .map(|(((id, start), end), text)| Self {
+                id,
+                start,
+                end,
+                text,
+            })
     }
 }
 
@@ -101,7 +110,7 @@ impl<'a> SRTDocument<'a> {
             .spanned()
             .repeated()
             .collect()
-            .from_tuple()
+            .map(|segments| Self { segments })
     }
 
     pub fn find_containing_segment(&self, byte: usize) -> Option<&Spanned<SRTSegment<'_>>> {
