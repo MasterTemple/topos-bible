@@ -1,6 +1,6 @@
 use std::{process::ExitCode, sync::Arc};
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 
 use crate::{
     args::Args,
@@ -11,13 +11,27 @@ use crate::{
 
 mod args;
 mod cache;
+mod complete;
 mod config;
 mod output;
+mod queries;
 mod search;
 
 /// Like ripgrep: 0 when something matched, 1 when nothing did, 2 on errors
 fn main() -> ExitCode {
-    let argv = match config::with_defaults(std::env::args_os().collect()) {
+    // `COMPLETE=bash topos` prints the registration script; see complete::write_bash_registration
+    if std::env::var_os("COMPLETE").is_some_and(|shell| shell == "bash")
+        && std::env::args_os().len() == 1
+    {
+        return match complete::write_bash_registration(&mut std::io::stdout()) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(_) => ExitCode::FAILURE,
+        };
+    }
+    // Answers the shell when Tab is pressed (COMPLETE=<shell> is set), then exits
+    clap_complete::CompleteEnv::with_factory(Args::command).complete();
+    let argv = match config::with_defaults(std::env::args_os().collect()).and_then(queries::expand)
+    {
         Ok(argv) => argv,
         Err(err) => {
             eprintln!("topos: {err}");
@@ -25,6 +39,22 @@ fn main() -> ExitCode {
         }
     };
     let mut args = Args::parse_from(argv);
+    if args.list_queries {
+        return match queries::load() {
+            Ok(queries) => {
+                for (name, query) in queries {
+                    let query =
+                        shlex::try_join(query.iter().map(String::as_str)).unwrap_or_default();
+                    println!("{name}\t{query}");
+                }
+                ExitCode::SUCCESS
+            }
+            Err(err) => {
+                eprintln!("topos: {err}");
+                ExitCode::from(2)
+            }
+        };
+    }
     let matcher = match args.matcher() {
         Ok(matcher) => matcher,
         Err(err) => {
@@ -49,6 +79,12 @@ fn main() -> ExitCode {
             .then(|| Cache::open(&args.fingerprint()))
             .flatten(),
         needs_text: before + after > 0 || printer.needs_text(),
+        extensions: args
+            .extensions
+            .iter()
+            .map(|ext| ext.trim().trim_start_matches('.').to_ascii_lowercase())
+            .filter(|ext| !ext.is_empty())
+            .collect(),
     });
     let results = search(searcher.clone(), input);
     let mut files: Vec<_> = vec![];

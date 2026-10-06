@@ -21,6 +21,8 @@ topos-lib = { path = "../topos-lib" }
 serde = { workspace = true }
 toml = "1.1"
 serde_json = { workspace = true }
+shlex = "1"
+clap_complete = { version = "4.6.11", features = ["unstable-dynamic"] }
 
 [features]
 # Search PDFs (builds MuPDF)

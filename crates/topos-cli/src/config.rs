@@ -1,5 +1,6 @@
 //! Default options from `~/.config/topos/config.toml` (or `--config PATH`), added before the
-//! command line's.
+//! command line's. On first use (without `--config` or `--no-config`), a commented
+//! `config.toml` and a sample `queries.toml` are written there if they don't exist.
 //!
 //! Each key is a long option name and its value becomes that option's argument:
 //!
@@ -10,7 +11,11 @@
 //! data = "~/bible/custom.json"        # --data ~/bible/custom.json (`~/` is expanded)
 //! ```
 
-use std::{ffi::OsString, fs, path::PathBuf};
+use std::{
+    ffi::OsString,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use clap::CommandFactory;
 use toml::Value;
@@ -23,6 +28,39 @@ pub fn default_path() -> Option<PathBuf> {
         .map(PathBuf::from)
         .or_else(|| home().map(|home| home.join(".config")))?;
     Some(base.join("topos").join("config.toml"))
+}
+
+/// The commented config file and sample queries written on first use
+const DEFAULT_CONFIG: &str = include_str!("../defaults/config.toml");
+const DEFAULT_QUERIES: &str = include_str!("../defaults/queries.toml");
+
+/// Writes `config.toml` and `queries.toml` next to `config` when they don't exist, so every user
+/// has documented files to start from. Existing files are never touched, and failing to write
+/// (a read-only home, say) is not an error.
+fn create_defaults(config: &Path) {
+    let Some(dir) = config.parent() else { return };
+    let queries = crate::queries::default_path();
+    let missing: Vec<_> = [
+        (Some(config.to_path_buf()), DEFAULT_CONFIG),
+        (queries, DEFAULT_QUERIES),
+    ]
+    .into_iter()
+    .filter_map(|(path, text)| Some((path?, text)))
+    .filter(|(path, _)| !path.exists())
+    .collect();
+    if missing.is_empty() || fs::create_dir_all(dir).is_err() {
+        return;
+    }
+    for (path, text) in missing {
+        // create_new: never overwrite a file another process just wrote
+        if let Ok(mut file) = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            let _ = std::io::Write::write_all(&mut file, text.as_bytes());
+        }
+    }
 }
 
 fn home() -> Option<PathBuf> {
@@ -52,7 +90,10 @@ pub fn with_defaults(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
             return Err(format!("{}: config file not found", path.display()));
         }
         Some(path) => path,
-        None => match default_path().filter(|path| path.exists()) {
+        None => match default_path()
+            .inspect(|path| create_defaults(path))
+            .filter(|path| path.exists())
+        {
             Some(path) => path,
             None => return Ok(args),
         },

@@ -1,0 +1,6 @@
+# Named queries for `topos -q NAME` (list them with `topos --list-queries`).
+# Each is a string of options, like on the command line (an optional path first), or a list of
+# arguments. Options given after -q add to or override the query's. Queries can use other
+# queries with -q. The Obsidian plugin's saved searches use the same syntax.
+
+pauline = '--nt -g "Pauline Epistles"'

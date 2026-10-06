@@ -24,6 +24,7 @@ pip install topos-bible
 | [`topos-cli`](./crates/topos-cli/README.md) | `topos`, a ripgrep-style search tool |
 | [`topos-lsp`](./crates/topos-lsp/README.md) | A language server: completion, hover, and document symbols |
 | [`topos-ffi`](./crates/topos-ffi) | Bindings for TypeScript/WASM, Python, Swift, and Kotlin via [BoltFFI](https://boltffi.dev) |
+| [`obsidian`](./obsidian/README.md) | An Obsidian plugin: verse search with filters, autocomplete, and Literal Word links |
 
 See [ROADMAP.md](./ROADMAP.md) for what is planned and [doc/architecture.md](./doc/architecture.md) for how it fits together.
 

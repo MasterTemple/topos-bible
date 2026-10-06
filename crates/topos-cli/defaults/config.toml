@@ -1,0 +1,11 @@
+# Default options for topos. Each key is a long option name; the command line overrides them.
+# `--config PATH` reads another file instead, and `--no-config` skips this one.
+# Run `topos --help` for every option.
+
+# mode = "grouped"                   # how to print results: grouped, quickfix, json, count, ...
+# format = "abbreviation"            # how to write references: name, abbreviation, osis
+# context = 1                        # lines of context around each match
+# cache = true                       # reuse results for unchanged files
+# sort = true                        # print results sorted by path
+# exclude-book = ["Song of Solomon"] # always leave out these books
+# query = "pauline"                  # always apply a named query from queries.toml

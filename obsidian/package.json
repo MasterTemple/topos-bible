@@ -1,0 +1,28 @@
+{
+  "name": "obsidian-topos-bible",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Find, search, link, and autocomplete Bible references in Obsidian",
+  "license": "CC0-1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc --noEmit && node esbuild.config.mjs production",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "topos-bible": "file:../crates/topos-ffi/dist/wasm/pkg"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
+    "happy-dom": "^20.14.5",
+    "obsidian": "^1.13.1",
+    "typescript": "^6.0.3"
+  }
+}

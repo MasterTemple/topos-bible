@@ -99,6 +99,35 @@ fn json_lines() {
         (value["line"].as_u64(), value["column"].as_u64()),
         (Some(1), Some(3))
     );
+
+    // UTF-16 positions, book data, and segments (for editors and the Obsidian plugin).
+    // `é` and the spaces are 1 UTF-16 unit each, and `📖` is 2
+    let text = "é 📖 Jn 3:16-18; 5\nnext Rom 8:28";
+    let output = topos(&["--text", text, "-m", "json"], None);
+    let lines: Vec<serde_json::Value> = stdout(&output)
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(lines[0]["book_id"], 43);
+    assert_eq!(lines[0]["book"], "John");
+    assert_eq!(
+        (
+            lines[0]["start_utf16"].as_u64(),
+            lines[0]["end_utf16"].as_u64()
+        ),
+        (Some(5), Some(18))
+    );
+    assert_eq!(lines[0]["utf16_column"], 6);
+    assert_eq!(lines[0]["line_text"], "é 📖 Jn 3:16-18; 5");
+    assert_eq!(
+        lines[0]["segments"],
+        serde_json::json!([
+            { "tag": "Verses", "start": { "chapter": 3, "verse": 16 }, "end": { "chapter": 3, "verse": 18 } },
+            { "tag": "Chapters", "start": 5, "end": null },
+        ])
+    );
+    assert_eq!(lines[1]["start_utf16"], 24);
+    assert_eq!(lines[1]["line_text"], "next Rom 8:28");
 }
 
 #[test]
@@ -222,4 +251,216 @@ fn explicit_config_file() {
     assert_eq!(missing.status.code(), Some(2));
     let both = topos(&["--config", config, "--no-config", "--text", "x"], None);
     assert_eq!(both.status.code(), Some(2));
+}
+
+#[test]
+fn ext_limits_walked_files() {
+    let dir = scratch("ext");
+    std::fs::create_dir_all(dir.join("notes")).unwrap();
+    std::fs::write(dir.join("notes/a.md"), "John 3:16\n").unwrap();
+    std::fs::write(dir.join("notes/b.TXT"), "Romans 8:28\n").unwrap();
+    std::fs::write(dir.join("notes/c.html"), "<p>Genesis 1:1</p>\n").unwrap();
+    let run = |args: &[&str]| {
+        let mut args = args.to_vec();
+        args.extend(["--no-config", "-m", "quickfix", "--sort"]);
+        let output = Command::new(env!("CARGO_BIN_EXE_topos"))
+            .args(&args)
+            .current_dir(&dir)
+            .stdin(Stdio::null())
+            .output()
+            .unwrap();
+        let text = String::from_utf8(output.stdout).unwrap();
+        text.lines()
+            .map(|line| line.rsplit(": ").next().unwrap().to_string())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(run(&["."]), ["John 3:16", "Romans 8:28", "Genesis 1:1"]);
+    assert_eq!(
+        run(&[".", "--ext", "md,.txt"]),
+        ["John 3:16", "Romans 8:28"]
+    );
+    assert_eq!(
+        run(&[".", "--ext", "md", "--ext", "txt"]),
+        ["John 3:16", "Romans 8:28"]
+    );
+    // A file named on the command line is searched whatever its extension
+    assert_eq!(run(&["notes/c.html", "--ext", "md"]), ["Genesis 1:1"]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn testaments_narrow_genres() {
+    let text = "John 3:16, Romans 8:28, Genesis 1:1";
+    let nt = topos(
+        &[
+            "--text",
+            text,
+            "--nt",
+            "-g",
+            "Pauline Epistles",
+            "-m",
+            "quickfix",
+        ],
+        None,
+    );
+    assert_eq!(stdout(&nt), ":1:12: Romans 8:28\n");
+    let ot = topos(&["--text", text, "--ot", "-g", "Pauline Epistles"], None);
+    assert_eq!(ot.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&ot.stderr).contains("nothing can match"));
+
+    let passages = topos(&["--text", text, "-b", "Genesis", "-i", "Romans 8"], None);
+    assert_eq!(passages.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&passages.stderr)
+            .contains("Romans 8 is in books that aren't searched, so nothing can match")
+    );
+}
+
+#[test]
+fn named_queries() {
+    let home = scratch("queries");
+    std::fs::create_dir_all(home.join("topos")).unwrap();
+    std::fs::write(
+        home.join("topos/queries.toml"),
+        "paul = '--nt -g \"Pauline Epistles\"'\ngospels = ['-g', 'Gospels']\n",
+    )
+    .unwrap();
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_topos"))
+            .args(args)
+            .env("XDG_CONFIG_HOME", &home)
+            .stdin(Stdio::null())
+            .output()
+            .unwrap()
+    };
+    let text = "John 3:16, Romans 8:28, Genesis 1:1";
+    let paul = run(&[
+        "--text",
+        text,
+        "--no-config",
+        "-q",
+        "paul",
+        "-m",
+        "quickfix",
+    ]);
+    assert_eq!(stdout(&paul), ":1:12: Romans 8:28\n");
+    let gospels = run(&["--text", text, "-qgospels", "-m", "quickfix"]);
+    assert_eq!(stdout(&gospels), ":1:1: John 3:16\n");
+
+    let unknown = run(&["--text", text, "-q", "nope"]);
+    assert_eq!(unknown.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&unknown.stderr)
+            .contains("unknown query `nope` (queries: gospels, paul)")
+    );
+
+    let list = run(&["--list-queries"]);
+    assert_eq!(
+        stdout(&list),
+        "gospels\t-g Gospels\npaul\t--nt -g 'Pauline Epistles'\n"
+    );
+    let _ = std::fs::remove_dir_all(&home);
+}
+
+#[test]
+fn first_run_writes_default_files() {
+    let home = scratch("first-run");
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_topos"))
+            .args(args)
+            .env("XDG_CONFIG_HOME", &home)
+            .stdin(Stdio::null())
+            .output()
+            .unwrap()
+    };
+    // --no-config leaves the config folder alone
+    run(&["--text", "John 3:16", "--no-config"]);
+    assert!(!home.join("topos").exists());
+
+    let first = run(&[
+        "--text",
+        "John 3:16 and Romans 8:28",
+        "-q",
+        "pauline",
+        "-m",
+        "quickfix",
+    ]);
+    assert_eq!(stdout(&first), ":1:15: Romans 8:28\n");
+    let config = std::fs::read_to_string(home.join("topos/config.toml")).unwrap();
+    assert!(config.contains("# cache = true"), "{config}");
+    assert_eq!(
+        stdout(&run(&["--list-queries"])),
+        "pauline\t--nt -g 'Pauline Epistles'\n"
+    );
+
+    // Existing files are kept
+    std::fs::write(home.join("topos/queries.toml"), "mine = '-b John'\n").unwrap();
+    run(&["--text", "x"]);
+    assert_eq!(stdout(&run(&["--list-queries"])), "mine\t-b John\n");
+    let _ = std::fs::remove_dir_all(&home);
+}
+
+/// Asks topos for completions the way bash's registration does
+fn complete(words: &[&str], config_home: &std::path::Path) -> Vec<String> {
+    let output = Command::new(env!("CARGO_BIN_EXE_topos"))
+        .arg("--")
+        .args(words)
+        .env("COMPLETE", "bash")
+        .env("_CLAP_IFS", "\n")
+        .env("_CLAP_COMPLETE_INDEX", (words.len() - 1).to_string())
+        .env("_CLAP_COMPLETE_COMP_TYPE", "9")
+        .env("_CLAP_COMPLETE_SPACE", "true")
+        .env("XDG_CONFIG_HOME", config_home)
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    String::from_utf8(output.stdout)
+        .unwrap()
+        .lines()
+        .map(str::to_string)
+        .collect()
+}
+
+#[test]
+fn shell_completions() {
+    let home = scratch("complete");
+    std::fs::create_dir_all(home.join("topos")).unwrap();
+    std::fs::write(home.join("topos/queries.toml"), "paul = '-g pauline'\n").unwrap();
+    let c = |words: &[&str]| complete(words, &home);
+
+    assert_eq!(
+        c(&["topos", "-m", ""]),
+        [
+            "auto",
+            "grouped",
+            "quickfix",
+            "table",
+            "json",
+            "count",
+            "total-count"
+        ]
+    );
+    assert_eq!(c(&["topos", "-b", "1 co"]), ["1 Corinthians"]);
+    // What bash passes for an unquoted word keeps its backslashes
+    assert_eq!(
+        c(&["topos", "--exclude-book", "song\\ of"]),
+        ["Song of Solomon"]
+    );
+    assert_eq!(c(&["topos", "-b", "jn"]), ["Jonah", "John"]);
+    assert!(c(&["topos", "-g", ""]).contains(&"Pauline Epistles".to_string()));
+    assert_eq!(c(&["topos", "-t", ""]), ["old", "new"]);
+    assert_eq!(c(&["topos", "-q", ""]), ["paul"]);
+    assert_eq!(c(&["topos", "-o", "Ps 119:"]).len(), 176);
+    assert_eq!(c(&["topos", "-i", "rom 8"]), ["Romans 8"]);
+    assert!(c(&["topos", "--ex"]).contains(&"--exclude-book".to_string()));
+
+    // The registration script lets readline quote candidates
+    let script = Command::new(env!("CARGO_BIN_EXE_topos"))
+        .env("COMPLETE", "bash")
+        .output()
+        .unwrap();
+    let script = String::from_utf8(script.stdout).unwrap();
+    assert!(script.contains("compopt -o filenames"), "{script}");
+    assert!(script.contains("complete -o nospace"), "{script}");
+    let _ = std::fs::remove_dir_all(&home);
 }

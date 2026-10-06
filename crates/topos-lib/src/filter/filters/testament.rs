@@ -21,6 +21,10 @@ impl TestamentFilter {
 }
 
 impl IsFilter for TestamentFilter {
+    fn narrows(&self) -> bool {
+        true
+    }
+
     fn get_ids(
         &self,
         _data: &crate::data::bible_data::BibleData,
@@ -73,13 +77,14 @@ mod tests {
         0
     );
 
+    // Exclusions win whatever the order
     mk_test!(
         exclude_include,
         [
             Operation::Exclude(TestamentFilter::New),
             Operation::Include(TestamentFilter::New),
         ],
-        27
+        0
     );
 
     mk_test!(

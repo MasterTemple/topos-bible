@@ -1,7 +1,10 @@
 use std::io::{self, IsTerminal, Write};
 
 use serde_json::json;
-use topos_lib::{data::bible_data::BibleData, segments::Passage};
+use topos_lib::{
+    data::bible_data::BibleData,
+    segments::{Passage, Segment, verse_bounds::VerseBounds},
+};
 
 use crate::{
     args::{Args, ColorChoice, OutputMode, ReferenceFormat},
@@ -101,21 +104,38 @@ impl Printer {
                 }
             }
             OutputMode::Json => {
+                // Hits are in order, so UTF-16 offsets are counted in one pass over the file
+                let mut utf16 = Utf16Offsets::default();
                 for hit in &file.hits {
                     let text = match (&file.text, &hit.bytes) {
                         (Some(text), Some(bytes)) => Some(&text[bytes.clone()]),
                         _ => None,
                     };
+                    let (start_utf16, end_utf16, line_text) = match (&file.text, &hit.bytes) {
+                        (Some(text), Some(bytes)) => (
+                            Some(utf16.at(text, bytes.start)),
+                            Some(utf16.at(text, bytes.end)),
+                            Some(line_at(text, bytes.start)),
+                        ),
+                        _ => (None, None, None),
+                    };
                     let value = json!({
                         "path": file.path,
                         "reference": self.reference(&hit.passage),
                         "osis": hit.passage.to_osis(self.data.books()),
+                        "book_id": hit.passage.book.0,
+                        "book": self.data.books().get_name(hit.passage.book),
+                        "segments": segments_json(&hit.passage),
                         "line": hit.position.map(|(s, _)| s.line),
                         "column": hit.position.map(|(s, _)| s.column),
+                        "utf16_column": hit.position.map(|(s, _)| s.utf16_column),
                         "end_line": hit.position.map(|(_, e)| e.line),
                         "end_column": hit.position.map(|(_, e)| e.column),
                         "start_byte": hit.bytes.as_ref().map(|b| b.start),
                         "end_byte": hit.bytes.as_ref().map(|b| b.end),
+                        "start_utf16": start_utf16,
+                        "end_utf16": end_utf16,
+                        "line_text": line_text,
                         "label": hit.label,
                         "text": text,
                     });
@@ -248,6 +268,63 @@ impl Printer {
             ));
         }
     }
+}
+
+/// Converts increasing byte offsets in one text to UTF-16 offsets, counting each byte once
+#[derive(Default)]
+struct Utf16Offsets {
+    byte: usize,
+    utf16: usize,
+}
+
+impl Utf16Offsets {
+    fn at(&mut self, text: &str, byte: usize) -> usize {
+        if byte < self.byte {
+            *self = Self::default();
+        }
+        self.utf16 += text[self.byte..byte].encode_utf16().count();
+        self.byte = byte;
+        self.utf16
+    }
+}
+
+/// The line that contains a byte offset, without its line break
+fn line_at(text: &str, byte: usize) -> &str {
+    let start = text[..byte].rfind('\n').map_or(0, |i| i + 1);
+    let end = text[byte..].find('\n').map_or(text.len(), |i| byte + i);
+    text[start..end].trim_end_matches('\r')
+}
+
+/// Segments as written, in the same shape as the bindings' `PassageSegment`
+fn segments_json(passage: &Passage) -> Vec<serde_json::Value> {
+    passage
+        .segments
+        .iter()
+        .map(|seg| {
+            let cv = |chapter: u8, verse: u8| json!({ "chapter": chapter, "verse": verse });
+            let (sc, sv, ec) = (
+                seg.starting_chapter(),
+                seg.starting_verse(),
+                seg.ending_chapter(),
+            );
+            match (seg, seg.ending_verse()) {
+                (Segment::ChapterVerse(_), _) => {
+                    json!({ "tag": "Verses", "start": cv(sc, sv), "end": null })
+                }
+                (Segment::FullChapter(_), _) => {
+                    json!({ "tag": "Chapters", "start": sc, "end": null })
+                }
+                (Segment::FullChapterRange(_), _) => {
+                    json!({ "tag": "Chapters", "start": sc, "end": ec })
+                }
+                (_, end_verse) => json!({
+                    "tag": "Verses",
+                    "start": cv(sc, sv),
+                    "end": cv(ec, end_verse.unwrap_or_default()),
+                }),
+            }
+        })
+        .collect()
 }
 
 /// Prints a line, exiting quietly if stdout is closed (like `topos | head`)

@@ -44,6 +44,27 @@ pub enum BookStyle {
     Osis,
 }
 
+/// A book in the data (for listing and filtering)
+#[data]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BookInfo {
+    /// 1 for Genesis through 66 for Revelation (with the default data)
+    pub id: u8,
+    pub name: String,
+    pub abbreviation: String,
+    pub osis: String,
+    /// How many chapters it has (`0` if the data has no verse counts for it)
+    pub chapters: u8,
+}
+
+/// A group of books, like `Gospels` or `Pauline Epistles`
+#[data]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GenreInfo {
+    pub name: String,
+    pub book_ids: Vec<u8>,
+}
+
 #[data]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ChapterVerse {
@@ -176,10 +197,58 @@ impl Topos {
     /// The first reference in `text`, read as one reference (`Jn 3:16` or `John.3.16`)
     pub fn parse(&self, reference: String, style: BookStyle) -> Option<Passage> {
         let books = self.matcher.data().books();
+        // OSIS first: as plain text, `John.3.16-John.3.18` would read as just John 3:16
         let passage = books
-            .parse(&reference)
-            .or_else(|| books.parse_osis(&reference).ok())?;
+            .parse_osis(&reference)
+            .ok()
+            .or_else(|| books.parse(&reference))?;
         self.passage(&passage, style.into())
+    }
+
+    /// Every book, in order
+    pub fn books(&self) -> Vec<BookInfo> {
+        let data = self.matcher.data();
+        let books = data.books();
+        books
+            .ids()
+            .map(|id| BookInfo {
+                id: id.0,
+                name: books.get_name(id).cloned().unwrap_or_default(),
+                abbreviation: books.get_abbrev(id).cloned().unwrap_or_default(),
+                osis: books.get_osis(id).cloned().unwrap_or_default(),
+                chapters: data
+                    .chapter_verses()
+                    .get_chapter_verses(&id)
+                    .map_or(0, |cv| cv.get_chapter_count()),
+            })
+            .collect()
+    }
+
+    /// Every genre (book group), in order
+    pub fn genres(&self) -> Vec<GenreInfo> {
+        self.matcher
+            .data()
+            .genres()
+            .iter()
+            .map(|genre| GenreInfo {
+                name: genre.name().to_string(),
+                book_ids: genre.books().iter().map(|id| id.0).collect(),
+            })
+            .collect()
+    }
+
+    /// The book with this name or abbreviation (`Jn`, `1 Cor`), ignoring case
+    pub fn find_book(&self, name: String) -> Option<u8> {
+        self.matcher.data().books().search(&name).map(|id| id.0)
+    }
+
+    /// The genre with this name or abbreviation (`gospels`, `pauline`), ignoring case
+    pub fn find_genre(&self, name: String) -> Option<GenreInfo> {
+        let genre = self.matcher.data().genres().get(&name)?;
+        Some(GenreInfo {
+            name: genre.name().to_string(),
+            book_ids: genre.books().iter().map(|id| id.0).collect(),
+        })
     }
 
     /// Each segment as an explicit verse range: whole chapters run from verse 1 to their last verse
@@ -515,6 +584,42 @@ mod tests {
         assert!(!topos.contains(parse("John 3:16"), parse("John 3:16-17")));
         assert!(topos.overlaps(parse("John 3:16-17"), parse("John 3:17-4:1")));
         assert!(!topos.overlaps(parse("John 3"), parse("Romans 3")));
+    }
+
+    #[test]
+    fn books_and_genres() {
+        let topos = Topos::new();
+        let books = topos.books();
+        assert_eq!(books.len(), 66);
+        assert_eq!(
+            books[42],
+            BookInfo {
+                id: 43,
+                name: "John".into(),
+                abbreviation: "Jn".into(),
+                osis: "John".into(),
+                chapters: 21
+            }
+        );
+        assert_eq!(topos.find_book("1 cor".into()), Some(46));
+        assert_eq!(topos.find_book("nope".into()), None);
+
+        let genres = topos.genres();
+        let gospels = genres.iter().find(|g| g.name == "Gospels").unwrap();
+        assert_eq!(gospels.book_ids, [40, 41, 42, 43]);
+        // Genres made of other genres include their books
+        let prophets = genres.iter().find(|g| g.name == "Prophets").unwrap();
+        assert_eq!(prophets.book_ids.len(), 17);
+        assert_eq!(topos.find_genre("gospels".into()).unwrap().name, "Gospels");
+    }
+
+    #[test]
+    fn parses_osis_ranges() {
+        let topos = Topos::new();
+        let range = topos.parse("John.3.16-John.3.18 John.4".into(), BookStyle::Name);
+        assert_eq!(range.unwrap().reference, "John 3:16-18; 4");
+        let plain = topos.parse("Jn 3:16-18".into(), BookStyle::Name);
+        assert_eq!(plain.unwrap().reference, "John 3:16-18");
     }
 
     #[test]

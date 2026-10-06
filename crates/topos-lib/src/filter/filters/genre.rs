@@ -88,13 +88,14 @@ mod tests {
         23
     );
 
+    // A testament narrows the genres to the books in it
     mk_test!(
         nt_and_gospels,
         [
             Operation::Include(TestamentFilter::New),
             Operation::Include(GenreFilter::new("gospels")),
         ],
-        27
+        4
     );
 
     mk_test!(

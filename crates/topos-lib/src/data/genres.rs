@@ -63,7 +63,7 @@ impl Genres {
                 BTreeSet::default()
             };
 
-            let genre = Genre::new(key.clone(), ids);
+            let genre = Genre::new(key.clone(), genre.title.clone(), ids);
 
             // use title as the genre key
             genres.insert(key.clone(), genre);
@@ -99,6 +99,11 @@ impl Genres {
     pub fn search<'a>(&'a self, input: &'_ str) -> Option<&'a GenreKey> {
         let key = Self::normalize_key(input);
         self.input_to_key.get(&key)
+    }
+
+    /// Every genre, in the order of the data
+    pub fn iter(&self) -> impl Iterator<Item = &Genre> {
+        self.genres.values()
     }
 
     pub fn get<'a>(&'a self, input: &'_ str) -> Option<&'a Genre> {
@@ -139,13 +144,24 @@ impl Default for Genres {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Genre {
-    title: GenreKey,
+    key: GenreKey,
+    /// The display name, like `Pauline Epistles`
+    name: String,
     books: BTreeSet<BookId>,
 }
 
 impl Genre {
-    pub fn new(key: GenreKey, books: BTreeSet<BookId>) -> Self {
-        Self { title: key, books }
+    pub fn new(key: GenreKey, name: String, books: BTreeSet<BookId>) -> Self {
+        Self { key, name, books }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Its books, including those of its subcategories
+    pub fn books(&self) -> &BTreeSet<BookId> {
+        &self.books
     }
 }
 

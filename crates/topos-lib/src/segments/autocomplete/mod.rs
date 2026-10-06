@@ -84,6 +84,8 @@ fn segment_completions(data: &BibleData, before: &str, format: &FormatOptions) -
     let Some(found) = segments::suggest_segments(data, before) else {
         return vec![];
     };
+    // The number being typed narrows the suggestions: `John 2` offers 2, 20, and 21
+    let typed = &before[before.trim_end_matches(|c: char| c.is_ascii_digit()).len()..];
     found
         .suggestions
         .into_iter()
@@ -93,6 +95,9 @@ fn segment_completions(data: &BibleData, before: &str, format: &FormatOptions) -
                 .with_suggestion(suggestion)
                 .with_book(found.book);
             let text = format.passage(&passage, data)?;
+            if !last_number(&text).starts_with(typed) {
+                return None;
+            }
             let kind = match suggestion {
                 Segment::FullChapter(_) | Segment::FullChapterRange(_) => CompletionKind::Chapter,
                 _ => CompletionKind::Verse,
@@ -108,6 +113,17 @@ fn segment_completions(data: &BibleData, before: &str, format: &FormatOptions) -
             })
         })
         .collect()
+}
+
+/// The last run of digits in `text` (`16` in `John 3:16`)
+fn last_number(text: &str) -> &str {
+    let end = text
+        .rfind(|c: char| c.is_ascii_digit())
+        .map_or(0, |i| i + 1);
+    let start = text[..end]
+        .rfind(|c: char| !c.is_ascii_digit())
+        .map_or(0, |i| i + 1);
+    &text[start..end]
 }
 
 /// The longest word suffix of `before` (up to 3 words) that starts some book name, and the books
@@ -203,6 +219,28 @@ mod tests {
         // Same lexer as search, so Roman numerals and other dashes work here too
         assert_eq!(labels("Genesis i:").len(), 31);
         assert_eq!(labels("Genesis 1:1–")[0], "Genesis 1:1-2");
+    }
+
+    #[test]
+    fn narrows_by_the_number_being_typed() {
+        // John has 21 chapters, and John 3 has 36 verses
+        assert_eq!(labels("John 2"), ["John 2", "John 20", "John 21"]);
+        assert_eq!(labels("John 3"), ["John 3"]);
+        assert_eq!(
+            labels("John 3:3"),
+            [
+                "John 3:3",
+                "John 3:30",
+                "John 3:31",
+                "John 3:32",
+                "John 3:33",
+                "John 3:34",
+                "John 3:35",
+                "John 3:36"
+            ]
+        );
+        assert_eq!(labels("John 3:1-2")[0], "John 3:1-2");
+        assert_eq!(labels("John 3:").len(), 36);
     }
 
     #[test]

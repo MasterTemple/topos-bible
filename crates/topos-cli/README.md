@@ -166,9 +166,13 @@ topos --exclude-testament new -m table
 
 ## Rules
 
-- Including a testament, genre, or book excludes everything else in that category
-- Exclusions are applied after all inclusions, so a book can be excluded from an included genre
-- Several inclusions are joined with a logical OR (`--nt -b Psalms` is the New Testament and Psalms)
+- Including a testament limits the search to it (`--nt -g Gospels` is the four Gospels)
+- Included genres and books add up (`-g Pentateuch -b Revelation` is six books)
+- Filters that can't match anything print a warning: genres or books outside the included
+  testaments (`--ot -g "Pauline Epistles"`), `-i`/`-o` passages only in books that aren't searched
+  (`-b Genesis -i "Romans 8"`), or only within `--outside` passages (`-i "John 3:16" --outside
+  "John 3"`)
+- Exclusions always win, so a book can be excluded from an included genre
 - `-m count` prints matches per file; `--total-count` prints one total across all files
 - `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches
 - Unknown books or genres are errors
@@ -176,6 +180,8 @@ topos --exclude-testament new -m table
 ## Config
 
 Default options go in `~/.config/topos/config.toml` (or `$XDG_CONFIG_HOME/topos/config.toml`).
+The first run writes a commented `config.toml` and a `queries.toml` with a sample query there if
+they don't exist (it never overwrites them, and doesn't touch the folder with `--no-config`).
 Each key is a long option name; the command line overrides them. Use `--config PATH` to read another file instead, or `--no-config` to read none.
 
 ```toml
@@ -185,6 +191,48 @@ cache = true
 exclude-book = ["Song of Solomon"]
 data = "~/bible/custom.json"   # custom books, genres, or chapter and verse counts
 ```
+
+## Named queries
+
+Name searches you repeat in `~/.config/topos/queries.toml` (next to `config.toml`), and use them
+with `-q NAME`:
+
+```toml
+paul = '--nt -g "Pauline Epistles"'
+sermons = 'Sermons -o "John 1" --exclude-book Philemon'
+gospels = ["-g", "Gospels"]   # or the arguments already split
+```
+
+```sh
+topos -q paul ~/notes          # topos --nt -g "Pauline Epistles" ~/notes
+topos -q sermons -m count      # options after -q add to (or override) the query's
+topos --list-queries
+```
+
+`-q` is replaced by the query's options where it appears, so queries can use other queries, and
+`config.toml` can set a default one (`query = "paul"`). The file is read even with `--no-config`.
+The Obsidian plugin's saved searches use the same syntax.
+
+## Shell completions
+
+Tab completes options and their values: modes and formats, book and genre names (`-b jn` offers
+Jonah and John; `-b "1 Co` gives `"1 Corinthians"`), testaments, your named queries, references
+for `-i`/`-o`/`--outside` (books, then chapters, verses, and range ends, like the editor plugins),
+and paths. `topos` computes them itself when Tab is pressed, so they always match the installed
+version and your `queries.toml`.
+
+```sh
+# bash: load on demand
+COMPLETE=bash topos > ~/.local/share/bash-completion/completions/topos
+# or in ~/.bashrc
+source <(COMPLETE=bash topos)
+
+# zsh (~/.zshrc), fish (~/.config/fish/config.fish), elvish, powershell
+source <(COMPLETE=zsh topos)
+COMPLETE=fish topos | source
+```
+
+Quote references (`-o "John 3:16"`): bash splits words at `:`.
 
 ## File types
 
@@ -197,9 +245,9 @@ data = "~/bible/custom.json"   # custom books, genres, or chapter and verse coun
 ```
 Find Bible references in files, directories, text, or stdin.
 
-- Including a testament, genre, or book excludes everything else in that category
-- Exclusions are applied after inclusions, so a book can be excluded from an included genre
-- Several inclusions of the same kind are joined with a logical OR
+- Including a testament limits the search to it: `--nt -g Gospels` is the four Gospels
+- Included genres and books add up: `-g Pentateuch -b Revelation` is six books
+- Exclusions always win, so a book can be excluded from an included genre
 - `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches
 
 Usage: topos [OPTIONS] [PATHS]...
@@ -253,6 +301,12 @@ Options:
 
       --data <DATA>
           A JSON file with custom books, genres, or chapter and verse counts
+
+  -q, --query <NAME>
+          Use a named query from ~/.config/topos/queries.toml (its options go where this is)
+
+      --list-queries
+          List the named queries and exit
 
       --config <PATH>
           Read default options from this file instead of ~/.config/topos/config.toml
@@ -311,6 +365,10 @@ Options:
 
       --cache
           Reuse results for files that have not changed since the last search with the same options
+
+      --ext <EXT>
+          Only search files with these extensions when walking directories (e.g. md,txt); files
+          named on the command line are always searched
 
   -h, --help
           Print help (see a summary with '-h')

@@ -1,6 +1,9 @@
 use std::{fs, path::PathBuf};
 
-use clap::{Parser, ValueEnum};
+use crate::complete;
+
+use clap::{Parser, ValueEnum, ValueHint};
+use clap_complete::engine::ArgValueCompleter;
 use topos_lib::{
     data::bible_data::{BibleData, BibleDataInput},
     error::AnyResult,
@@ -15,9 +18,9 @@ use topos_lib::{
 /**
 Find Bible references in files, directories, text, or stdin.
 
-- Including a testament, genre, or book excludes everything else in that category
-- Exclusions are applied after inclusions, so a book can be excluded from an included genre
-- Several inclusions of the same kind are joined with a logical OR
+- Including a testament limits the search to it: `--nt -g Gospels` is the four Gospels
+- Included genres and books add up: `-g Pentateuch -b Revelation` is six books
+- Exclusions always win, so a book can be excluded from an included genre
 - `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches
 */
 #[derive(Parser, Debug)]
@@ -32,6 +35,7 @@ Find Bible references in files, directories, text, or stdin.
 pub struct Args {
     /// Files or directories to search (respecting .gitignore); defaults to stdin when piped,
     /// otherwise the current directory
+    #[arg(value_hint = ValueHint::AnyPath)]
     pub paths: Vec<PathBuf>,
 
     /// Search this text instead of files
@@ -39,7 +43,7 @@ pub struct Args {
     pub text: Option<String>,
 
     /// Include books from a testament (old/new)
-    #[arg(long = "testament", short = 't')]
+    #[arg(long = "testament", short = 't', add = ArgValueCompleter::new(complete::testaments))]
     pub testaments: Vec<TestamentFilter>,
 
     /// Include the New Testament (same as `-t new`)
@@ -51,40 +55,40 @@ pub struct Args {
     pub ot: bool,
 
     /// Exclude books from a testament
-    #[arg(long = "exclude-testament")]
+    #[arg(long = "exclude-testament", add = ArgValueCompleter::new(complete::testaments))]
     pub exclude_testaments: Vec<TestamentFilter>,
 
     /// Include books of a genre (e.g. epistles, gospels)
-    #[arg(long = "genre", short = 'g')]
+    #[arg(long = "genre", short = 'g', add = ArgValueCompleter::new(complete::genres))]
     pub genres: Vec<String>,
 
     /// Exclude books of a genre
-    #[arg(long = "exclude-genre")]
+    #[arg(long = "exclude-genre", add = ArgValueCompleter::new(complete::genres))]
     pub exclude_genres: Vec<String>,
 
     /// Include a book (e.g. John)
-    #[arg(long = "book", short = 'b')]
+    #[arg(long = "book", short = 'b', add = ArgValueCompleter::new(complete::books))]
     pub books: Vec<String>,
 
     /// Exclude a book
-    #[arg(long = "exclude-book")]
+    #[arg(long = "exclude-book", add = ArgValueCompleter::new(complete::books))]
     pub exclude_books: Vec<String>,
 
     /// Only keep references entirely inside this passage (e.g. "John 1" keeps John 1:2-3)
-    #[arg(long = "inside", short = 'i')]
+    #[arg(long = "inside", short = 'i', add = ArgValueCompleter::new(complete::passages))]
     pub inside: Vec<String>,
 
     /// Only keep references that share any verse with this passage (e.g. "John 1" keeps
     /// John 1:51-2:1)
-    #[arg(long = "overlaps", short = 'o')]
+    #[arg(long = "overlaps", short = 'o', add = ArgValueCompleter::new(complete::passages))]
     pub overlaps: Vec<String>,
 
     /// Drop references that share any verse with this passage
-    #[arg(long = "outside")]
+    #[arg(long = "outside", add = ArgValueCompleter::new(complete::passages))]
     pub outside: Vec<String>,
 
     /// Treat the input as being about this book, so references like 3:16 match
-    #[arg(long)]
+    #[arg(long, add = ArgValueCompleter::new(complete::books))]
     pub context_book: Option<String>,
 
     /// Lines matching this pattern set the book for references after them, like '^#+ {book}$'
@@ -92,11 +96,19 @@ pub struct Args {
     pub context_heading: Option<String>,
 
     /// A JSON file with custom books, genres, or chapter and verse counts
-    #[arg(long)]
+    #[arg(long, value_hint = ValueHint::FilePath)]
     pub data: Option<PathBuf>,
 
+    /// Use a named query from ~/.config/topos/queries.toml (its options go where this is)
+    #[arg(long, short = 'q', value_name = "NAME", add = ArgValueCompleter::new(complete::queries))]
+    pub query: Vec<String>,
+
+    /// List the named queries and exit
+    #[arg(long)]
+    pub list_queries: bool,
+
     /// Read default options from this file instead of ~/.config/topos/config.toml
-    #[arg(long, value_name = "PATH", conflicts_with = "no_config")]
+    #[arg(long, value_name = "PATH", conflicts_with = "no_config", value_hint = ValueHint::FilePath)]
     pub config: Option<PathBuf>,
 
     /// Do not read default options from a config file
@@ -138,6 +150,11 @@ pub struct Args {
     /// Reuse results for files that have not changed since the last search with the same options
     #[arg(long)]
     pub cache: bool,
+
+    /// Only search files with these extensions when walking directories (e.g. md,txt); files
+    /// named on the command line are always searched
+    #[arg(long = "ext", value_name = "EXT", value_delimiter = ',')]
+    pub extensions: Vec<String>,
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, ValueEnum)]
@@ -257,6 +274,9 @@ impl Args {
             filter.filter_outside(passage)?;
         }
 
+        if let Some(reason) = filter.contradiction() {
+            eprintln!("topos: warning: {reason}, so nothing can match");
+        }
         let matcher = filter.create_matcher();
         let books = matcher.data().books();
         let context = match (&self.context_book, &self.context_heading) {

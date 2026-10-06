@@ -1,0 +1,322 @@
+/* References in the editor and reading view */
+.topos-reference {
+  text-decoration: underline dotted var(--text-accent);
+  text-underline-offset: 3px;
+}
+.cm-content .topos-reference[data-topos-url]:hover {
+  cursor: pointer;
+}
+
+/* Suggestions */
+.topos-suggestion {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--size-4-2);
+}
+.topos-suggestion-kind {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+.topos-hit-suggestion .topos-hit-location,
+.topos-hit-suggestion .topos-hit-context {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+/* Sidebar */
+.topos-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+  font-size: var(--font-ui-small);
+}
+.topos-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-1);
+}
+.topos-toolbar select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.topos-folder,
+.topos-input input {
+  width: 100%;
+}
+/* Looks like a control: flex hides the native disclosure triangle, so draw one */
+.topos-filters summary {
+  cursor: pointer;
+  font-weight: var(--font-semibold);
+  display: flex;
+  gap: var(--size-4-2);
+  align-items: center;
+  list-style: none;
+  padding: var(--size-4-1) var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+}
+.topos-filters summary::-webkit-details-marker {
+  display: none;
+}
+.topos-filters summary::before {
+  content: "▸";
+  color: var(--text-muted);
+  transition: transform 100ms ease-in-out;
+}
+.topos-filters[open] summary::before {
+  transform: rotate(90deg);
+}
+.topos-filters summary:hover {
+  background: var(--background-modifier-hover);
+}
+.topos-filters-title {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-1);
+  flex: 1;
+}
+.topos-badge {
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-normal);
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  border-radius: var(--radius-l);
+  padding: 0 var(--size-4-2);
+}
+.topos-filters-books {
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-normal);
+  color: var(--text-muted);
+}
+.topos-conflict {
+  margin-top: var(--size-4-2);
+  padding: var(--size-4-1) var(--size-4-2);
+  border-radius: var(--radius-s);
+  color: var(--text-warning);
+  background: rgba(var(--color-orange-rgb), 0.1);
+  font-size: var(--font-ui-small);
+}
+.topos-saved {
+  display: flex;
+  gap: var(--size-4-1);
+  margin-bottom: var(--size-4-2);
+}
+.topos-saved select,
+.topos-saved input {
+  flex: 1;
+  min-width: 0;
+}
+.topos-query {
+  display: flex;
+  gap: var(--size-4-2);
+  align-items: center;
+  margin-top: var(--size-4-2);
+}
+.topos-query code {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+.topos-copy {
+  font-size: var(--font-ui-smaller);
+  padding: 0 var(--size-4-2);
+  height: auto;
+}
+.topos-query-text {
+  display: block;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+}
+.topos-query-input {
+  width: 22em;
+  font-family: var(--font-monospace);
+}
+.topos-query-error {
+  color: var(--text-error);
+}
+.topos-clear {
+  font-size: var(--font-ui-smaller);
+  padding: 0 var(--size-4-2);
+  height: auto;
+}
+.topos-filter-row {
+  display: grid;
+  grid-template-columns: 6.5em 1fr;
+  gap: var(--size-4-2);
+  align-items: start;
+  margin-top: var(--size-4-2);
+}
+.topos-filter-row > label {
+  color: var(--text-muted);
+  padding-top: var(--size-4-1);
+}
+.topos-filter-values {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-1);
+  min-width: 0;
+}
+.topos-testaments {
+  display: flex;
+  gap: var(--size-4-1);
+}
+.topos-toggle.is-include,
+.topos-chip {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.topos-toggle.is-exclude,
+.topos-chip.is-exclude {
+  background-color: var(--background-modifier-error);
+  color: var(--text-on-accent);
+}
+.topos-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-1);
+}
+.topos-chips:empty {
+  display: none;
+}
+.topos-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-1);
+  border-radius: var(--radius-s);
+  padding: 0 0 0 var(--size-4-2);
+}
+.topos-chip button {
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  padding: 0 var(--size-4-1);
+  height: auto;
+}
+.topos-input {
+  position: relative;
+}
+.topos-input input.is-invalid {
+  border-color: var(--background-modifier-error);
+}
+.topos-dropdown {
+  position: absolute;
+  z-index: var(--layer-popover);
+  left: 0;
+  right: 0;
+  margin: 2px 0 0;
+  padding: var(--size-2-2);
+  list-style: none;
+  max-height: 16em;
+  overflow-y: auto;
+  background: var(--background-primary);
+  border: var(--border-width) solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-s);
+}
+.topos-dropdown li {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--size-2-2) var(--size-4-2);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+.topos-dropdown li.is-active,
+.topos-dropdown li:hover {
+  background: var(--background-modifier-hover);
+}
+.topos-errors {
+  color: var(--text-error);
+  margin: var(--size-4-2) 0 0;
+  padding-left: var(--size-4-4);
+}
+.topos-summary {
+  color: var(--text-muted);
+}
+.topos-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-1);
+  padding: var(--size-2-2) 0;
+  cursor: pointer;
+  font-weight: var(--font-semibold);
+}
+.topos-group-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topos-caret.is-collapsed {
+  transform: rotate(-90deg);
+}
+.topos-count {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+.topos-hit {
+  padding: var(--size-2-2) var(--size-4-2);
+  margin-left: var(--size-4-3);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+.topos-hit:hover {
+  background: var(--background-modifier-hover);
+}
+.topos-hit-head {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+}
+.topos-hit-reference {
+  font-weight: var(--font-medium);
+  color: var(--text-accent);
+}
+.topos-hit-location {
+  flex: 1;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+.topos-lw {
+  padding: 0 var(--size-4-1);
+  height: auto;
+  background: none;
+  box-shadow: none;
+}
+.topos-hit-context {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topos-hit-context mark {
+  background: var(--text-highlight-bg);
+  color: var(--text-normal);
+}
+.topos-more {
+  width: 100%;
+  margin-top: var(--size-4-2);
+}
+.topos-dropdown li.is-add {
+  font-weight: var(--font-semibold);
+  color: var(--text-accent);
+}
+.topos-chip {
+  user-select: none;
+}
+/* With context, lines wrap in full so they line up */
+.topos-context-line,
+.topos-hit.has-context .topos-hit-context {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.topos-context-line {
+  color: var(--text-faint);
+}
+.topos-crash pre {
+  white-space: pre-wrap;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-error);
+}
