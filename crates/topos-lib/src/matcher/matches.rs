@@ -7,20 +7,21 @@ use crate::{
 };
 
 /// Decides which matches to keep, after every book has been matched
-/// Decides which matches to keep, after every book has been matched
 #[derive(Clone, Debug, Default)]
 pub struct ComplexFilter {
     /// [`None`] keeps every book
     books: Option<BTreeSet<BookId>>,
     /// Keep matches entirely inside one of these
     inside_of: Vec<Passage>,
-    /// Keep matches that share a verse with one of these
-    overlapping: Vec<Passage>,
-    /// Drop matches that share a verse with any of these
-    outside_of: Vec<Passage>,
-    /// Matches overlap only through the verses they name, not whole chapters (`John 3` doesn't
-    /// overlap `John 3:16`, but `John 3:14-18` does), for `overlapping` and `outside_of`
-    explicit_overlap: bool,
+    /// Keep matches that share any verse with one of these
+    any_overlap: Vec<Passage>,
+    /// Keep matches that name a verse of one of these: whole chapters in a match don't count
+    /// (`John 3` doesn't overlap `John 3:16`, but `John 3:14-18` does)
+    explicit_overlap: Vec<Passage>,
+    /// Keep matches that are exactly one of these (the same verses, however they are written)
+    exact: Vec<Passage>,
+    /// Drop matches that share any verse with one of these
+    exclude_overlap: Vec<Passage>,
 }
 
 impl ComplexFilter {
@@ -33,56 +34,66 @@ impl ComplexFilter {
         self.inside_of.push(psg);
     }
 
-    pub fn overlaps(&mut self, psg: Passage) {
-        self.overlapping.push(psg);
+    pub fn any_overlap(&mut self, psg: Passage) {
+        self.any_overlap.push(psg);
     }
 
-    pub fn outside(&mut self, psg: Passage) {
-        self.outside_of.push(psg);
+    pub fn explicit_overlap(&mut self, psg: Passage) {
+        self.explicit_overlap.push(psg);
     }
 
-    /// Whole chapters in matches don't count as overlapping (see the field)
-    pub fn explicit_overlap(&mut self, explicit: bool) {
-        self.explicit_overlap = explicit;
+    pub fn exact_overlap(&mut self, psg: Passage) {
+        self.exact.push(psg);
+    }
+
+    pub fn exclude_overlap(&mut self, psg: Passage) {
+        self.exclude_overlap.push(psg);
+    }
+
+    /// The passages that include matches (inside, any, explicit, and exact)
+    fn inclusions(&self) -> impl Iterator<Item = &Passage> {
+        (self.inside_of.iter())
+            .chain(&self.any_overlap)
+            .chain(&self.explicit_overlap)
+            .chain(&self.exact)
     }
 
     /**
-    - Inside and overlapping passages are inclusions, joined with a logical OR: a match is kept
-      if it is inside any `inside` passage or overlaps any `overlaps` passage
-    - Then a match that overlaps any `outside` passage is dropped
+    - The passage filters that include matches are joined with a logical OR: a match is kept if
+      it is inside an `inside` passage, overlaps an `any_overlap` one, names a verse of an
+      `explicit_overlap` one, or is exactly an `exact` one
+    - Then a match that shares any verse with an `exclude_overlap` passage is dropped
     */
     pub fn keep(&self, psg: &Passage, data: &BibleData) -> bool {
         if self.books.as_ref().is_some_and(|b| !b.contains(&psg.book)) {
             return false;
         }
         let versification = data.chapter_verses().get_chapter_verses(&psg.book);
-        // With explicit overlap, only the verses the match names can overlap
-        let explicit = self.explicit_overlap.then(|| psg.explicit_verses());
-        let overlap_part = match &explicit {
-            Some(part) => part.as_ref(),
-            None => Some(psg),
-        };
-        let overlaps = |other: &Passage| {
-            overlap_part.is_some_and(|part| other.overlaps_passage(part, versification))
-        };
-        let included = (self.inside_of.is_empty() && self.overlapping.is_empty())
+        let overlaps = |other: &Passage| other.overlaps_passage(psg, versification);
+        let included = self.inclusions().next().is_none()
             || self
                 .inside_of
                 .iter()
                 .any(|outer| outer.contains_passage(psg, versification))
-            || self.overlapping.iter().any(overlaps);
-        included && !self.outside_of.iter().any(overlaps)
+            || self.any_overlap.iter().any(overlaps)
+            || (!self.explicit_overlap.is_empty()
+                && psg.explicit_verses().is_some_and(|named| {
+                    (self.explicit_overlap.iter())
+                        .any(|other| other.overlaps_passage(&named, versification))
+                }))
+            || self.exact.iter().any(|other| {
+                other.contains_passage(psg, versification)
+                    && psg.contains_passage(other, versification)
+            });
+        included && !self.exclude_overlap.iter().any(overlaps)
     }
 
     /// The only books a kept match can be in, or [`None`] for any book: the allowed books,
-    /// narrowed to the books of the inside and overlapping passages when there are any
+    /// narrowed to the books of the passages that include matches, when there are any
     pub fn possible_books(&self) -> Option<BTreeSet<BookId>> {
         let mut books = self.books.clone();
-        if !self.inside_of.is_empty() || !self.overlapping.is_empty() {
-            let passages: BTreeSet<BookId> = (self.inside_of.iter())
-                .chain(&self.overlapping)
-                .map(|psg| psg.book)
-                .collect();
+        if self.inclusions().next().is_some() {
+            let passages: BTreeSet<BookId> = self.inclusions().map(|psg| psg.book).collect();
             books = Some(match books {
                 Some(books) => books.intersection(&passages).copied().collect(),
                 None => passages,

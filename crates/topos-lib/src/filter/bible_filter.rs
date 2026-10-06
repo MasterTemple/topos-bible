@@ -62,9 +62,10 @@ pub struct BibleFilter {
     /// The books to search, kept up to date as filters are pushed
     ids: BTreeSet<BookId>,
     complex_filter: ComplexFilter,
-    /// `--inside` and `--overlaps` passages as given, to explain contradictions
+    /// Passages that include matches (inside, any, explicit, exact) as given, to explain
+    /// contradictions
     included_passages: Vec<(String, Passage)>,
-    /// `--outside` passages as given
+    /// `--exclude-overlap` passages as given
     outside_passages: Vec<(String, Passage)>,
 }
 
@@ -198,35 +199,59 @@ impl BibleFilter {
 
     /// Keep matches entirely inside this passage (`Err` if it cannot be parsed)
     pub fn filter_inside(&mut self, passage: &str) -> ToposResult<()> {
-        let psg = self.parse_passage(passage)?;
-        self.included_passages
-            .push((passage.to_string(), psg.clone()));
+        let psg = self.include_passage(passage)?;
         self.complex_filter.inside(psg);
         Ok(())
     }
 
-    /// Keep matches that share any verse with this passage (`Err` if it cannot be parsed)
-    pub fn filter_overlaps(&mut self, passage: &str) -> ToposResult<()> {
-        let psg = self.parse_passage(passage)?;
-        self.included_passages
-            .push((passage.to_string(), psg.clone()));
-        self.complex_filter.overlaps(psg);
+    /// Keep matches that share any verse with this passage
+    pub fn filter_any_overlap(&mut self, passage: &str) -> ToposResult<()> {
+        let psg = self.include_passage(passage)?;
+        self.complex_filter.any_overlap(psg);
         Ok(())
     }
 
-    /// Matches overlap (for `filter_overlaps` and `filter_outside`) only through the verses they
-    /// name: a whole chapter like `John 3` doesn't overlap `John 3:16`, but `John 3:14-18` does
-    pub fn explicit_overlap(&mut self, explicit: bool) {
-        self.complex_filter.explicit_overlap(explicit);
+    /// Keep matches that name a verse of this passage: a whole chapter like `John 3` doesn't
+    /// count for `John 3:16`, but `John 3:14-18` and `John 2; 3:16` do
+    pub fn filter_explicit_overlap(&mut self, passage: &str) -> ToposResult<()> {
+        let psg = self.include_passage(passage)?;
+        self.complex_filter.explicit_overlap(psg);
+        Ok(())
     }
 
-    /// Drop matches that overlap this passage (`Err` if it cannot be parsed)
-    pub fn filter_outside(&mut self, passage: &str) -> ToposResult<()> {
+    /// Keep matches that are exactly this passage (the same verses: `Jn 3:16-18` is `John
+    /// 3:16, 17-18`, and `John 3` is `John 3:1-36`)
+    pub fn filter_exact_overlap(&mut self, passage: &str) -> ToposResult<()> {
+        let psg = self.include_passage(passage)?;
+        self.complex_filter.exact_overlap(psg);
+        Ok(())
+    }
+
+    /// Drop matches that share any verse with this passage
+    pub fn filter_exclude_overlap(&mut self, passage: &str) -> ToposResult<()> {
         let psg = self.parse_passage(passage)?;
         self.outside_passages
             .push((passage.to_string(), psg.clone()));
-        self.complex_filter.outside(psg);
+        self.complex_filter.exclude_overlap(psg);
         Ok(())
+    }
+
+    #[deprecated(since = "0.4.0", note = "renamed to `filter_any_overlap`")]
+    pub fn filter_overlaps(&mut self, passage: &str) -> ToposResult<()> {
+        self.filter_any_overlap(passage)
+    }
+
+    #[deprecated(since = "0.4.0", note = "renamed to `filter_exclude_overlap`")]
+    pub fn filter_outside(&mut self, passage: &str) -> ToposResult<()> {
+        self.filter_exclude_overlap(passage)
+    }
+
+    /// Parses a passage that includes matches, remembering it to explain contradictions
+    fn include_passage(&mut self, passage: &str) -> ToposResult<Passage> {
+        let psg = self.parse_passage(passage)?;
+        self.included_passages
+            .push((passage.to_string(), psg.clone()));
+        Ok(psg)
     }
 
     fn parse_passage(&self, passage: &str) -> ToposResult<Passage> {
@@ -287,14 +312,14 @@ mod tests {
         assert_eq!(search(inside, text), ["Romans 8:28"]);
 
         let mut overlaps = BibleFilter::default();
-        overlaps.filter_overlaps("Romans 8").unwrap();
+        overlaps.filter_any_overlap("Romans 8").unwrap();
         assert_eq!(search(overlaps, text), ["Romans 8:28", "Romans 8:38-9:1"]);
 
         // Inclusions are joined with OR; exclusions apply after
         let mut both = BibleFilter::default();
         both.filter_inside("Romans 9").unwrap();
-        both.filter_overlaps("John 8").unwrap();
-        both.filter_outside("Romans 9:2").unwrap();
+        both.filter_any_overlap("John 8").unwrap();
+        both.filter_exclude_overlap("Romans 9:2").unwrap();
         assert_eq!(search(both, text), ["John 8:1"]);
     }
 
@@ -334,19 +359,13 @@ mod tests {
     #[test]
     fn explicit_overlap_ignores_whole_chapters() {
         let text = "John 3, John 2-4, John 3:14-18, John 3:16-4:2, John 2; 3:16, John 3:1-5";
-        let found = |explicit: bool, overlaps: &[&str], outside: &[&str]| {
+        let found = |build: &dyn Fn(&mut BibleFilter)| {
             let mut filter = BibleFilter::default();
-            filter.explicit_overlap(explicit);
-            for passage in overlaps {
-                filter.filter_overlaps(passage).unwrap();
-            }
-            for passage in outside {
-                filter.filter_outside(passage).unwrap();
-            }
+            build(&mut filter);
             search(filter, text)
         };
         assert_eq!(
-            found(false, &["John 3:16"], &[]),
+            found(&|f| f.filter_any_overlap("John 3:16").unwrap()),
             [
                 "John 3",
                 "John 2-4",
@@ -356,12 +375,12 @@ mod tests {
             ]
         );
         assert_eq!(
-            found(true, &["John 3:16"], &[]),
+            found(&|f| f.filter_explicit_overlap("John 3:16").unwrap()),
             ["John 3:14-18", "John 3:16-4:2", "John 2; 3:16"]
         );
-        // The passages given still cover whole chapters: `John 3` overlaps any verse in it
+        // The passage given still covers whole chapters: `John 3` includes any verse in it
         assert_eq!(
-            found(true, &["John 3"], &[]),
+            found(&|f| f.filter_explicit_overlap("John 3").unwrap()),
             [
                 "John 3:14-18",
                 "John 3:16-4:2",
@@ -369,11 +388,22 @@ mod tests {
                 "John 3:1-5"
             ]
         );
-        // --outside only drops matches that name one of its verses
+        // Excluding drops anything that shares a verse, whole chapters included
         assert_eq!(
-            found(true, &[], &["John 3:16"]),
-            ["John 3", "John 2-4", "John 3:1-5"]
+            found(&|f| f.filter_exclude_overlap("John 3:16").unwrap()),
+            ["John 3:1-5"]
         );
+    }
+
+    #[test]
+    fn exact_overlap_means_the_same_verses() {
+        let text = "Jn 3:16-18, John 3:16, 17-18, John 3:16-17, John 3, John 3:1-36, John 3:16-4:1";
+        let mut filter = BibleFilter::default();
+        filter.filter_exact_overlap("John 3:16-18").unwrap();
+        assert_eq!(search(filter, text), ["John 3:16-18", "John 3:16,17-18"]);
+        let mut filter = BibleFilter::default();
+        filter.filter_exact_overlap("John 3").unwrap();
+        assert_eq!(search(filter, text), ["John 3", "John 3:1-36"]);
     }
 
     #[test]
@@ -386,21 +416,21 @@ mod tests {
             Some("Romans 8 is in books that aren't searched")
         );
         // One passage in a searched book is enough
-        filter.filter_overlaps("Gen 1").unwrap();
+        filter.filter_any_overlap("Gen 1").unwrap();
         assert_eq!(filter.contradiction(), None);
 
         let mut filter = BibleFilter::default();
         filter.filter_inside("John 3:16").unwrap();
-        filter.filter_overlaps("John 3:1-5").unwrap();
-        filter.filter_outside("John 3").unwrap();
+        filter.filter_any_overlap("John 3:1-5").unwrap();
+        filter.filter_exclude_overlap("John 3").unwrap();
         assert_eq!(
             filter.contradiction().as_deref(),
             Some("John 3:16, John 3:1-5 are within the outside passages (John 3)")
         );
         // Partly outside still leaves something to find
         let mut filter = BibleFilter::default();
-        filter.filter_overlaps("John 3-4").unwrap();
-        filter.filter_outside("John 3").unwrap();
+        filter.filter_any_overlap("John 3-4").unwrap();
+        filter.filter_exclude_overlap("John 3").unwrap();
         assert_eq!(filter.contradiction(), None);
     }
 

@@ -39,18 +39,20 @@ fn filters() -> Vec<(&'static str, BibleFilter)> {
     });
     add("inside john 3", &|f| f.filter_inside("John 3").unwrap());
     add("overlaps rom 8, gen 1", &|f| {
-        f.filter_overlaps("Romans 8").unwrap();
-        f.filter_overlaps("Genesis 1").unwrap();
+        f.filter_any_overlap("Romans 8").unwrap();
+        f.filter_any_overlap("Genesis 1").unwrap();
     });
-    add("explicit overlaps john 3:16, outside rom 8:28", &|f| {
-        f.explicit_overlap(true);
-        f.filter_overlaps("John 3:16").unwrap();
-        f.filter_overlaps("Romans 8").unwrap();
-        f.filter_outside("Romans 8:28").unwrap();
-    });
+    add(
+        "explicit john 3:16, exact rom 8:28, excluding ps 23",
+        &|f| {
+            f.filter_explicit_overlap("John 3:16").unwrap();
+            f.filter_exact_overlap("Romans 8:28").unwrap();
+            f.filter_exclude_overlap("Psalm 23").unwrap();
+        },
+    );
     add("nt outside john", &|f| {
         f.include(TestamentFilter::New).unwrap();
-        f.filter_outside("John 1-21").unwrap();
+        f.filter_exclude_overlap("John 1-21").unwrap();
     });
     cases
 }

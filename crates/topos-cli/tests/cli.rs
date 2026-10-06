@@ -213,7 +213,7 @@ fn inside_overlaps_and_outside() {
         ":1:1: Romans 8:28\n:1:11: Romans 8:38-9:1\n"
     );
     assert_eq!(
-        refs(&["-o", "Romans 9", "--outside", "Romans 9:2"]),
+        refs(&["-o", "Romans 9", "--exclude-overlap", "Romans 9:2"]),
         ":1:11: Romans 8:38-9:1\n"
     );
 }
@@ -751,31 +751,61 @@ fn path_options() {
 }
 
 #[test]
-fn explicit_overlap() {
-    let text = "John 3, John 2-4, John 3:14-18, John 2; 3:16";
+fn passage_filters() {
+    let text = "John 3, John 2-4, John 3:14-18, John 2; 3:16, Jn 3:16, John 3:16-17";
     let run = |args: &[&str]| {
-        let mut all = vec![
-            "--no-config",
-            "--text",
-            text,
-            "-m",
-            "quickfix",
-            "-o",
-            "John 3:16",
-        ];
+        let mut all = vec!["--no-config", "--text", text, "-m", "quickfix"];
         all.extend(args);
         stdout(&topos(&all, None))
+            .lines()
+            .map(|line| line.split(": ").nth(1).unwrap().to_string())
+            .collect::<Vec<_>>()
     };
-    assert_eq!(run(&[]).lines().count(), 4);
+    let all = [
+        "John 3",
+        "John 2-4",
+        "John 3:14-18",
+        "John 2; 3:16",
+        "John 3:16",
+        "John 3:16-17",
+    ];
+    assert_eq!(run(&["--any-overlap", "John 3:16"]), all);
+    // The old name still works
+    assert_eq!(run(&["--overlaps", "John 3:16"]), all);
+    // -o: whole chapters don't count
     assert_eq!(
-        run(&["--explicit-overlap"]),
-        ":1:19: John 3:14-18\n:1:33: John 2; 3:16\n"
+        run(&["-o", "John 3:16"]),
+        ["John 3:14-18", "John 2; 3:16", "John 3:16", "John 3:16-17"]
     );
-    // As a config option
+    // John 2; 3:16 also has chapter 2, so only Jn 3:16 is exactly John 3:16
+    assert_eq!(run(&["--exact-overlap", "John 3:16"]), ["John 3:16"]);
+    assert_eq!(run(&["--exact-overlap", "John 3:16-17"]), ["John 3:16-17"]);
+    // Inclusions add up; exclusions win
+    assert_eq!(
+        run(&[
+            "--exact-overlap",
+            "John 3",
+            "-i",
+            "John 3:14-17",
+            "--exclude-overlap",
+            "John 3:15"
+        ]),
+        // John 3 is exact, but shares 3:15, and exclusions win
+        ["John 3:16", "John 3:16-17"]
+    );
+    // The old name for --exclude-overlap: every reference here shares John 3:16
+    assert_eq!(run(&["--outside", "John 3:16"]), Vec::<String>::new());
+
+    // Old names work in config.toml too
     let configured = topos_with_config(
-        Some("explicit-overlap = true\nmode = \"quickfix\"\n"),
-        &["--text", text, "-o", "John 3:16"],
+        Some("overlaps = \"John 3:16\"\noutside = \"John 2\"\nmode = \"quickfix\"\n"),
+        &["--text", text],
         None,
     );
-    assert_eq!(stdout(&configured).lines().count(), 2);
+    assert_eq!(
+        stdout(&configured).lines().count(),
+        4,
+        "{}",
+        stdout(&configured)
+    );
 }

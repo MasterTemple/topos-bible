@@ -125,7 +125,7 @@ topos -b Romans -m table
 **Command**
 
 ```bash
-topos -o "1 Peter 1:1-5, 4:11,14-16" -m table
+topos --any-overlap "1 Peter 1:1-5, 4:11,14-16" -m table
 ```
 
 **Output**
@@ -140,12 +140,21 @@ topos -o "1 Peter 1:1-5, 4:11,14-16" -m table
 | ./Church 03-09-25.md | 241  | 12  | 1 Peter 1:3-4 |
 ```
 
-`-o`/`--overlaps` keeps references that share any verse with the passage (like `1 Peter 4` above).
-`-i`/`--inside` only keeps references entirely inside it, so `1 Peter 4` would be dropped.
+| Option | Keeps references that | `John 3:16` keeps |
+|---|---|---|
+| `--any-overlap` | share any verse with the passage | `John 3`, `John 3:14-18`, `John 2; 3:16` |
+| `-o`, `--explicit-overlap` | name a verse of the passage (whole chapters don't count) | `John 3:14-18`, `John 2; 3:16` |
+| `-i`, `--inside` | are entirely inside the passage | `John 3:16` |
+| `--exact-overlap` | are exactly the passage, however written | `Jn 3:16`, not `John 3:16-17` |
+| `--exclude-overlap` | share no verse with the passage | everything else |
+
+So `1 Peter 4` above is kept by `--any-overlap`, but not by `-o` (it names no verse) or `-i`
+(it isn't inside the passage). The options that keep references can be combined and repeated
+(a reference passes if any one keeps it); `--exclude-overlap` then removes references.
 
 ### Exclude Testament/Genre/Book/Passage
 
-Use just like above, but prefix the full option with `exclude` (or use `--outside` for passages)
+Use just like above, but prefix the full option with `exclude` (`--exclude-overlap` for passages)
 
 ```bash
 topos --exclude-testament new -m table
@@ -169,15 +178,14 @@ topos --exclude-testament new -m table
 - Including a testament limits the search to it (`--nt -g Gospels` is the four Gospels)
 - Included genres and books add up (`-g Pentateuch -b Revelation` is six books)
 - Filters that can't match anything print a warning: genres or books outside the included
-  testaments (`--ot -g "Pauline Epistles"`), `-i`/`-o` passages only in books that aren't searched
-  (`-b Genesis -i "Romans 8"`), or only within `--outside` passages (`-i "John 3:16" --outside
-  "John 3"`)
+  testaments (`--ot -g "Pauline Epistles"`), passages to keep only in books that aren't searched
+  (`-b Genesis -i "Romans 8"`), or only within excluded passages (`-i "John 3:16"
+  --exclude-overlap "John 3"`)
 - Exclusions always win, so a book can be excluded from an included genre
 - `-m count` prints matches per file; `--total-count` prints one total across all files
-- `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches
-- With `--explicit-overlap`, a reference overlaps only through the verses it names: `John 3` and
-  `John 2-4` don't overlap `-o "John 3:16"`, but `John 3:14-18` and `John 2; 3:16` do (the same
-  goes for `--outside`)
+- Passage filters that keep references (`-i`, `--any-overlap`, `-o`, `--exact-overlap`) are joined
+  with a logical OR, then `--exclude-overlap` removes references
+- `--overlaps` and `--outside` still work, as old names for `--any-overlap` and `--exclude-overlap`
 - Unknown books or genres are errors
 
 ## Config
@@ -288,7 +296,7 @@ each completion's text, label, and kind (book, chapter, or verse).
 
 Tab completes options and their values: modes and formats, book and genre names (`-b jn` offers
 Jonah and John; `-b "1 Co` gives `"1 Corinthians"`), testaments, your named queries, references
-for `-i`/`-o`/`--outside` (books, then chapters, verses, and range ends, like the editor plugins),
+for the passage filters (books, then chapters, verses, and range ends, like the editor plugins),
 and paths. `topos` computes them itself when Tab is pressed, so they always match the installed
 version and your `queries.toml`.
 
@@ -345,7 +353,8 @@ Find Bible references in files, directories, text, or stdin.
 - Including a testament limits the search to it: `--nt -g Gospels` is the four Gospels
 - Included genres and books add up: `-g Pentateuch -b Revelation` is six books
 - Exclusions always win, so a book can be excluded from an included genre
-- `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches
+- Passage filters that keep references (`-i`, `--any-overlap`, `-o`, `--exact-overlap`) are joined
+ with a logical OR, then `--exclude-overlap` removes references
 
 Usage: topos [OPTIONS] [PATHS]...
 
@@ -384,13 +393,16 @@ Options:
   -i, --inside <INSIDE>
           Only keep references entirely inside this passage (e.g. "John 1" keeps John 1:2-3)
 
-  -o, --overlaps <OVERLAPS>
-          Only keep references that share any verse with this passage (e.g. "John 1" keeps John 1:51-2:1)
+      --any-overlap <ANY_OVERLAP>
+          Only keep references that share any verse with this passage, whole chapters included (e.g. "John 3:16" keeps John 3 and John 3:14-18)
 
-      --explicit-overlap
-          With -o and --outside, references overlap only through the verses they name: a whole chapter like `John 3` doesn't overlap `John 3:16`, but `John 3:14-18` does
+  -o, --explicit-overlap <EXPLICIT_OVERLAP>
+          Only keep references that name a verse of this passage: whole chapters don't count (e.g. "John 3:16" keeps John 3:14-18 and John 2; 3:16, but not John 3)
 
-      --outside <OUTSIDE>
+      --exact-overlap <EXACT_OVERLAP>
+          Only keep references that are exactly this passage, however they are written (e.g. "John 3:16-18" keeps Jn 3:16-18 and John 3:16, 17-18, but not John 3:16-17)
+
+      --exclude-overlap <EXCLUDE_OVERLAP>
           Drop references that share any verse with this passage
 
       --context-book <CONTEXT_BOOK>

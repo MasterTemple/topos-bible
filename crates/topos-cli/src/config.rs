@@ -115,13 +115,21 @@ fn parse(text: &str) -> Result<Vec<OsString>, String> {
     let command = Args::command();
     let mut args = vec![];
     for (key, value) in table {
-        let name = key.replace('_', "-");
-        let known = command
+        let given = key.replace('_', "-");
+        // Old names (aliases like `overlaps` and `outside`) still work
+        let name = command
             .get_arguments()
-            .any(|arg| arg.get_long() == Some(name.as_str()));
-        if !known || name == "no-config" || name == "config" {
+            .find(|arg| {
+                arg.get_long() == Some(given.as_str())
+                    || arg
+                        .get_all_aliases()
+                        .is_some_and(|aliases| aliases.contains(&given.as_str()))
+            })
+            .and_then(|arg| arg.get_long())
+            .map(str::to_string);
+        let Some(name) = name.filter(|name| name != "no-config" && name != "config") else {
             return Err(format!("unknown option `{key}`"));
-        }
+        };
         let flag = OsString::from(format!("--{name}"));
         let values = match value {
             Value::Array(values) => values,

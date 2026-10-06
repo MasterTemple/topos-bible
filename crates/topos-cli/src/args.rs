@@ -24,7 +24,8 @@ Find Bible references in files, directories, text, or stdin.
 - Including a testament limits the search to it: `--nt -g Gospels` is the four Gospels
 - Included genres and books add up: `-g Pentateuch -b Revelation` is six books
 - Exclusions always win, so a book can be excluded from an included genre
-- `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches
+- Passage filters that keep references (`-i`, `--any-overlap`, `-o`, `--exact-overlap`) are joined
+  with a logical OR, then `--exclude-overlap` removes references
 */
 #[derive(Parser, Debug)]
 #[command(
@@ -81,19 +82,36 @@ pub struct Args {
     #[arg(long = "inside", short = 'i', add = ArgValueCompleter::new(complete::passages))]
     pub inside: Vec<String>,
 
-    /// Only keep references that share any verse with this passage (e.g. "John 1" keeps
-    /// John 1:51-2:1)
-    #[arg(long = "overlaps", short = 'o', add = ArgValueCompleter::new(complete::passages))]
-    pub overlaps: Vec<String>,
+    /// Only keep references that share any verse with this passage, whole chapters included
+    /// (e.g. "John 3:16" keeps John 3 and John 3:14-18)
+    #[arg(
+        long = "any-overlap",
+        alias = "overlaps",
+        add = ArgValueCompleter::new(complete::passages)
+    )]
+    pub any_overlap: Vec<String>,
 
-    /// With -o and --outside, references overlap only through the verses they name: a whole
-    /// chapter like `John 3` doesn't overlap `John 3:16`, but `John 3:14-18` does
-    #[arg(long)]
-    pub explicit_overlap: bool,
+    /// Only keep references that name a verse of this passage: whole chapters don't count
+    /// (e.g. "John 3:16" keeps John 3:14-18 and John 2; 3:16, but not John 3)
+    #[arg(
+        long = "explicit-overlap",
+        short = 'o',
+        add = ArgValueCompleter::new(complete::passages)
+    )]
+    pub explicit_overlap: Vec<String>,
+
+    /// Only keep references that are exactly this passage, however they are written (e.g.
+    /// "John 3:16-18" keeps Jn 3:16-18 and John 3:16, 17-18, but not John 3:16-17)
+    #[arg(long = "exact-overlap", add = ArgValueCompleter::new(complete::passages))]
+    pub exact_overlap: Vec<String>,
 
     /// Drop references that share any verse with this passage
-    #[arg(long = "outside", add = ArgValueCompleter::new(complete::passages))]
-    pub outside: Vec<String>,
+    #[arg(
+        long = "exclude-overlap",
+        alias = "outside",
+        add = ArgValueCompleter::new(complete::passages)
+    )]
+    pub exclude_overlap: Vec<String>,
 
     /// Treat the input as being about this book, so references like 3:16 match
     #[arg(long, add = ArgValueCompleter::new(complete::books))]
@@ -477,12 +495,17 @@ impl Args {
         for passage in &self.inside {
             filter.filter_inside(passage)?;
         }
-        filter.explicit_overlap(self.explicit_overlap);
-        for passage in &self.overlaps {
-            filter.filter_overlaps(passage)?;
+        for passage in &self.any_overlap {
+            filter.filter_any_overlap(passage)?;
         }
-        for passage in &self.outside {
-            filter.filter_outside(passage)?;
+        for passage in &self.explicit_overlap {
+            filter.filter_explicit_overlap(passage)?;
+        }
+        for passage in &self.exact_overlap {
+            filter.filter_exact_overlap(passage)?;
+        }
+        for passage in &self.exclude_overlap {
+            filter.filter_exclude_overlap(passage)?;
         }
 
         if let Some(reason) = filter.contradiction() {

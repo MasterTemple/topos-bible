@@ -98,7 +98,7 @@ use topos_bible::filter::{
 let mut filter = BibleFilter::default();
 filter.include(TestamentFilter::New)?;
 filter.include(GenreFilter::new("Pauline Epistles"))?;
-filter.filter_outside("Romans 9-11")?;
+filter.filter_exclude_overlap("Romans 9-11")?;
 let matcher = filter.create_matcher();
 
 let found = matcher.search("John 3:16, Rom 8:28, Rom 9:2, Gen 1:1");
