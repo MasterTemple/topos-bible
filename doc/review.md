@@ -1,5 +1,7 @@
 # Codebase Review (2026-10)
 
+> **Status:** this is the review as written before the fixes. Almost everything below has since been fixed; see [ROADMAP.md](../ROADMAP.md) for what is done and what is left.
+
 What's wrong right now, ranked by priority. The fixes are planned in [ROADMAP.md](../ROADMAP.md), and the target design is in [architecture.md](./architecture.md).
 
 ## 1. The workspace does not build

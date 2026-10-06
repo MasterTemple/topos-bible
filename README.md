@@ -4,7 +4,17 @@
 
 Locate Bible verses in text, files, and entire directories!
 
-Check out the [CLI Tool](./crates/topos-cli/README.md)!
+## Crates
+
+| Crate | What it is |
+|---|---|
+| [`topos-lib`](./crates/topos-lib) | The core: book data, the segment grammar, resolving, searching, formatting, OSIS, and autocomplete |
+| [`topos-formats`](./crates/topos-formats) | Locations in HTML, SRT/WebVTT/SBV, EPUB, JSON, XML, and PDF (`pdf` feature) |
+| [`topos-cli`](./crates/topos-cli/README.md) | `topos`, a ripgrep-style search tool |
+| [`topos-lsp`](./crates/topos-lsp/README.md) | A language server: completion, hover, and document symbols |
+| [`topos-ffi`](./crates/topos-ffi) | Bindings for TypeScript/WASM, Python, Swift, and Kotlin via [BoltFFI](https://boltffi.dev) |
+
+See [ROADMAP.md](./ROADMAP.md) for what is planned and [doc/architecture.md](./doc/architecture.md) for how it fits together.
 
 ## Showcase
 

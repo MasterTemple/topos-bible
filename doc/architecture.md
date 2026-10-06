@@ -12,6 +12,7 @@ crates/
                    json, xml, and pdf (MuPDF, opt-in)
   topos-cli/       ripgrep-style binary (depends on topos-lib + topos-formats)
   topos-ffi/       one BoltFFI façade over topos-lib (TypeScript/WASM, Python, Swift, Kotlin)
+  topos-lsp/       a language server: completion, hover, document symbols
 ```
 
 `topos-parser` and `topos-pdf` are gone. The PyO3, wasm-bindgen and BoltFFI test crates get replaced by `topos-ffi`.

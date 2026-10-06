@@ -58,12 +58,14 @@ The phases are in order, and each one leaves the repo working.
 - [x] Choose a format by file extension through `topos-formats`, skip binary files, and report unreadable files on stderr (exit codes like ripgrep)
 - [x] Clarify inputs: `topos [PATH]...` (paths only, like ripgrep), with `--text` or piped stdin for literal text (`-i` already filters by passage)
 - [x] `--config` for custom book, genre and versification data (JSON, via `BibleDataInput`)
-- [ ] Cache search results [#2](https://github.com/MasterTemple/topos/issues/2)
+- [x] Cache search results [#2](https://github.com/MasterTemple/topos/issues/2) (`--cache`)
 
 ## Phase 6: Bindings and tooling
 
-- [ ] A `topos-ffi` façade (BoltFFI) with owned DTOs; remove `topos-ts`
-- [ ] Python through BoltFFI if it's supported, otherwise a thin PyO3 wrapper over the same façade
-- [ ] An LSP server (diagnostics for invalid references, completion, hover with the normalized reference) built on the autocomplete API
-- [ ] Incremental parsing (re-scan only the edited lines; easy once matches are span-based)
-- [ ] Criterion benchmarks on a large corpus
+- [x] A `topos-ffi` façade (BoltFFI 0.31) with owned data types and offsets in the caller's unit
+- [ ] Remove the old `topos-py`, `topos-ts`, and `topos-ts-boltffi` test crates
+- [x] Python through BoltFFI (`boltffi pack python` builds a working wheel)
+- [x] An LSP server (`topos-lsp`): completion, hover with the normalized reference, and document symbols
+- [ ] LSP diagnostics for references that do not exist (needs search to report rejected references)
+- [ ] Incremental parsing (re-scan only the edited lines). Deferred: search runs at about 30 MiB/s, so re-searching a document on each LSP request is fast enough for now
+- [x] Criterion benchmarks (`cargo bench -p topos-lib`)
