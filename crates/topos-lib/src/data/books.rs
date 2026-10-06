@@ -59,11 +59,17 @@ impl BookRegexes {
     fn new<'a>(keys: impl Iterator<Item = &'a String>) -> Result<Self, regex::Error> {
         let mut keys: Vec<&String> = keys.collect();
         keys.sort_by_key(|k| std::cmp::Reverse(k.chars().count()));
+        // Unicode word boundaries are ~100x slower, so only use them for non-ASCII book names
+        let b = if keys.iter().all(|k| k.is_ascii()) {
+            r"(?-u:\b)"
+        } else {
+            r"\b"
+        };
         let books = keys.into_iter().map(|k| regex::escape(k)).join("|");
         Ok(Self {
-            candidate: Regex::new(&format!(r"(?i)\b((?:{books})\.?)\s*[0-9ivxlc]"))?,
-            book: Regex::new(&format!(r"(?i)\b((?:{books})\b\.?)"))?,
-            passage: Regex::new(&format!(r"(?i)\b((?:{books}))\b\.?(.*)"))?,
+            candidate: Regex::new(&format!(r"(?i){b}((?:{books})\.?)\s*[0-9ivxlc]"))?,
+            book: Regex::new(&format!(r"(?i){b}((?:{books}){b}\.?)"))?,
+            passage: Regex::new(&format!(r"(?i){b}((?:{books})){b}\.?(.*)"))?,
         })
     }
 }
