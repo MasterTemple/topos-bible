@@ -166,9 +166,11 @@ topos --exclude-testament new -m table
 
 ## Rules
 
-- Including a testament, genre, or book excludes everything else in that category
-- Exclusions are applied after all inclusions, so a book can be excluded from an included genre
-- Several inclusions are joined with a logical OR (`--nt -b Psalms` is the New Testament and Psalms)
+- Including a testament limits the search to it (`--nt -g Gospels` is the four Gospels)
+- Included genres and books add up (`-g Pentateuch -b Revelation` is six books)
+- Including genres or books outside the included testaments (`--ot -g "Pauline Epistles"`)
+  matches nothing, with a warning
+- Exclusions always win, so a book can be excluded from an included genre
 - `-m count` prints matches per file; `--total-count` prints one total across all files
 - `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches
 - Unknown books or genres are errors
@@ -197,9 +199,9 @@ data = "~/bible/custom.json"   # custom books, genres, or chapter and verse coun
 ```
 Find Bible references in files, directories, text, or stdin.
 
-- Including a testament, genre, or book excludes everything else in that category
-- Exclusions are applied after inclusions, so a book can be excluded from an included genre
-- Several inclusions of the same kind are joined with a logical OR
+- Including a testament limits the search to it: `--nt -g Gospels` is the four Gospels
+- Included genres and books add up: `-g Pentateuch -b Revelation` is six books
+- Exclusions always win, so a book can be excluded from an included genre
 - `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches
 
 Usage: topos [OPTIONS] [PATHS]...

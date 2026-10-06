@@ -15,9 +15,9 @@ use topos_lib::{
 /**
 Find Bible references in files, directories, text, or stdin.
 
-- Including a testament, genre, or book excludes everything else in that category
-- Exclusions are applied after inclusions, so a book can be excluded from an included genre
-- Several inclusions of the same kind are joined with a logical OR
+- Including a testament limits the search to it: `--nt -g Gospels` is the four Gospels
+- Included genres and books add up: `-g Pentateuch -b Revelation` is six books
+- Exclusions always win, so a book can be excluded from an included genre
 - `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches
 */
 #[derive(Parser, Debug)]
@@ -252,6 +252,11 @@ impl Args {
         filter.exclude_many(self.exclude_testaments.iter().copied())?;
         filter.exclude_many(self.exclude_genres.iter().map(GenreFilter::new))?;
         filter.exclude_many(self.exclude_books.iter().map(BookFilter::new))?;
+        if filter.is_contradictory() {
+            eprintln!(
+                "topos: warning: no included genre or book is in the included testaments, so nothing can match"
+            );
+        }
         for passage in &self.inside {
             filter.filter_inside(passage)?;
         }

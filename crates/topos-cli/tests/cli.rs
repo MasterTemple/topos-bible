@@ -287,3 +287,24 @@ fn ext_limits_walked_files() {
     assert_eq!(run(&["notes/c.html", "--ext", "md"]), ["Genesis 1:1"]);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn testaments_narrow_genres() {
+    let text = "John 3:16, Romans 8:28, Genesis 1:1";
+    let nt = topos(
+        &[
+            "--text",
+            text,
+            "--nt",
+            "-g",
+            "Pauline Epistles",
+            "-m",
+            "quickfix",
+        ],
+        None,
+    );
+    assert_eq!(stdout(&nt), ":1:12: Romans 8:28\n");
+    let ot = topos(&["--text", text, "--ot", "-g", "Pauline Epistles"], None);
+    assert_eq!(ot.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&ot.stderr).contains("nothing can match"));
+}
