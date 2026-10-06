@@ -16,21 +16,21 @@ The phases are in order, and each one leaves the repo working.
 
 ## Phase 1: Correctness, with a test corpus first
 
-- [ ] Add `tests/cases.toml`, a table of `input → expected references`, run by one test. Seed it with every example in the review and the issues
+- [x] Add `tests/cases/search.txt`, a table of `input => expected references`, run by one test
 - [x] Fix the `5:12-6:6` resolution bug
-- [ ] Restore the "chapters until a verse is seen" rule
-- [ ] Handle single-chapter books (`Jude 5`, `3 John 5`)
-- [ ] Always match all books and filter by `BookId` afterward: Searching `John` only matches `1 John` [#8](https://github.com/MasterTemple/topos/issues/8)
-- [ ] Escape regex keys, sort them longest-first, and drop the hard-coded `1..=66`
-- [ ] Implement `Ord` for `Segment` by hand, and fix `Passage::contains` / `Segments::fully_contains`
-- [ ] Restrict Roman numerals to chapter position (whole-word, canonical-only, and `is_ascii_digit` are done)
-- [ ] Validate against versification (Validate match segments based on actual verse in the text)
-- [ ] Add a fuzz target (`cargo fuzz`) for the parser, since it runs on arbitrary text
+- [x] Restore the "chapters until a verse is seen" rule (and `;` starts chapters again)
+- [x] Handle single-chapter books (`Jude 5`, `3 John 5`)
+- [x] Always match all books and filter by `BookId` afterward: Searching `John` only matches `1 John` [#8](https://github.com/MasterTemple/topos/issues/8)
+- [x] Escape regex keys, sort them longest-first, and drop the hard-coded `1..=66` (plus ASCII word boundaries: search is 31x faster)
+- [x] Implement `Ord` for `Segment` by hand, and fix `Passage::contains` / `Segments::fully_contains`
+- [x] Restrict Roman numerals to chapter position, whole words, and canonical forms; use `is_ascii_digit`
+- [x] Validate against versification (Validate match segments based on actual verse in the text)
+- [x] Add a fuzz target (`cargo fuzz run search` in `fuzz/`), plus a seeded randomized test of the same invariants in CI
 
 ## Phase 2: One parser and a resolve stage
 
 - [x] One lexer/parser that produces a lossless syntax tree with spans, replacing minimal, verbose and the autocomplete regexes (`segments/grammar`)
-- [ ] A resolver stage with a `Context` (see architecture)
+- [ ] A resolver stage with a `Context` (see architecture; `segments::resolve` exists, without document context yet)
   - [ ] Parse older formats / Roman numerals / sub-verses: `Matth. x, 8` [#5](https://github.com/MasterTemple/topos/issues/5)
   - [ ] `cf` and `ff` [#10](https://github.com/MasterTemple/topos/issues/10)
   - [ ] Support dashes in book names for justified text [#11](https://github.com/MasterTemple/topos/issues/11)
