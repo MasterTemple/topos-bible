@@ -3,7 +3,7 @@ use std::{process::ExitCode, sync::Arc};
 use clap::{CommandFactory, Parser};
 
 use crate::{
-    args::Args,
+    args::{Args, OutputMode},
     cache::Cache,
     output::Printer,
     search::{CachedSearch, Input, Searcher, search},
@@ -71,6 +71,18 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    // Before reading the input, since these never search
+    if let Some(text) = args.complete.take().or(args.list_books.then(String::new)) {
+        let json = args.mode == OutputMode::Json;
+        for suggestion in complete::suggestions(&matcher, &text, &args.format_options()) {
+            if json {
+                println!("{}", serde_json::to_string(&suggestion).unwrap_or_default());
+            } else {
+                println!("{}", suggestion.text);
+            }
+        }
+        return ExitCode::SUCCESS;
+    }
     let input = match Input::new(std::mem::take(&mut args.paths), args.text.take()) {
         Ok(input) => input,
         Err(err) => {

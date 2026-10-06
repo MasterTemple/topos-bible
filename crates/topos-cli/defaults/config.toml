@@ -5,7 +5,7 @@
 # mode = "grouped"                   # how to print results: grouped, quickfix, json, count, ...
 # format = "abbreviation"            # how to write references: name, abbreviation, osis
 # context = 1                        # lines of context around each match
-# cache = true                       # reuse results for unchanged files
+cache = true                         # reuse results for unchanged files (--no-cache turns it off)
 # sort = true                        # print results sorted by path
 # exclude-book = ["Song of Solomon"] # always leave out these books
 # query = "pauline"                  # always apply a named query from queries.toml

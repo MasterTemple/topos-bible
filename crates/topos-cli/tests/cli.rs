@@ -29,6 +29,7 @@ fn topos_with_config(config: Option<&str>, args: &[&str], stdin: Option<&str>) -
     let mut child = Command::new(env!("CARGO_BIN_EXE_topos"))
         .args(args)
         .env("XDG_CONFIG_HOME", &home)
+        .env("XDG_CACHE_HOME", home.join("cache"))
         .stdin(if stdin.is_some() {
             Stdio::piped()
         } else {
@@ -352,6 +353,8 @@ fn named_queries() {
         Command::new(env!("CARGO_BIN_EXE_topos"))
             .args(args)
             .env("XDG_CONFIG_HOME", &home)
+            .env("XDG_CACHE_HOME", home.join("cache"))
+            .env("XDG_CACHE_HOME", home.join("cache"))
             .stdin(Stdio::null())
             .output()
             .unwrap()
@@ -392,6 +395,8 @@ fn first_run_writes_default_files() {
         Command::new(env!("CARGO_BIN_EXE_topos"))
             .args(args)
             .env("XDG_CONFIG_HOME", &home)
+            .env("XDG_CACHE_HOME", home.join("cache"))
+            .env("XDG_CACHE_HOME", home.join("cache"))
             .stdin(Stdio::null())
             .output()
             .unwrap()
@@ -410,7 +415,9 @@ fn first_run_writes_default_files() {
     ]);
     assert_eq!(stdout(&first), ":1:15: Romans 8:28\n");
     let config = std::fs::read_to_string(home.join("topos/config.toml")).unwrap();
-    assert!(config.contains("# cache = true"), "{config}");
+    // The default config turns the cache on
+    assert!(config.contains("\ncache = true"), "{config}");
+    assert!(home.join("cache/topos").exists());
     assert_eq!(
         stdout(&run(&["--list-queries"])),
         "pauline\t--nt -g 'Pauline Epistles'\n"
@@ -434,6 +441,7 @@ fn complete(words: &[&str], config_home: &std::path::Path) -> Vec<String> {
         .env("_CLAP_COMPLETE_COMP_TYPE", "9")
         .env("_CLAP_COMPLETE_SPACE", "true")
         .env("XDG_CONFIG_HOME", config_home)
+        .env("XDG_CACHE_HOME", config_home.join("cache"))
         .stdin(Stdio::null())
         .output()
         .unwrap();
@@ -486,4 +494,72 @@ fn shell_completions() {
     assert!(script.contains("compopt -o filenames"), "{script}");
     assert!(script.contains("complete -o nospace"), "{script}");
     let _ = std::fs::remove_dir_all(&home);
+}
+
+#[test]
+fn no_cache_overrides_the_config() {
+    let home = scratch("no-cache");
+    std::fs::create_dir_all(home.join("topos")).unwrap();
+    std::fs::write(home.join("topos/config.toml"), "cache = true\n").unwrap();
+    std::fs::write(home.join("a.txt"), "John 3:16\n").unwrap();
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_topos"))
+            .arg(home.join("a.txt"))
+            .args(args)
+            .env("XDG_CONFIG_HOME", &home)
+            .env("XDG_CACHE_HOME", home.join("cache"))
+            .stdin(Stdio::null())
+            .output()
+            .unwrap()
+    };
+    run(&["--no-cache"]);
+    assert!(!home.join("cache/topos").exists());
+    // The last of --cache and --no-cache wins
+    run(&["--no-cache", "--cache"]);
+    assert!(home.join("cache/topos").exists());
+    let _ = std::fs::remove_dir_all(&home);
+}
+
+#[test]
+fn complete_and_list_books() {
+    let lines = |args: &[&str]| -> Vec<String> {
+        let mut all = vec!["--no-config"];
+        all.extend(args);
+        stdout(&topos(&all, None))
+            .lines()
+            .map(str::to_string)
+            .collect()
+    };
+    let books = lines(&["--complete"]);
+    assert_eq!(books.len(), 66);
+    assert_eq!(books[0], "Genesis");
+    assert_eq!(lines(&["--complete", ""]), books);
+    assert_eq!(lines(&["--list-books"]), books);
+    assert_eq!(
+        lines(&["--list-books", "-f", "abbreviation"])[..2],
+        ["Gn", "Ex"]
+    );
+    assert_eq!(lines(&["--list-books", "-f", "osis"])[65], "Rev");
+    assert_eq!(lines(&["--list-books", "--nt"]).len(), 27);
+
+    let verses = lines(&["--complete", "John 3:"]);
+    assert_eq!(verses.len(), 36);
+    assert_eq!(verses[15], "John 3:16");
+    assert_eq!(
+        lines(&["--complete", "jn 3:16-"])[..2],
+        ["John 3:16-17", "John 3:16-18"]
+    );
+    assert_eq!(lines(&["--complete", "jn 3:", "-f", "osis"])[0], "John.3.1");
+    assert_eq!(
+        lines(&["--complete", "jn 3:", "-f", "abbreviation"])[0],
+        "Jn 3:1"
+    );
+    assert_eq!(
+        lines(&["--complete", "John 3:", "-o", "John 3:16-17"]),
+        ["John 3:16", "John 3:17"]
+    );
+    assert_eq!(
+        lines(&["--complete", "Rom 8", "-m", "json"]),
+        [r#"{"text":"Romans 8","label":"Romans 8","kind":"chapter"}"#]
+    );
 }

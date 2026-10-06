@@ -8,8 +8,12 @@ use std::ffi::OsStr;
 
 use clap_complete::engine::CompletionCandidate;
 use topos_lib::{
+    data::books::BookId,
     matcher::BibleMatcher,
-    segments::autocomplete::{CompleteOptions, CompletionKind},
+    segments::{
+        autocomplete::{CompleteOptions, CompletionKind},
+        formatter::{BookStyle, FormatOptions},
+    },
 };
 
 /// What is typed, without the shell's quoting: bash passes the word as typed, so `"1 Co` or
@@ -118,6 +122,83 @@ pub fn queries(value: &OsStr) -> Vec<CompletionCandidate> {
         .collect()
 }
 
+/// One completion: the input with it applied, what a menu shows, and what it completes
+#[derive(Debug, serde::Serialize)]
+pub struct Suggestion {
+    pub text: String,
+    pub label: String,
+    pub kind: &'static str,
+}
+
+/// A book's name in a style (`John`, `Jn`, `John` in OSIS)
+pub fn book_in_style(matcher: &BibleMatcher, id: BookId, style: BookStyle) -> Option<String> {
+    let books = matcher.data().books();
+    match style {
+        BookStyle::Name => books.get_name(id),
+        BookStyle::Abbreviation => books.get_abbrev(id),
+        BookStyle::Osis => books.get_osis(id),
+    }
+    .cloned()
+}
+
+/**
+Completions for a partly typed reference, for Tab and `--complete`
+- Nothing typed: every book (that the matcher's filters allow), in the format's book style
+- Otherwise the engine's completions (books, then chapters, verses, and range ends), applied to
+  the input, without ones that change nothing, and only those the filters keep
+*/
+pub fn suggestions(matcher: &BibleMatcher, text: &str, format: &FormatOptions) -> Vec<Suggestion> {
+    let possible = matcher.possible_books();
+    let allowed = |id: BookId| possible.as_ref().is_none_or(|books| books.contains(&id));
+    let books = matcher.data().books();
+    if text.trim().is_empty() {
+        return books
+            .ids()
+            .filter(|id| allowed(*id))
+            .filter_map(|id| {
+                let text = book_in_style(matcher, id, format.book)?;
+                let label = books.get_name(id).cloned().unwrap_or_else(|| text.clone());
+                Some(Suggestion {
+                    text,
+                    label,
+                    kind: "book",
+                })
+            })
+            .collect();
+    }
+    let options = CompleteOptions {
+        format: format.clone(),
+        limit: None,
+    };
+    matcher
+        .complete(text, text.len(), &options)
+        .into_iter()
+        .filter(|completion| match &completion.passage {
+            Some(passage) => matcher.keeps(passage),
+            None => books.search(&completion.label).is_none_or(allowed),
+        })
+        .filter_map(|completion| {
+            let mut full = text.to_string();
+            full.replace_range(completion.edit.range.clone(), &completion.edit.text);
+            let kind = match completion.kind {
+                CompletionKind::Book => "book",
+                CompletionKind::Chapter => "chapter",
+                CompletionKind::Verse => "verse",
+            };
+            // OSIS is a reference format of its own (`John.3.16`), not a way to type one
+            let osis = (format.book == BookStyle::Osis)
+                .then(|| completion.passage.as_ref()?.to_osis(books))
+                .flatten();
+            let full = osis.unwrap_or_else(|| full.trim_end().to_string());
+            (full != text.trim_end()).then_some(Suggestion {
+                text: full,
+                label: completion.label,
+                kind,
+            })
+        })
+        .collect()
+}
+
 /// References, with the same autocomplete as the editor plugins: books, then chapters, verses,
 /// and range ends (`John 3:` offers every verse of John 3)
 pub fn passages(value: &OsStr) -> Vec<CompletionCandidate> {
@@ -125,21 +206,16 @@ pub fn passages(value: &OsStr) -> Vec<CompletionCandidate> {
     if text.trim().is_empty() {
         return books(value);
     }
-    let matcher = BibleMatcher::default();
-    let options = CompleteOptions::default();
-    let completions = matcher.complete(&text, text.len(), &options);
-    // The engine also offers the typed reference in full (`Rom 8` → `Romans 8`)
-    completions
+    suggestions(&BibleMatcher::default(), &text, &FormatOptions::default())
         .into_iter()
-        .filter_map(|completion| {
-            let mut full = text.clone();
-            full.replace_range(completion.edit.range.clone(), &completion.edit.text);
-            let help = match completion.kind {
-                CompletionKind::Book => "book",
-                CompletionKind::Chapter => "chapter",
-                CompletionKind::Verse => "verse",
+        .map(|s| {
+            // Book completions end with a space, ready for the chapter
+            let text = if s.kind == "book" {
+                format!("{} ", s.text)
+            } else {
+                s.text
             };
-            (full != text.trim_end()).then(|| candidate(value, full).help(Some(help.into())))
+            candidate(value, text).help(Some(s.kind.into()))
         })
         .collect()
 }

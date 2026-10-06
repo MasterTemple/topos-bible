@@ -148,8 +148,28 @@ pub struct Args {
     pub sort: bool,
 
     /// Reuse results for files that have not changed (stored unfiltered, so any filters can use them)
-    #[arg(long)]
+    #[arg(long, overrides_with = "no_cache")]
     pub cache: bool,
+
+    /// Don't use the cache, even if the config turns it on
+    #[arg(long, overrides_with = "cache")]
+    pub no_cache: bool,
+
+    /// Print the completions for a partly typed reference, one per line, and exit: books for ""
+    /// (or nothing), then chapters, verses, and range ends ("John 3:" gives John 3:1, ...).
+    /// Uses -f for the book style and the book filters; -m json prints objects
+    #[arg(
+        long,
+        value_name = "TEXT",
+        num_args = 0..=1,
+        default_missing_value = "",
+        add = ArgValueCompleter::new(complete::passages)
+    )]
+    pub complete: Option<String>,
+
+    /// Print every book, one per line, and exit (the same as `--complete ""`)
+    #[arg(long)]
+    pub list_books: bool,
 
     /// Delete the cache (in ~/.cache/topos) and exit
     #[arg(long)]
