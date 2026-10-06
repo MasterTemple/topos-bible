@@ -2,7 +2,7 @@ use crate::{
     data::{bible_data::BibleData, books::BookId},
     segments::{
         autocomplete::incomplete::IncompleteSegment, grammar::SegmentList, passage::Segments,
-        segment::Segment,
+        resolve::Resolver, segment::Segment,
     },
 };
 
@@ -31,10 +31,26 @@ pub(crate) fn suggest_segments(data: &BibleData, input: &str) -> Option<SegmentS
         return None;
     }
     let (complete, incomplete) = list.split_incomplete();
-    let segments = Segments::from_nodes(complete);
     let chapter_verses = data.chapter_verses().get_chapter_verses(&book)?;
-    let suggestions =
-        IncompleteSegment::from_node(incomplete)?.suggest(chapter_verses, segments.last())?;
+    // Resolved like search, so single-chapter books read numbers as verses
+    let resolver = Resolver::for_book(Some(chapter_verses));
+    let segments = resolver.resolve(complete).segments;
+    // Whether the segment being typed starts with a verse: the separator before it (or after
+    // the last segment, if nothing is typed yet) and what came before decide, as in search
+    let separator = match incomplete {
+        Some(node) => node.separator,
+        None => list.trailing_separator,
+    };
+    let verse_chapter = resolver.next_verse_chapter(
+        separator.map(|s| s.actual),
+        complete.last(),
+        segments.last(),
+    );
+    let suggestions = IncompleteSegment::from_node(incomplete)?.suggest(
+        chapter_verses,
+        segments.last(),
+        verse_chapter,
+    )?;
 
     Some(SegmentSuggestions {
         start: book_match.start(),

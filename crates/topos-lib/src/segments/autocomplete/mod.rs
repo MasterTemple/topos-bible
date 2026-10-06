@@ -194,6 +194,51 @@ fn book_completions(data: &BibleData, before: &str, format: &FormatOptions) -> V
 
 #[cfg(test)]
 mod tests {
+    /// The segment being typed is a verse or a chapter by the same rules as search
+    #[test]
+    fn ranges_after_verse_lists() {
+        let matcher = BibleMatcher::default();
+        let first = |text: &str, join: bool| {
+            let options = CompleteOptions {
+                format: FormatOptions {
+                    join_adjacent: join,
+                    ..FormatOptions::default()
+                },
+                limit: Some(1),
+            };
+            matcher
+                .complete(text, text.len(), &options)
+                .into_iter()
+                .next()
+                .map(|c| c.label)
+        };
+        // After a verse, `5-` is a verse range in the same chapter (not chapters 5 to 6)
+        assert_eq!(
+            first("1 Timothy 1:3,4,5-", false).as_deref(),
+            Some("1 Timothy 1:3,4,5-6")
+        );
+        // Joined, adjacent verses become one range
+        assert_eq!(
+            first("1 Timothy 1:3,4,5-", true).as_deref(),
+            Some("1 Timothy 1:3-6")
+        );
+        assert_eq!(
+            first("John 3:16,17-", true).as_deref(),
+            Some("John 3:16-18")
+        );
+        // `;` starts chapters again, and so do chapter lists
+        assert_eq!(
+            first("John 3:16; 4-", false).as_deref(),
+            Some("John 3:16; 4-5")
+        );
+        assert_eq!(first("John 3, 5-", false).as_deref(), Some("John 3,5-6"));
+        // Single-chapter books have only verses
+        assert_eq!(first("Jude 5-", false).as_deref(), Some("Jude 1:5-6"));
+        assert_eq!(first("Jude 3,", false).as_deref(), Some("Jude 1:3,4"));
+        // A new segment after a verse continues with the next verse
+        assert_eq!(first("John 3:16,", false).as_deref(), Some("John 3:16,17"));
+    }
+
     /// Separators can be any text, like an en dash (3 bytes), which used to split a character
     #[test]
     fn multibyte_separators() {

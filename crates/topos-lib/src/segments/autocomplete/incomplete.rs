@@ -109,59 +109,46 @@ impl IncompleteSegment {
     }
 
     /**
-    This will suggest segments that can be added to the input segments
-    These segments can be suggesting chapters or verses or both
+    The segments that can complete this one, chapters or verses
+    - `verse_chapter` is the chapter its first number is a verse in, or [`None`] if that number
+      is a chapter ([`Resolver::next_verse_chapter`](crate::segments::resolve::Resolver::next_verse_chapter)):
+      `3:3,4,5-` offers verses `5-6` ... in chapter 3, `3:3; 5-` offers chapters `5-6` ...
+    - Verses continue after the previous segment's last verse when it is in the same chapter
     */
     pub fn suggest(
         &self,
         chapter_verses: &ChapterVerses,
         prev: Option<&Segment>,
+        verse_chapter: Option<u8>,
     ) -> Option<Vec<Segment>> {
         let last_chapter = chapter_verses.get_chapter_count();
 
         Some(match self.clone() {
-            // the first number of all segments is always and only a chapter
-            Self::ChapterOrVerse { start: _ } => {
-                if let Some(prev) = prev {
-                    let next_verse = match prev.ending_verse() {
-                        Some(cur) => cur.saturating_add(1),
-                        None => 1,
+            Self::ChapterOrVerse { start: _ } => match verse_chapter {
+                Some(chapter) => {
+                    let first = match prev {
+                        Some(prev) if prev.ending_chapter() == chapter => {
+                            prev.ending_verse().map_or(1, |v| v.saturating_add(1))
+                        }
+                        _ => 1,
                     };
-                    let current_chapter = prev.ending_chapter();
-
-                    (next_verse..=chapter_verses.get_last_verse(current_chapter)?)
-                        .map(|v| Segment::chapter_verse(current_chapter, v))
-                        .collect_vec()
-                } else {
-                    (1..=last_chapter).map(Segment::full_chapter).collect()
-                }
-            }
-
-            Self::ChapterOrVerseTo { start, end: _ } => {
-                // I can use context to determine if start is a chapter or a verse
-                if let Some(prev) = prev {
-                    let is_chapter = prev.ending_verse().is_some();
-                    if is_chapter {
-                        (start.saturating_add(1)..=last_chapter)
-                            .map(|c| Segment::full_chapter_range(start, c))
-                            .collect_vec()
-                    } else {
-                        let next_verse = match prev.ending_verse() {
-                            Some(cur) => cur.saturating_add(1),
-                            None => 1,
-                        };
-                        let current_chapter = prev.ending_chapter();
-
-                        (next_verse..=chapter_verses.get_last_verse(current_chapter)?)
-                            .map(|v| Segment::chapter_verse(current_chapter, v))
-                            .collect_vec()
-                    }
-                } else {
-                    (start.saturating_add(1)..=last_chapter)
-                        .map(|c| Segment::full_chapter_range(start, c))
+                    (first..=chapter_verses.get_last_verse(chapter)?)
+                        .map(|v| Segment::chapter_verse(chapter, v))
                         .collect_vec()
                 }
-            }
+                None => (1..=last_chapter).map(Segment::full_chapter).collect(),
+            },
+
+            Self::ChapterOrVerseTo { start, end: _ } => match verse_chapter {
+                // A verse range in that chapter: `3:3,4,5-` is 3:5-6, 3:5-7, ...
+                Some(chapter) => (start.saturating_add(1)
+                    ..=chapter_verses.get_last_verse(chapter)?)
+                    .map(|v| Segment::chapter_verse_range(chapter, start, v))
+                    .collect_vec(),
+                None => (start.saturating_add(1)..=last_chapter)
+                    .map(|c| Segment::full_chapter_range(start, c))
+                    .collect_vec(),
+            },
 
             Self::ChapterVerse {
                 start_chapter,

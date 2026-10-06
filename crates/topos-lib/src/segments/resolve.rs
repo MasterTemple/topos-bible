@@ -86,6 +86,35 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    /**
+    The chapter that the next segment's first number is a verse in, or [`None`] if it is a
+    chapter, given the separator before it and the segments so far: the same rules as
+    resolving, for completing a segment that is still being typed
+    - `John 3:16, 1` is a verse (in chapter 3), `John 3:16; 1` and `John 3, 1` are chapters
+    */
+    pub fn next_verse_chapter(
+        &self,
+        separator: Option<char>,
+        prev_node: Option<&SegmentNode>,
+        prev: Option<&Segment>,
+    ) -> Option<u8> {
+        if self.single_chapter() {
+            return Some(1);
+        }
+        let prev = prev?;
+        if separator == Some(';') {
+            return None;
+        }
+        // `Matth. x, 8`: after a Roman numeral chapter, a comma starts its verse
+        let old_style = separator == Some(',')
+            && prev_node
+                .is_some_and(|p| p.start.kind == NumberKind::Roman && p.parts().next().is_none());
+        if prev.ending_verse().is_none() && !old_style {
+            return None;
+        }
+        Some(prev.ending_chapter())
+    }
+
     fn single_chapter(&self) -> bool {
         self.versification
             .is_some_and(ChapterVerses::has_one_chapter)
