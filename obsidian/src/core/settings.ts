@@ -12,7 +12,7 @@ export interface ToposSettings {
   style: StyleName;
   /** Where references open: a link template (see links.ts), or "" for no links */
   linkTemplate: string;
-  /** Underline references in the editor and make them clickable */
+  /** Highlight references in the editor and make them clickable */
   linkInEditor: boolean;
   /** Turn references into links in reading view */
   linkInReading: boolean;

@@ -1,9 +1,11 @@
 /* References in the editor and reading view */
+/* A faint highlight in the theme's accent color, a little stronger when it can be opened */
 .topos-reference {
-  text-decoration: underline dotted var(--text-accent);
-  text-underline-offset: 3px;
+  background-color: color-mix(in srgb, var(--text-accent) 12%, transparent);
+  border-radius: var(--radius-s);
 }
 .cm-content .topos-reference[data-topos-url]:hover {
+  background-color: color-mix(in srgb, var(--text-accent) 22%, transparent);
   cursor: pointer;
 }
 

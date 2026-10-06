@@ -14,7 +14,7 @@ import type ToposPlugin from "../main.ts";
 export const refreshReferences = StateEffect.define<null>();
 
 /**
- * Underlines references in the visible part of the editor, and opens their links on
+ * Highlights references in the visible part of the editor, and opens their links on
  * click (Ctrl/Cmd-click by default, so a plain click still places the cursor).
  */
 export function referenceDecorations(plugin: ToposPlugin) {

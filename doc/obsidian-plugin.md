@@ -34,7 +34,7 @@ verse) or grouped by book, which the CLI can't do.
   `1 Corinthians`); in prose that would fire on every word, so by default book names only
   complete when they start with a capital letter or a number.
 - **Clickable references**: references in the editor (live preview and source) and in reading
-  view are underlined. Clicking (Ctrl/Cmd-click in the editor, so editing still works) opens
+  view are highlighted. Clicking (Ctrl/Cmd-click in the editor, so editing still works) opens
   its link (Literal Word by default; see Links).
 - **Context menu** on a reference: open its link, copy as OSIS, find it in the vault.
 
@@ -68,7 +68,7 @@ Settings from before templates (a Literal Word translation) become the matching 
 
 ### Settings
 
-Reference style; where references open (a site, a link template, or nowhere); whether editor clicks need Ctrl/Cmd; underline
+Reference style; where references open (a site, a link template, or nowhere); whether editor clicks need Ctrl/Cmd; highlight
 references in the editor and reading view; autocomplete on/off, book-name completion
 (off, capitalized, always), and how many suggestions; files and folders to exclude from search.
 

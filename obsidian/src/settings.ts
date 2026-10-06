@@ -43,7 +43,7 @@ export class ToposSettingTab extends PluginSettingTab {
     this.links(containerEl);
     new Setting(containerEl)
       .setName("Link references in the editor")
-      .setDesc("Underline references while editing, and open their links when clicked.")
+      .setDesc("Highlight references while editing, and open their links when clicked.")
       .addToggle((t) =>
         t.setValue(settings.linkInEditor).onChange((value) => {
           settings.linkInEditor = value;
