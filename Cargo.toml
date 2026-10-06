@@ -4,6 +4,7 @@ members = [
     "crates/topos-ffi",
     "crates/topos-formats",
     "crates/topos-lib",
+    "crates/topos-lsp",
     "crates/topos-py",
     "crates/topos-ts",
     "crates/topos-ts-boltffi",

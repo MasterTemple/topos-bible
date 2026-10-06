@@ -57,6 +57,29 @@ impl<'a> LineIndex<'a> {
     }
 }
 
+impl LineIndex<'_> {
+    /**
+    The byte offset of a 0-based line and UTF-16 column (an LSP position)
+    - A column past the end of the line clamps to the end, as LSP specifies
+    - [`None`] for a line past the end, or a column inside a character
+    */
+    pub fn offset_of_utf16(&self, line: usize, utf16_column: usize) -> Option<usize> {
+        let start = *self.line_starts.get(line)?;
+        let end = self
+            .line_starts
+            .get(line + 1)
+            .map_or(self.text.len(), |next| next - 1);
+        let mut units = 0;
+        for (idx, c) in self.text[start..end].char_indices() {
+            if units >= utf16_column {
+                return (units == utf16_column).then_some(start + idx);
+            }
+            units += c.len_utf16();
+        }
+        Some(end)
+    }
+}
+
 /// Where a match is in plain text: byte offsets, plus line and column positions
 #[derive(Copy, Clone, Debug)]
 pub struct LineColLocation {
@@ -93,5 +116,19 @@ mod tests {
         let x = "ab\nJé 日𝄞".len();
         assert_eq!(at(x), (2, 12, 6, 7));
         assert_eq!(at(x + 2), (3, 1, 1, 1));
+    }
+
+    #[test]
+    fn offsets_from_lsp_positions() {
+        let text = "ab\nJé 日𝄞x\n";
+        let index = LineIndex::new(text);
+        assert_eq!(index.offset_of_utf16(0, 0), Some(0));
+        assert_eq!(index.offset_of_utf16(1, 2), Some(3 + "Jé".len()));
+        // `𝄞` is 2 UTF-16 units, so column 6 is after it and column 5 is inside it
+        assert_eq!(index.offset_of_utf16(1, 6), Some(3 + "Jé 日𝄞".len()));
+        assert_eq!(index.offset_of_utf16(1, 5), None);
+        // past the end of a line clamps; past the last line is an error
+        assert_eq!(index.offset_of_utf16(0, 99), Some(2));
+        assert_eq!(index.offset_of_utf16(9, 0), None);
     }
 }

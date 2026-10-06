@@ -136,16 +136,13 @@ impl Books {
     */
     pub fn candidates<'h>(&self, text: &'h str) -> impl Iterator<Item = regex::Match<'h>> {
         // The whole match is the book name, so `find_iter` avoids the slower capture engine
-        self.regexes
-            .candidate
-            .find_iter(text)
-            .filter(move |m| {
-                text[m.end()..]
-                    .trim_start()
-                    .bytes()
-                    .next()
-                    .is_some_and(|b| b.is_ascii_digit() || roman::is_numeral(b))
-            })
+        self.regexes.candidate.find_iter(text).filter(move |m| {
+            text[m.end()..]
+                .trim_start()
+                .bytes()
+                .next()
+                .is_some_and(|b| b.is_ascii_digit() || roman::is_numeral(b))
+        })
     }
 
     /// The alternation of every book name and abbreviation (escaped, longest first, lowercase)

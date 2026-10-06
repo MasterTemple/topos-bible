@@ -1,0 +1,16 @@
+[package]
+name = "topos-lsp"
+version = "0.1.0"
+edition = "2024"
+description = "A language server for Bible references: completion, hover, and document symbols"
+
+[[bin]]
+name = "topos-lsp"
+path = "src/main.rs"
+
+[dependencies]
+lsp-server = "0.10.0"
+lsp-types = "0.97.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
+topos-lib = { path = "../topos-lib" }
