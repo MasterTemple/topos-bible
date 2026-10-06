@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } fr
 import { compileFilters, isEmpty, keep, NO_FILTERS, type Filters, type Testament } from "../core/filters.ts";
 import { literalWordUrl } from "../core/literalWord.ts";
 import { formatQuery, parseQuery } from "../core/query.ts";
-import { styled } from "../core/references.ts";
+import { written } from "../core/format.ts";
 import type { Hit } from "../core/search.ts";
 import { groupHits, sortHits, type SortOrder } from "../core/sort.ts";
 import type ToposPlugin from "../main.ts";
@@ -284,7 +284,7 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
               style={style}
               placeholder={row.placeholder}
               onSubmit={addTo(row.key)}
-              joinAdjacent={plugin.settings.joinAdjacent}
+              format={plugin.settings.format}
             />
           </FilterRow>
         ))}
@@ -343,7 +343,7 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
                     key={`${hit.path}:${hit.start}`}
                     plugin={plugin}
                     hit={hit}
-                    reference={styled(topos, hit.passage, style)}
+                    reference={written(topos, hit.passage, style, plugin.settings.format)}
                     showPath={state.groupBy === "book"}
                     context={state.context}
                     lines={fileLines.get(hit.path)}

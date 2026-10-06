@@ -1,15 +1,7 @@
-import { BookStyle, OffsetUnit, type Match, type Topos } from "topos-bible";
+import { OffsetUnit, type BookStyle, type Match, type Topos } from "topos-bible";
+import { DEFAULT_FORMAT, written, type FormatSettings } from "./format.ts";
 
-/** The reference written in a style: `John 3:16`, `Jn 3:16`, or `John.3.16` */
-export function styled(
-  topos: Topos,
-  passage: { osis: string; reference: string },
-  style: BookStyle,
-): string {
-  if (style === BookStyle.Name) return passage.reference;
-  if (style === BookStyle.Osis) return passage.osis;
-  return topos.parse(passage.osis, style)?.reference ?? passage.reference;
-}
+export { written };
 
 /** The reference in `line` that contains the column `ch` (UTF-16, 0-based), if any */
 export function referenceAt(topos: Topos, line: string, ch: number): Match | null {
@@ -23,10 +15,15 @@ export interface Replacement {
   text: string;
 }
 
-export function normalizeReferences(topos: Topos, text: string, style: BookStyle): Replacement[] {
+export function normalizeReferences(
+  topos: Topos,
+  text: string,
+  style: BookStyle,
+  format: FormatSettings = DEFAULT_FORMAT,
+): Replacement[] {
   return topos
     .search(text, OffsetUnit.Utf16)
-    .map((m) => ({ start: m.start, end: m.end, text: styled(topos, m.passage, style) }))
+    .map((m) => ({ start: m.start, end: m.end, text: written(topos, m.passage, style, format) }))
     .filter((r) => text.slice(r.start, r.end) !== r.text)
     .reverse();
 }

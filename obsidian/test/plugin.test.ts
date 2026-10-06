@@ -32,7 +32,10 @@ class Plugin {
     this.views.push(type);
   }
   addRibbonIcon() {}
-  addSettingTab() {}
+  settingTab: any;
+  addSettingTab(tab: any) {
+    this.settingTab = tab;
+  }
   registerEditorSuggest(suggest: any) {
     this.suggests.push(suggest);
   }
@@ -53,6 +56,42 @@ class TFile {
     this.extension = path.split(".").pop()!;
   }
 }
+/** Records each setting's name, description, and controls, so a test can change them */
+class FakeSetting {
+  name = "";
+  desc = "";
+  controls: any[] = [];
+  descEl = { toggleClass() {} };
+  constructor(containerEl: any) {
+    containerEl.settings.push(this);
+  }
+  private control(kind: string, build: (c: any) => void) {
+    const control: any = { kind, inputEl: { addClass() {} } };
+    for (const method of ["setPlaceholder", "setValue", "addOptions", "addOption", "setLimits", "setDynamicTooltip", "setButtonText", "setIcon", "setTooltip"]) {
+      control[method] = (value: any) => {
+        if (method === "setValue") control.value = value;
+        if (method === "setButtonText") control.text = value;
+        return control;
+      };
+    }
+    control.onChange = (handler: any) => ((control.change = handler), control);
+    control.onClick = (handler: any) => ((control.click = handler), control);
+    build(control);
+    this.controls.push(control);
+    return this;
+  }
+  setName(name: string) { this.name = name; return this; }
+  setDesc(desc: string) { this.desc = desc; return this; }
+  setHeading() { return this; }
+  addText(build: any) { return this.control("text", build); }
+  addTextArea(build: any) { return this.control("text", build); }
+  addToggle(build: any) { return this.control("toggle", build); }
+  addDropdown(build: any) { return this.control("dropdown", build); }
+  addSlider(build: any) { return this.control("slider", build); }
+  addButton(build: any) { return this.control("button", build); }
+  addExtraButton(build: any) { return this.control("button", build); }
+}
+
 class EditorSuggest {
   app: any;
   context: any = null;
@@ -76,8 +115,11 @@ const obsidian = {
   Plugin,
   TFile,
   EditorSuggest,
-  PluginSettingTab: class {},
-  Setting: class {},
+  PluginSettingTab: class {
+    containerEl: any = { settings: [] as any[], empty() { this.settings = []; } };
+    constructor(_app: any, _plugin: any) {}
+  },
+  Setting: FakeSetting,
   ItemView: class {},
   SuggestModal: class {},
   MarkdownView: class {},
@@ -214,6 +256,36 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   await plugin.deleteQuery("Paul");
   assert.deepEqual(saved.at(-1).queries.map((q: any) => q.name), ["Sermons"]);
   assert.ok(plugin.commands.some((c: any) => c.id === "open-saved-search"));
+
+  // The settings page: the format fields, with a preview that follows them
+  plugin.saveData = async () => {};
+  const tab = plugin.settingTab;
+  tab.display();
+  const setting = (name: string) => tab.containerEl.settings.find((s: any) => s.name === name);
+  assert.equal(setting("Reference format").desc, "Preview: John 3:16,17,18; 4:1-5:3   Jude 1:5");
+  setting("Join adjacent verses").controls[0].change(true);
+  setting("Chapter in single-chapter books").controls[0].change(false);
+  setting("Range").controls[0].change("–");
+  assert.equal(setting("Reference format").desc, "Preview: John 3:16–18; 4:1–5:3   Jude 5");
+  // An empty separator field goes back to the default
+  setting("Range").controls[0].change("");
+  assert.equal(plugin.settings.format.range, "-");
+  // Normalizing uses the format
+  const note = fakeEditor("See jn 3:16,17,18");
+  plugin.commands.find((c: any) => c.id === "normalize-references").editorCallback(note);
+  assert.equal(note.value, "See John 3:16-18");
+  const reset = tab.containerEl.settings
+    .flatMap((s: any) => s.controls)
+    .find((c: any) => c.text === "Reset the format");
+  reset.click();
+  assert.equal(plugin.settings.format.joinAdjacent, false);
+
+  // An earlier joinAdjacent setting moves into the format
+  plugin.loadData = async () => ({ joinAdjacent: true });
+  await plugin.loadSettings();
+  assert.equal(plugin.settings.format.joinAdjacent, true);
+  assert.equal(plugin.settings.format.range, "-");
+  assert.equal("joinAdjacent" in plugin.settings, false);
 
   // Saved searches from before 0.4.0 are migrated once (-o used to mean any overlap)
   const loadData = plugin.loadData;

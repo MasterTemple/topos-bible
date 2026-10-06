@@ -1,8 +1,10 @@
 import { App, Notice, Platform, PluginSettingTab, Setting } from "obsidian";
+import { BookStyle } from "topos-bible";
+import { DEFAULT_FORMAT, written, type FormatSettings } from "./core/format.ts";
 import { parseQuery } from "./core/query.ts";
 import type { BookCompletion } from "./core/completions.ts";
 import { TRANSLATIONS, type Translation } from "./core/literalWord.ts";
-import type { StyleName } from "./core/settings.ts";
+import { bookStyle, type StyleName } from "./core/settings.ts";
 import type ToposPlugin from "./main.ts";
 
 export { bookStyle, DEFAULT_SETTINGS, type StyleName, type ToposSettings } from "./core/settings.ts";
@@ -110,15 +112,8 @@ export class ToposSettingTab extends PluginSettingTab {
             void save();
           }),
       );
-    new Setting(containerEl)
-      .setName("Join adjacent verses")
-      .setDesc("Complete 3:16,17,18 as 3:16-18 (like the CLI's --fmt-join-adjacent).")
-      .addToggle((t) =>
-        t.setValue(settings.joinAdjacent).onChange((value) => {
-          settings.joinAdjacent = value;
-          void save();
-        }),
-      );
+
+    this.formatSettings(containerEl);
 
     new Setting(containerEl).setName("Search").setHeading();
     new Setting(containerEl)
@@ -189,6 +184,75 @@ export class ToposSettingTab extends PluginSettingTab {
       );
 
     this.savedSearches(containerEl);
+  }
+
+  /**
+   * How references are written (the CLI's --psg-fmt fields), with a preview: completions, the
+   * sidebar, the dialogs, and "Normalize references" all use it
+   */
+  private formatSettings(containerEl: HTMLElement): void {
+    const { settings } = this.plugin;
+    const format = settings.format;
+    const heading = new Setting(containerEl).setName("Reference format").setHeading();
+    const preview = () => {
+      const topos = this.plugin.topos;
+      const style = bookStyle(settings.style);
+      const samples = ["John 3:16,17,18; 4:1-5:3", "Jude 5"]
+        .map((text) => topos.parse(text, BookStyle.Name))
+        .filter((passage) => passage !== null)
+        .map((passage) => written(topos, passage, style, format));
+      heading.setDesc(`Preview: ${samples.join("   ")}`);
+    };
+    const save = () => {
+      void this.plugin.saveSettings();
+      preview();
+    };
+    const texts: [keyof FormatSettings, string, string][] = [
+      ["bookSeparator", "Between the book and chapter", "John␣3:16"],
+      ["chapterVerse", "Between chapter and verse", "3:16"],
+      ["range", "Range", "3:16-18"],
+      ["verseSeparator", "Between verses in a chapter", "3:16,18"],
+      ["chapterSeparator", "Between chapters", "3:16; 4:1"],
+    ];
+    for (const [key, name, example] of texts) {
+      new Setting(containerEl)
+        .setName(name)
+        .setDesc(example)
+        .addText((t) =>
+          t
+            .setPlaceholder(JSON.stringify(DEFAULT_FORMAT[key]))
+            .setValue(String(format[key]))
+            .onChange((value) => {
+              // Separators can be spaces, so only an empty field means the default
+              (format[key] as string) = value === "" ? (DEFAULT_FORMAT[key] as string) : value;
+              save();
+            }),
+        );
+    }
+    const toggles: [keyof FormatSettings, string, string][] = [
+      ["joinAdjacent", "Join adjacent verses", "3:16-18, not 3:16,17,18"],
+      ["omitFirstVerseOfChapterRange", "Leave out the first verse of chapter ranges", "1-2:3, not 1:1-2:3"],
+      ["chapterInSingleChapterBooks", "Chapter in single-chapter books", "Jude 1:5, not Jude 5"],
+    ];
+    for (const [key, name, example] of toggles) {
+      new Setting(containerEl)
+        .setName(name)
+        .setDesc(example)
+        .addToggle((t) =>
+          t.setValue(format[key] as boolean).onChange((value) => {
+            (format[key] as boolean) = value;
+            save();
+          }),
+        );
+    }
+    new Setting(containerEl).addButton((b) =>
+      b.setButtonText("Reset the format").onClick(() => {
+        settings.format = { ...DEFAULT_FORMAT };
+        void this.plugin.saveSettings();
+        this.display();
+      }),
+    );
+    preview();
   }
 
   /** Each saved search is a name and the CLI's filter options, editable here */

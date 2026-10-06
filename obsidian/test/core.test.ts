@@ -7,7 +7,7 @@ import {
   applyReplacements,
   normalizeReferences,
   referenceAt,
-  styled,
+  written,
 } from "../src/core/references.ts";
 import { ReferenceIndex, searchText } from "../src/core/search.ts";
 import { groupHits, sortHits } from "../src/core/sort.ts";
@@ -148,9 +148,9 @@ test("sorting and grouping", () => {
 
 test("references in a style, under the cursor, and normalized", () => {
   const passage = parse("jn 3:16-18");
-  assert.equal(styled(topos, passage, BookStyle.Name), "John 3:16-18");
-  assert.equal(styled(topos, passage, BookStyle.Abbreviation), "Jn 3:16-18");
-  assert.equal(styled(topos, passage, BookStyle.Osis), "John.3.16-John.3.18");
+  assert.equal(written(topos, passage, BookStyle.Name), "John 3:16-18");
+  assert.equal(written(topos, passage, BookStyle.Abbreviation), "Jn 3:16-18");
+  assert.equal(written(topos, passage, BookStyle.Osis), "John.3.16-John.3.18");
 
   const line = "See jn 3:16 and Rom 8:28";
   assert.equal(referenceAt(topos, line, 6)?.passage.reference, "John 3:16");

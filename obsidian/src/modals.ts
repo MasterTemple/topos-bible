@@ -1,9 +1,9 @@
 import { App, Editor, SuggestModal } from "obsidian";
 import { CompletionKind, type Completion } from "topos-bible";
 import { applyCompletion, completionsBefore } from "./core/completions.ts";
+import { written } from "./core/format.ts";
 import { compileFilters, keep, NO_FILTERS } from "./core/filters.ts";
 import type { SavedQuery } from "./core/query.ts";
-import { styled } from "./core/references.ts";
 import type { Hit } from "./core/search.ts";
 import { sortHits } from "./core/sort.ts";
 import type ToposPlugin from "./main.ts";
@@ -33,9 +33,9 @@ export class InsertReferenceModal extends SuggestModal<Choice> {
     const style = bookStyle(settings.style);
     const choices: Choice[] = [];
     const passage = query.trim() ? topos.parse(query, style) : null;
-    if (passage) choices.push({ kind: "reference", text: styled(topos, passage, style) });
+    if (passage) choices.push({ kind: "reference", text: written(topos, passage, style, settings.format) });
     const completions = completionsBefore(topos, query, style, settings.suggestionLimit, "always", {
-      joinAdjacent: settings.joinAdjacent,
+      format: settings.format,
     });
     choices.push(...completions.map((completion) => ({ kind: "completion" as const, completion })));
     return choices;
@@ -94,7 +94,8 @@ export class GoToReferenceModal extends SuggestModal<Hit> {
   renderSuggestion(hit: Hit, el: HTMLElement): void {
     const style = bookStyle(this.plugin.settings.style);
     el.addClass("topos-hit-suggestion");
-    el.createDiv({ cls: "topos-hit-reference", text: styled(this.plugin.topos, hit.passage, style) });
+    const reference = written(this.plugin.topos, hit.passage, style, this.plugin.settings.format);
+    el.createDiv({ cls: "topos-hit-reference", text: reference });
     el.createDiv({ cls: "topos-hit-location", text: `${hit.path}:${hit.line}` });
     el.createDiv({ cls: "topos-hit-context", text: hit.lineText.trim() });
   }

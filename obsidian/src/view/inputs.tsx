@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { CompletionKind, type BookStyle, type Completion, type Topos } from "topos-bible";
 import { applyCompletion, completionsBefore } from "../core/completions.ts";
+import { DEFAULT_FORMAT, written, type FormatSettings } from "../core/format.ts";
 
 interface Option {
   value: string;
@@ -72,7 +73,7 @@ export function referenceChoices(
   style: BookStyle,
   value: string,
   caret: number,
-  joinAdjacent = false,
+  format: FormatSettings = DEFAULT_FORMAT,
 ): Choice[] {
   if (!value.trim()) {
     return topos.books().map((book) => {
@@ -85,12 +86,12 @@ export function referenceChoices(
   }
   const passage = topos.parse(value, style);
   const completions = completionsBefore(topos, value.slice(0, caret), style, MAX_OPTIONS, "always", {
-    joinAdjacent,
+    format,
   });
   const choices: Choice[] = completions.map((completion) => ({ kind: "complete", completion }));
   if (!passage) return choices;
   // The chip gets the reference written out in the chosen style: `jn 3:16-` adds John 3:16
-  const add: Choice = { kind: "add", reference: passage.reference };
+  const add: Choice = { kind: "add", reference: written(topos, passage, style, format) };
   return /[:\-–—,.;]\s*$/.test(value) ? [...choices, add] : [add, ...choices];
 }
 
@@ -100,13 +101,13 @@ export function ReferenceInput({
   style,
   placeholder,
   onSubmit,
-  joinAdjacent = false,
+  format = DEFAULT_FORMAT,
 }: {
   topos: Topos;
   style: BookStyle;
   placeholder: string;
   onSubmit: (reference: string) => void;
-  joinAdjacent?: boolean;
+  format?: FormatSettings;
 }) {
   const [value, setValue] = useState("");
   const [caret, setCaret] = useState(0);
@@ -115,8 +116,8 @@ export function ReferenceInput({
   const input = useRef<HTMLInputElement>(null);
 
   const choices = useMemo(
-    () => referenceChoices(topos, style, value, caret, joinAdjacent),
-    [topos, style, value, caret, joinAdjacent],
+    () => referenceChoices(topos, style, value, caret, format),
+    [topos, style, value, caret, format],
   );
   const valid = value.trim() !== "" && topos.parse(value, style) !== null;
 

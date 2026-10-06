@@ -11,6 +11,7 @@ import {
 } from "obsidian";
 import type { Passage, Topos } from "topos-bible";
 import { OutdatedCliError } from "./core/cli.ts";
+import { DEFAULT_FORMAT } from "./core/format.ts";
 import { migrateQuery, parseQuery, type SavedQuery } from "./core/query.ts";
 import { NO_FILTERS } from "./core/filters.ts";
 import { literalWordUrl } from "./core/literalWord.ts";
@@ -98,7 +99,15 @@ export default class ToposPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) as Partial<ToposSettings>) };
+    const saved = ((await this.loadData()) ?? {}) as Partial<ToposSettings> & { joinAdjacent?: boolean };
+    this.settings = { ...DEFAULT_SETTINGS, ...saved };
+    // Format fields added later get their defaults; an earlier joinAdjacent setting carries over
+    this.settings.format = {
+      ...DEFAULT_FORMAT,
+      ...(typeof saved.joinAdjacent === "boolean" ? { joinAdjacent: saved.joinAdjacent } : {}),
+      ...saved.format,
+    };
+    delete (this.settings as { joinAdjacent?: boolean }).joinAdjacent;
     this.settings.queries = (this.settings.queries ?? []).filter((q) => q && typeof q.name === "string");
     // Saved searches from before 0.4.0 used -o for any overlap
     if ((this.settings.queryFormat ?? 1) < 2) {
@@ -477,12 +486,12 @@ export default class ToposPlugin extends Plugin {
     const style = bookStyle(this.settings.style);
     const selection = editor.getSelection();
     if (selection) {
-      const replacements = normalizeReferences(this.topos, selection, style);
+      const replacements = normalizeReferences(this.topos, selection, style, this.settings.format);
       editor.replaceSelection(applyReplacements(selection, replacements));
       new Notice(`Normalized ${replacements.length} reference${replacements.length === 1 ? "" : "s"}`);
       return;
     }
-    const replacements = normalizeReferences(this.topos, editor.getValue(), style);
+    const replacements = normalizeReferences(this.topos, editor.getValue(), style, this.settings.format);
     editor.transaction({
       changes: replacements.map((r) => ({
         from: editor.offsetToPos(r.start),

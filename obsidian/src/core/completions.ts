@@ -1,4 +1,5 @@
-import { CompletionKind, OffsetUnit, ToposFormat, type BookStyle, type Completion, type Topos } from "topos-bible";
+import { CompletionKind, OffsetUnit, type BookStyle, type Completion, type Topos } from "topos-bible";
+import { DEFAULT_FORMAT, withFormat, type FormatSettings } from "./format.ts";
 
 export type BookCompletion = "off" | "capitalized" | "always";
 
@@ -11,7 +12,7 @@ export type BookCompletion = "off" | "capitalized" | "always";
  *   letter or a number (`capitalized`), so ordinary prose isn't interrupted
  * - `needsNumber`: in prose, `John ` alone doesn't list chapters until a number or a delimiter
  *   follows (`John 3`, `John 3:`, `John 3:16, `)
- * - `joinAdjacent`: write adjacent verses as a range (`3:16-18`, not `3:16,17,18`)
+ * - `format`: how completions are written (separators, joined ranges, ...)
  */
 export function completionsBefore(
   topos: Topos,
@@ -19,15 +20,11 @@ export function completionsBefore(
   style: BookStyle,
   limit: number,
   books: BookCompletion,
-  { needsNumber = false, joinAdjacent = false }: { needsNumber?: boolean; joinAdjacent?: boolean } = {},
+  { needsNumber = false, format = DEFAULT_FORMAT }: { needsNumber?: boolean; format?: FormatSettings } = {},
 ): Completion[] {
-  const format = ToposFormat.create().book(style).joinAdjacent(joinAdjacent);
-  let completions: Completion[];
-  try {
-    completions = topos.completeWith(before, before.length, OffsetUnit.Utf16, format, 0);
-  } finally {
-    format.dispose();
-  }
+  const completions = withFormat(format, style, (f) =>
+    topos.completeWith(before, before.length, OffsetUnit.Utf16, f, 0),
+  );
   const waiting = needsNumber && !/[\d:.,;\-–—]\s*$/.test(before);
   return completions
     .filter((c) => {
