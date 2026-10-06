@@ -86,6 +86,11 @@ pub struct Args {
     #[arg(long = "overlaps", short = 'o', add = ArgValueCompleter::new(complete::passages))]
     pub overlaps: Vec<String>,
 
+    /// With -o and --outside, references overlap only through the verses they name: a whole
+    /// chapter like `John 3` doesn't overlap `John 3:16`, but `John 3:14-18` does
+    #[arg(long)]
+    pub explicit_overlap: bool,
+
     /// Drop references that share any verse with this passage
     #[arg(long = "outside", add = ArgValueCompleter::new(complete::passages))]
     pub outside: Vec<String>,
@@ -472,6 +477,7 @@ impl Args {
         for passage in &self.inside {
             filter.filter_inside(passage)?;
         }
+        filter.explicit_overlap(self.explicit_overlap);
         for passage in &self.overlaps {
             filter.filter_overlaps(passage)?;
         }

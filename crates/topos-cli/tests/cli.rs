@@ -749,3 +749,33 @@ fn path_options() {
     assert_eq!(bad.1, Some(2));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn explicit_overlap() {
+    let text = "John 3, John 2-4, John 3:14-18, John 2; 3:16";
+    let run = |args: &[&str]| {
+        let mut all = vec![
+            "--no-config",
+            "--text",
+            text,
+            "-m",
+            "quickfix",
+            "-o",
+            "John 3:16",
+        ];
+        all.extend(args);
+        stdout(&topos(&all, None))
+    };
+    assert_eq!(run(&[]).lines().count(), 4);
+    assert_eq!(
+        run(&["--explicit-overlap"]),
+        ":1:19: John 3:14-18\n:1:33: John 2; 3:16\n"
+    );
+    // As a config option
+    let configured = topos_with_config(
+        Some("explicit-overlap = true\nmode = \"quickfix\"\n"),
+        &["--text", text, "-o", "John 3:16"],
+        None,
+    );
+    assert_eq!(stdout(&configured).lines().count(), 2);
+}

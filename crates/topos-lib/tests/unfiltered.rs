@@ -42,6 +42,12 @@ fn filters() -> Vec<(&'static str, BibleFilter)> {
         f.filter_overlaps("Romans 8").unwrap();
         f.filter_overlaps("Genesis 1").unwrap();
     });
+    add("explicit overlaps john 3:16, outside rom 8:28", &|f| {
+        f.explicit_overlap(true);
+        f.filter_overlaps("John 3:16").unwrap();
+        f.filter_overlaps("Romans 8").unwrap();
+        f.filter_outside("Romans 8:28").unwrap();
+    });
     add("nt outside john", &|f| {
         f.include(TestamentFilter::New).unwrap();
         f.filter_outside("John 1-21").unwrap();

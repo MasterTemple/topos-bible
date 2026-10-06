@@ -214,6 +214,12 @@ impl BibleFilter {
         Ok(())
     }
 
+    /// Matches overlap (for `filter_overlaps` and `filter_outside`) only through the verses they
+    /// name: a whole chapter like `John 3` doesn't overlap `John 3:16`, but `John 3:14-18` does
+    pub fn explicit_overlap(&mut self, explicit: bool) {
+        self.complex_filter.explicit_overlap(explicit);
+    }
+
     /// Drop matches that overlap this passage (`Err` if it cannot be parsed)
     pub fn filter_outside(&mut self, passage: &str) -> ToposResult<()> {
         let psg = self.parse_passage(passage)?;
@@ -323,6 +329,51 @@ mod tests {
         assert_eq!(books(&filter), [1, 2, 3, 4, 5, 66]);
         filter.include(TestamentFilter::Old).unwrap();
         assert_eq!(books(&filter), [1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn explicit_overlap_ignores_whole_chapters() {
+        let text = "John 3, John 2-4, John 3:14-18, John 3:16-4:2, John 2; 3:16, John 3:1-5";
+        let found = |explicit: bool, overlaps: &[&str], outside: &[&str]| {
+            let mut filter = BibleFilter::default();
+            filter.explicit_overlap(explicit);
+            for passage in overlaps {
+                filter.filter_overlaps(passage).unwrap();
+            }
+            for passage in outside {
+                filter.filter_outside(passage).unwrap();
+            }
+            search(filter, text)
+        };
+        assert_eq!(
+            found(false, &["John 3:16"], &[]),
+            [
+                "John 3",
+                "John 2-4",
+                "John 3:14-18",
+                "John 3:16-4:2",
+                "John 2; 3:16"
+            ]
+        );
+        assert_eq!(
+            found(true, &["John 3:16"], &[]),
+            ["John 3:14-18", "John 3:16-4:2", "John 2; 3:16"]
+        );
+        // The passages given still cover whole chapters: `John 3` overlaps any verse in it
+        assert_eq!(
+            found(true, &["John 3"], &[]),
+            [
+                "John 3:14-18",
+                "John 3:16-4:2",
+                "John 2; 3:16",
+                "John 3:1-5"
+            ]
+        );
+        // --outside only drops matches that name one of its verses
+        assert_eq!(
+            found(true, &[], &["John 3:16"]),
+            ["John 3", "John 2-4", "John 3:1-5"]
+        );
     }
 
     #[test]

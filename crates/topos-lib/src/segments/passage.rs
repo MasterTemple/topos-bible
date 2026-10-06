@@ -31,6 +31,30 @@ impl Passage {
     pub fn contains(&self, other: &Passage) -> bool {
         self.book == other.book && self.segments.fully_contains(&other.segments)
     }
+
+    /**
+    The segments that name verses, leaving out whole chapters (`John 3`, `John 3-4`), or [`None`]
+    if every segment is a whole chapter
+    - `John 2; 3:16` gives `John 3:16`
+    - A range from a whole chapter to a verse (`John 1-2:3`) names a verse, so it is kept
+    */
+    pub fn explicit_verses(&self) -> Option<Passage> {
+        let segments: Vec<Segment> = self
+            .segments
+            .iter()
+            .filter(|segment| {
+                !matches!(
+                    segment,
+                    Segment::FullChapter(_) | Segment::FullChapterRange(_)
+                )
+            })
+            .copied()
+            .collect();
+        (!segments.is_empty()).then_some(Passage {
+            book: self.book,
+            segments: Segments(segments),
+        })
+    }
 }
 
 /// TODO: I need Segments and PartialSegments/Incomplete segments to be unified under a large

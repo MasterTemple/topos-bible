@@ -18,6 +18,9 @@ pub struct ComplexFilter {
     overlapping: Vec<Passage>,
     /// Drop matches that share a verse with any of these
     outside_of: Vec<Passage>,
+    /// Matches overlap only through the verses they name, not whole chapters (`John 3` doesn't
+    /// overlap `John 3:16`, but `John 3:14-18` does), for `overlapping` and `outside_of`
+    explicit_overlap: bool,
 }
 
 impl ComplexFilter {
@@ -38,6 +41,11 @@ impl ComplexFilter {
         self.outside_of.push(psg);
     }
 
+    /// Whole chapters in matches don't count as overlapping (see the field)
+    pub fn explicit_overlap(&mut self, explicit: bool) {
+        self.explicit_overlap = explicit;
+    }
+
     /**
     - Inside and overlapping passages are inclusions, joined with a logical OR: a match is kept
       if it is inside any `inside` passage or overlaps any `overlaps` passage
@@ -48,20 +56,22 @@ impl ComplexFilter {
             return false;
         }
         let versification = data.chapter_verses().get_chapter_verses(&psg.book);
+        // With explicit overlap, only the verses the match names can overlap
+        let explicit = self.explicit_overlap.then(|| psg.explicit_verses());
+        let overlap_part = match &explicit {
+            Some(part) => part.as_ref(),
+            None => Some(psg),
+        };
+        let overlaps = |other: &Passage| {
+            overlap_part.is_some_and(|part| other.overlaps_passage(part, versification))
+        };
         let included = (self.inside_of.is_empty() && self.overlapping.is_empty())
             || self
                 .inside_of
                 .iter()
                 .any(|outer| outer.contains_passage(psg, versification))
-            || self
-                .overlapping
-                .iter()
-                .any(|other| other.overlaps_passage(psg, versification));
-        included
-            && !self
-                .outside_of
-                .iter()
-                .any(|outside| outside.overlaps_passage(psg, versification))
+            || self.overlapping.iter().any(overlaps);
+        included && !self.outside_of.iter().any(overlaps)
     }
 
     /// The only books a kept match can be in, or [`None`] for any book: the allowed books,

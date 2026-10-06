@@ -175,6 +175,9 @@ topos --exclude-testament new -m table
 - Exclusions always win, so a book can be excluded from an included genre
 - `-m count` prints matches per file; `--total-count` prints one total across all files
 - `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches
+- With `--explicit-overlap`, a reference overlaps only through the verses it names: `John 3` and
+  `John 2-4` don't overlap `-o "John 3:16"`, but `John 3:14-18` and `John 2; 3:16` do (the same
+  goes for `--outside`)
 - Unknown books or genres are errors
 
 ## Config
@@ -383,6 +386,9 @@ Options:
 
   -o, --overlaps <OVERLAPS>
           Only keep references that share any verse with this passage (e.g. "John 1" keeps John 1:51-2:1)
+
+      --explicit-overlap
+          With -o and --outside, references overlap only through the verses they name: a whole chapter like `John 3` doesn't overlap `John 3:16`, but `John 3:14-18` does
 
       --outside <OUTSIDE>
           Drop references that share any verse with this passage
