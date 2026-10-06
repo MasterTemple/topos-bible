@@ -65,6 +65,34 @@ if telescope then
   log("telescope ext", results(function() require("telescope").extensions.topos.explicit_overlap({ passage = "Rom 8:28" }) end))
   log("telescope ext query", results(function() require("telescope").extensions.topos.query({ args = '-g "Pauline Epistles"' }) end))
 end
+-- :ToposLspStart in an unnamed buffer with no file type, then again to restart
+local first = vim.lsp.get_clients({ name = "topos" })[1].id
+vim.cmd("enew")
+vim.api.nvim_buf_set_lines(0, 0, -1, false, { "Read jn 3:16 today" })
+local scratch = vim.api.nvim_get_current_buf()
+log("unnamed before", #vim.lsp.get_clients({ bufnr = scratch, name = "topos" }))
+vim.cmd("ToposLspStart")
+vim.wait(5000, function() return #vim.lsp.get_clients({ bufnr = scratch, name = "topos" }) > 0 end)
+vim.wait(3000, function() return #vim.diagnostic.get(scratch) > 0 end)
+local diagnostics = vim.diagnostic.get(scratch)
+log("unnamed after", #vim.lsp.get_clients({ bufnr = scratch, name = "topos" }), diagnostics[1] and diagnostics[1].message)
+-- Editing the unnamed buffer updates its diagnostics
+vim.api.nvim_buf_set_lines(scratch, 0, -1, false, { "Now rom 8:28" })
+vim.api.nvim_exec_autocmds("TextChanged", { buffer = scratch })
+vim.wait(3000, function()
+  local d = vim.diagnostic.get(scratch)[1]
+  return d and d.message == "Romans 8:28"
+end)
+log("unnamed edited", vim.diagnostic.get(scratch)[1] and vim.diagnostic.get(scratch)[1].message)
+vim.cmd("ToposLspStart")
+vim.wait(5000, function()
+  local c = vim.lsp.get_clients({ name = "topos" })[1]
+  return c and c.id ~= first and c.attached_buffers[scratch] ~= nil
+end)
+local restarted = vim.lsp.get_clients({ name = "topos" })
+local open = vim.fn.bufnr(WORK .. "/ws/open.txt")
+log("restarted", #restarted, restarted[1].id ~= first, restarted[1].attached_buffers[scratch] ~= nil, restarted[1].attached_buffers[open] ~= nil)
+vim.cmd("buffer " .. open)
 vim.cmd("checkhealth topos")
 local health = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
 log("health ok", select(2, health:gsub("OK", "")), "errors", select(2, health:gsub("ERROR", "")))

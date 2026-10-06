@@ -15,7 +15,8 @@
   "John 3:16"`, and `Reformat all N references in this file` when several differ), or search the
   workspace for it: `Search "John 3:16" for explicit overlap`, `... for any overlap`,
   `... for exact overlap`, and `Search inside "John 3"`
-- **Diagnostics**: an information diagnostic on each reference with how it's written in your
+- **Diagnostics**, pushed, or pulled when the editor asks for them (`textDocument/diagnostic`, for
+  editors that support it): an information diagnostic on each reference with how it's written in your
   format (`John 3:16`, code `reference`), and warnings for references that do not exist, like
   `John 3:99` (code `missing`)
 

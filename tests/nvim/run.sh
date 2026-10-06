@@ -43,6 +43,14 @@ check() {
   else
     echo "ok ($name)"
   fi
+  # :ToposLspStart starts the server in an unnamed buffer with no file type, then restarts it
+  for line in 'unnamed before 0' 'unnamed after 1 John 3:16' 'unnamed edited Romans 8:28' 'restarted 1 true true true'; do
+    if ! grep -qxF "$line" <<<"$output"; then
+      echo "FAIL ($name): expected '$line'"
+      grep -E '^(unnamed|restarted|ERROR)' <<<"$output" || true
+      status=1
+    fi
+  done
 }
 
 check quickfix "$(run)"

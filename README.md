@@ -1,4 +1,4 @@
-# τόπος
+# τόπος Bible
 
 > [τόπος](https://biblehub.com/greek/5117.htm): spot, location, position
 
@@ -31,7 +31,7 @@ Telescope pickers. With [lazy.nvim](https://lazy.folke.io):
   dependencies = { 'nvim-telescope/telescope.nvim' }, -- optional
   ft = { 'markdown', 'text' },
   cmd = { 'ToposSearch', 'ToposQuery', 'ToposExplicitOverlap', 'ToposAnyOverlap',
-          'ToposExactOverlap', 'ToposInside', 'ToposExcludeOverlap', 'ToposBuild' },
+          'ToposExactOverlap', 'ToposInside', 'ToposExcludeOverlap', 'ToposBuild', 'ToposLspStart' },
   opts = {
     -- topos-lsp's settings: the CLI's config.toml keys, which these override
     settings = {

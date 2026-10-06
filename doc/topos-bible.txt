@@ -24,7 +24,7 @@ With lazy.nvim: >lua
     dependencies = { 'nvim-telescope/telescope.nvim' }, -- optional
     ft = { 'markdown', 'text' },
     cmd = { 'ToposSearch', 'ToposQuery', 'ToposExplicitOverlap', 'ToposAnyOverlap',
-            'ToposExactOverlap', 'ToposInside', 'ToposExcludeOverlap', 'ToposBuild' },
+            'ToposExactOverlap', 'ToposInside', 'ToposExcludeOverlap', 'ToposBuild', 'ToposLspStart' },
     opts = { settings = { format = 'abbreviation', ['inlay-hints'] = 'never' } },
   }
 <
@@ -86,6 +86,13 @@ the language server's workspace folder (or a root marker, or the cwd).
 
 Without a passage, these use the reference under the cursor. Passages are
 completed with <Tab> (`John 3:` lists every verse).
+
+                                                              *:ToposLspStart*
+:ToposLspStart          Starts topos-lsp for the current buffer, whatever its
+                        file type (an unnamed buffer too), or restarts it if
+                        it is running (re-attaching its buffers). Neovim can't
+                        route diagnostics to an unnamed buffer, so the plugin
+                        asks for them itself as you edit.
 
                                                                  *:ToposBuild*
 :ToposBuild[!]          Builds topos-lsp and topos if they are missing (!

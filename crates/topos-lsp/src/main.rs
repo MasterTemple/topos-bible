@@ -11,8 +11,9 @@ use lsp_types::{
         Notification as LspNotification, PublishDiagnostics, ShowMessage,
     },
     request::{
-        CodeActionRequest, Completion, DocumentSymbolRequest, ExecuteCommand, HoverRequest,
-        InlayHintRequest, References, Request as LspRequest,
+        CodeActionRequest, Completion, DocumentDiagnosticRequest, DocumentSymbolRequest,
+        ExecuteCommand, HoverRequest, InlayHintRequest, References, Request as LspRequest,
+        WorkspaceDiagnosticRefresh,
     },
 };
 use topos_bible::matcher::BibleMatcher;
@@ -59,9 +60,39 @@ fn publish_diagnostics(
 }
 
 fn run(connection: &Connection) -> Result<(), AnyError> {
-    let init = connection.initialize(serde_json::to_value(Server::capabilities())?)?;
+    let (id, init) = connection.initialize_start()?;
     let init: InitializeParams = serde_json::from_value(init).unwrap_or_default();
+    let text_document = init.capabilities.text_document.as_ref();
+    // Editors that ask for diagnostics (pull) get them for any buffer, even an unnamed one whose
+    // `file://` URI a pushed notification couldn't be matched back to
+    let pull = text_document.and_then(|t| t.diagnostic.as_ref()).is_some();
+    let refresh = init
+        .capabilities
+        .workspace
+        .as_ref()
+        .and_then(|w| w.diagnostic.as_ref())
+        .and_then(|d| d.refresh_support)
+        .unwrap_or(false);
+    let mut capabilities = Server::capabilities();
+    if pull {
+        capabilities.diagnostic_provider = Some(lsp_types::DiagnosticServerCapabilities::Options(
+            lsp_types::DiagnosticOptions {
+                identifier: Some(String::from("topos")),
+                inter_file_dependencies: false,
+                workspace_diagnostics: false,
+                ..lsp_types::DiagnosticOptions::default()
+            },
+        ));
+    }
+    connection.initialize_finish(
+        id,
+        serde_json::json!({
+            "capabilities": capabilities,
+            "serverInfo": { "name": "topos-lsp", "version": env!("CARGO_PKG_VERSION") },
+        }),
+    )?;
     let mut server = Server::new(BibleMatcher::default());
+    let mut refreshes = 0;
     // The workspace folders, for go-to-references and searches
     #[allow(deprecated)]
     let roots = match &init.workspace_folders {
@@ -93,6 +124,16 @@ fn run(connection: &Connection) -> Result<(), AnyError> {
                 };
                 match server.configure(params.settings) {
                     // New data can change which references exist
+                    Ok(()) if pull && refresh => {
+                        refreshes += 1;
+                        let request = Request::new(
+                            lsp_server::RequestId::from(format!("refresh-{refreshes}")),
+                            WorkspaceDiagnosticRefresh::METHOD.into(),
+                            serde_json::Value::Null,
+                        );
+                        connection.sender.send(Message::Request(request))?;
+                    }
+                    Ok(()) if pull => {}
                     Ok(()) => {
                         for uri in server.documents() {
                             publish_diagnostics(connection, &server, &uri)?;
@@ -102,7 +143,9 @@ fn run(connection: &Connection) -> Result<(), AnyError> {
                 }
             }
             Message::Notification(notification) => {
-                if let Some(uri) = notify(&mut server, notification) {
+                if let Some(uri) = notify(&mut server, notification)
+                    && !pull
+                {
                     publish_diagnostics(connection, &server, &uri)?;
                 }
             }
@@ -122,6 +165,9 @@ fn respond(server: &Server, request: Request) -> Response {
         CodeActionRequest::METHOD => params(request).map(|p| json(server.code_actions(p))),
         References::METHOD => params(request).map(|p| json(server.references(p))),
         ExecuteCommand::METHOD => params(request).and_then(|p| server.execute_command(p).map(json)),
+        DocumentDiagnosticRequest::METHOD => {
+            params(request).map(|p| json(server.pull_diagnostics(p)))
+        }
         method => {
             let code = lsp_server::ErrorCode::MethodNotFound as i32;
             return Response::new_err(id, code, format!("unsupported request {method}"));
@@ -213,6 +259,58 @@ mod tests {
         };
         let value = hover.response_result.unwrap()["contents"]["value"].clone();
         assert_eq!(value, "**Philippians 4:1**\n\nOSIS: `Phil.4.1`");
+
+        send(request(3, "shutdown", json!(null)));
+        client.receiver.recv().unwrap();
+        send(Message::Notification(Notification::new(
+            "exit".into(),
+            json!(null),
+        )));
+        thread.join().unwrap();
+    }
+
+    /// Editors that support pull diagnostics ask for them, and get none pushed
+    #[test]
+    fn pull_diagnostics() {
+        let (client, server) = Connection::memory();
+        let thread = std::thread::spawn(move || super::run(&server).unwrap());
+        let send = |message: Message| client.sender.send(message).unwrap();
+        let request = |id: i32, method: &str, params| {
+            Message::Request(Request::new(RequestId::from(id), method.into(), params))
+        };
+        send(request(
+            1,
+            "initialize",
+            json!({ "capabilities": { "textDocument": { "diagnostic": {} } } }),
+        ));
+        let Message::Response(init) = client.receiver.recv().unwrap() else {
+            panic!("expected the initialize response")
+        };
+        let result = init.response_result.unwrap();
+        assert_eq!(
+            result["capabilities"]["diagnosticProvider"]["identifier"],
+            "topos"
+        );
+        send(Message::Notification(Notification::new(
+            "initialized".into(),
+            json!({}),
+        )));
+        send(Message::Notification(Notification::new(
+            "textDocument/didOpen".into(),
+            json!({ "textDocument": { "uri": "file://", "languageId": "", "version": 1, "text": "Read jn 3:16" } }),
+        )));
+        // No diagnostics are pushed: the next message is the answer to this request
+        send(request(
+            2,
+            "textDocument/diagnostic",
+            json!({ "textDocument": { "uri": "file://" } }),
+        ));
+        let Message::Response(report) = client.receiver.recv().unwrap() else {
+            panic!("expected the diagnostic report, not a pushed notification")
+        };
+        let report = report.response_result.unwrap();
+        assert_eq!(report["kind"], "full");
+        assert_eq!(report["items"][0]["message"], "John 3:16");
 
         send(request(3, "shutdown", json!(null)));
         client.receiver.recv().unwrap();

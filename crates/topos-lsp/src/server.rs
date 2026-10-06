@@ -266,6 +266,25 @@ impl Server {
         PublishDiagnosticsParams::new(uri.clone(), diagnostics, None)
     }
 
+    /// The document's diagnostics when the editor asks for them (pull diagnostics)
+    pub fn pull_diagnostics(
+        &self,
+        params: lsp_types::DocumentDiagnosticParams,
+    ) -> lsp_types::DocumentDiagnosticReportResult {
+        let items = self.diagnostics(&params.text_document.uri).diagnostics;
+        lsp_types::DocumentDiagnosticReportResult::Report(
+            lsp_types::DocumentDiagnosticReport::Full(
+                lsp_types::RelatedFullDocumentDiagnosticReport {
+                    related_documents: None,
+                    full_document_diagnostic_report: lsp_types::FullDocumentDiagnosticReport {
+                        result_id: None,
+                        items,
+                    },
+                },
+            ),
+        )
+    }
+
     /// The reference at a position, with the document's line index
     fn reference_at(&self, uri: &Uri, position: Position) -> Option<(BibleMatch, LineIndex<'_>)> {
         let text = self.documents.get(uri)?;

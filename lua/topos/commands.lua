@@ -72,6 +72,12 @@ local commands = {
     end,
     { nargs = '+', complete = M.complete_flags, desc = 'Search with the CLI\'s options, like -g Wisdom' },
   },
+  ToposLspStart = {
+    function()
+      require('topos').lsp_start()
+    end,
+    { desc = 'Start topos-lsp for this buffer (whatever its file type), or restart it' },
+  },
   ToposBuild = {
     function(opts)
       require('topos.build').build(opts.bang, function(ok)
