@@ -108,3 +108,26 @@ test("references in a style, under the cursor, and normalized", () => {
   const replacements = normalizeReferences(topos, text, BookStyle.Name);
   assert.equal(applyReplacements(text, replacements), "See John 3:16 and 1 Corinthians 13:4-7.");
 });
+
+import { applyCompletion, completionsBefore } from "../src/core/completions.ts";
+
+test("completions skip book names for ordinary words", () => {
+  const labels = (before: string, mode: "off" | "capitalized" | "always" = "capitalized") =>
+    completionsBefore(topos, before, BookStyle.Name, 50, mode).map((c) => c.label);
+  assert.ok(labels("I like Jo").includes("John"));
+  assert.ok(labels("see Jn").includes("John"));
+  assert.deepEqual(labels("The"), []);
+  assert.deepEqual(labels("First"), []);
+  assert.deepEqual(labels("I like jo"), []);
+  assert.ok(labels("I like jo", "always").includes("John"));
+  assert.deepEqual(labels("Jo", "off"), []);
+  // Chapters and verses always complete
+  assert.equal(labels("see John 3:")[0], "John 3:1");
+  assert.equal(labels("see 1 Co")[0], "1 Corinthians");
+});
+
+test("applying a completion", () => {
+  const text = "see gen 1:";
+  const [first] = completionsBefore(topos, text, BookStyle.Name, 5, "capitalized");
+  assert.equal(applyCompletion(text, first), "see Genesis 1:1");
+});
