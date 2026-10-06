@@ -22,6 +22,8 @@ export interface ToposSettings {
   /** Book names in prose would trigger on every word, so by default they need a capital */
   bookCompletion: BookCompletion;
   suggestionLimit: number;
+  /** Write adjacent verses as a range when completing: 3:16-18, not 3:16,17,18 */
+  joinAdjacent: boolean;
   /** File extensions to search, separated by commas */
   extensions: string;
   /** Folders to leave out of search, one per line */
@@ -52,6 +54,7 @@ export const DEFAULT_SETTINGS: ToposSettings = {
   autocomplete: true,
   bookCompletion: "capitalized",
   suggestionLimit: 20,
+  joinAdjacent: false,
   extensions: "md, txt",
   excludeFolders: "",
   sort: "file",

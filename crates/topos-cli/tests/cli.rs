@@ -886,3 +886,51 @@ fn passage_format_options() {
     assert_eq!(bad.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&bad.stderr).contains("unknown field `joins`"));
 }
+
+/// The shared completion cases (topos-lib's tests/cases/complete.txt), through --complete
+#[test]
+fn completion_cases() {
+    let cases = include_str!("../../topos-lib/tests/cases/complete.txt");
+    let mut failures = vec![];
+    for line in cases
+        .lines()
+        .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
+    {
+        let (input, expected) = line.split_once(" =>").unwrap();
+        let mut args = vec!["--no-config", "-m", "json"];
+        if input.starts_with("[join] ") {
+            args.push("--fmt-join-adjacent");
+        }
+        if input.starts_with("[abbreviation] ") {
+            args.extend(["-f", "abbreviation"]);
+        }
+        let input = input
+            .trim_start_matches("[join] ")
+            .trim_start_matches("[abbreviation] ");
+        args.extend(["--complete", input]);
+        let labels: Vec<String> = stdout(&topos(&args, None))
+            .lines()
+            .map(|l| {
+                let value: serde_json::Value = serde_json::from_str(l).unwrap();
+                value["label"].as_str().unwrap().to_string()
+            })
+            .collect();
+        let expected: Vec<&str> = expected
+            .split(" | ")
+            .map(str::trim)
+            .filter(|e| !e.is_empty())
+            .collect();
+        let ok = if expected.is_empty() {
+            labels.is_empty()
+        } else {
+            labels.len() >= expected.len() && labels[..expected.len()] == expected[..]
+        };
+        if !ok {
+            failures.push(format!(
+                "{input:?}: expected {expected:?}, got {:?}",
+                &labels[..labels.len().min(4)]
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}

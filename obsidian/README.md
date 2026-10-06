@@ -65,7 +65,8 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
 
 **Settings**: reference style (`John 3:16`, `Jn 3:16`, or `John.3.16`), Literal Word translation
 (NASB, LSB, ESV, NKJV, KJV, or its default), editor and reading-view links, whether editor clicks
-need Ctrl/Cmd, autocomplete and book-name completion, number of suggestions, file extensions to
+need Ctrl/Cmd, autocomplete and book-name completion, number of suggestions, joining adjacent
+verses in completions (3:16-18, not 3:16,17,18), file extensions to
 search, excluded folders, and the search engine (below).
 
 ### Large vaults

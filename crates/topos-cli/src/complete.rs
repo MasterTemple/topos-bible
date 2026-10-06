@@ -177,7 +177,8 @@ pub fn suggestions(matcher: &BibleMatcher, text: &str, format: &FormatOptions) -
             Some(passage) => matcher.keeps(passage),
             None => books.search(&completion.label).is_none_or(allowed),
         })
-        .filter_map(|completion| {
+        // The library leaves out completions that change nothing
+        .map(|completion| {
             let mut full = text.to_string();
             full.replace_range(completion.edit.range.clone(), &completion.edit.text);
             let kind = match completion.kind {
@@ -190,11 +191,11 @@ pub fn suggestions(matcher: &BibleMatcher, text: &str, format: &FormatOptions) -
                 .then(|| completion.passage.as_ref()?.to_osis(books))
                 .flatten();
             let full = osis.unwrap_or_else(|| full.trim_end().to_string());
-            (full != text.trim_end()).then_some(Suggestion {
+            Suggestion {
                 text: full,
                 label: completion.label,
                 kind,
-            })
+            }
         })
         .collect()
 }

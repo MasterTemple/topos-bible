@@ -24,6 +24,7 @@ Crates are named by package (folder in parentheses); `topos-bible`, `topos-bible
 
 ## Conventions and lessons
 
+- Completion logic lives only in the library (`BibleMatcher::complete`): which books a word offers, narrowing by the typed number, whether the segment being typed is a verse (`Resolver::next_verse_chapter`, the same rule as search), and leaving out completions that change nothing. Front ends only add presentation and typing preferences. Add completion behavior to `crates/topos-lib/tests/cases/complete.txt`; the library, CLI, FFI, LSP, and Obsidian plugin each run it.
 - Add search behavior changes to `crates/topos-lib/tests/cases/search.txt` (`input => Ref | Ref`; `?` marks a known failure; `\n` is a line break). Expected values are `Segments`' display form, which is designed to parse back to the same passage.
 - The interpretation rules live only in the resolver: chapters until a verse appears, `;` resets to chapters, single-chapter books, `ff`, Roman numerals only where a chapter goes, and a `.`-part fallback.
 - False-positive rules (book candidates, `FoundPassage::find`): candidates don't consume the chapter, ambiguous abbreviations (marked `ambiguous` in `default_books.json`) need an explicit verse, there are no candidates inside runs of 64+ characters without whitespace, a book glued to its chapter needs a verse, and the book name's casing must be plausible. Test new rules against a real corpus (diff old and new output), not only unit tests.

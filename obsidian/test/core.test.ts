@@ -183,14 +183,14 @@ test("completions narrow by the number being typed", () => {
     completionsBefore(topos, before, BookStyle.Name, 100, "capitalized", { needsNumber }).map(
       (c) => c.label,
     );
-  // John has 21 chapters
-  assert.deepEqual(labels("John 2"), ["John 2", "John 20", "John 21"]);
-  assert.deepEqual(labels("John 3"), ["John 3"]);
-  assert.deepEqual(labels("John 3:3").slice(0, 3), ["John 3:3", "John 3:30", "John 3:31"]);
+  // John has 21 chapters; what's already typed isn't offered (see complete.txt for the rest)
+  assert.deepEqual(labels("John 2"), ["John 20", "John 21"]);
+  assert.deepEqual(labels("John 3"), []);
+  assert.deepEqual(labels("John 3:3").slice(0, 2), ["John 3:30", "John 3:31"]);
   assert.equal(labels("John 3:").length, 36);
   // In the editor, `John ` alone does not list chapters, but a number or delimiter does
   assert.deepEqual(labels("I asked John ", true), []);
-  assert.deepEqual(labels("see John 2", true), ["John 2", "John 20", "John 21"]);
+  assert.deepEqual(labels("see John 2", true), ["John 20", "John 21"]);
   assert.equal(labels("see John 3:", true).length, 36);
   assert.equal(labels("see John 3:16, ", true)[0], "John 3:16,17");
   assert.ok(labels("see 1 Co", true).includes("1 Corinthians"));

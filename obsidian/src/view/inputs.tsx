@@ -67,7 +67,13 @@ type Choice = { kind: "add"; reference: string } | { kind: "complete"; completio
  * finished reference can be added; that comes first unless the text ends in a delimiter (`3:`,
  * `16-`, `16,`), where the next number is probably wanted.
  */
-export function referenceChoices(topos: Topos, style: BookStyle, value: string, caret: number): Choice[] {
+export function referenceChoices(
+  topos: Topos,
+  style: BookStyle,
+  value: string,
+  caret: number,
+  joinAdjacent = false,
+): Choice[] {
   if (!value.trim()) {
     return topos.books().map((book) => {
       const name = book[(["name", "abbreviation", "osis"] as const)[style] ?? "name"] || book.name;
@@ -78,9 +84,9 @@ export function referenceChoices(topos: Topos, style: BookStyle, value: string, 
     });
   }
   const passage = topos.parse(value, style);
-  const completions = completionsBefore(topos, value.slice(0, caret), style, MAX_OPTIONS, "always")
-    // Completing to what is already there does nothing
-    .filter((c) => applyCompletion(value.slice(0, caret), c) + value.slice(caret) !== value);
+  const completions = completionsBefore(topos, value.slice(0, caret), style, MAX_OPTIONS, "always", {
+    joinAdjacent,
+  });
   const choices: Choice[] = completions.map((completion) => ({ kind: "complete", completion }));
   if (!passage) return choices;
   // The chip gets the reference written out in the chosen style: `jn 3:16-` adds John 3:16
@@ -94,11 +100,13 @@ export function ReferenceInput({
   style,
   placeholder,
   onSubmit,
+  joinAdjacent = false,
 }: {
   topos: Topos;
   style: BookStyle;
   placeholder: string;
   onSubmit: (reference: string) => void;
+  joinAdjacent?: boolean;
 }) {
   const [value, setValue] = useState("");
   const [caret, setCaret] = useState(0);
@@ -106,7 +114,10 @@ export function ReferenceInput({
   const [focused, setFocused] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
-  const choices = useMemo(() => referenceChoices(topos, style, value, caret), [topos, style, value, caret]);
+  const choices = useMemo(
+    () => referenceChoices(topos, style, value, caret, joinAdjacent),
+    [topos, style, value, caret, joinAdjacent],
+  );
   const valid = value.trim() !== "" && topos.parse(value, style) !== null;
 
   const update = (next: string, nextCaret = next.length) => {

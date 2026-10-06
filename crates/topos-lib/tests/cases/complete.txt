@@ -1,0 +1,35 @@
+# Completion cases: `input => the first completions, in order`, separated by ` | `. The input
+# ends at the cursor; each completion is its label (the reference as it would be written).
+# - `[join]` before the input joins adjacent verses; `[abbreviation]` abbreviates books
+# - Nothing after `=>` means no completions
+# - Every front end runs these: the library (tests/complete.rs), the CLI (--complete), the
+#   bindings (topos-ffi), the language server, and the Obsidian plugin, so they can't drift apart
+
+# Books: a typed word must be an abbreviation, or start a name, abbreviation, or OSIS id
+Jo => Job | John | Joel | Jonah
+jn => John | John 1 | John 2
+1 Co => 1 Corinthians | 1 Corinthians 1
+see Rev => Revelation | Revelation 1
+The =>
+Can =>
+
+# Chapters and verses, narrowed by the number being typed; what's already typed isn't offered
+John 3: => John 3:1 | John 3:2 | John 3:3
+John 2 => John 20 | John 21
+John 3 =>
+jn 3 => John 3
+John 3:16- => John 3:16-17 | John 3:16-18
+John 3:16, => John 3:16,17 | John 3:16,18
+Genesis 1:1– => Genesis 1:1-2 | Genesis 1:1-3
+
+# The segment being typed is a verse or a chapter by the same rules as search
+1 Timothy 1:3,4,5- => 1 Timothy 1:3,4,5-6 | 1 Timothy 1:3,4,5-7
+John 3:16; 4- => John 3:16; 4-5 | John 3:16; 4-6
+John 3, 5- => John 3,5-6 | John 3,5-7
+Jude 5- => Jude 1:5-6 | Jude 1:5-7
+Jude 3, => Jude 1:3,4 | Jude 1:3,5
+
+# Formats
+[join] 1 Timothy 1:3,4,5- => 1 Timothy 1:3-6 | 1 Timothy 1:3-7
+[join] John 3:16,17- => John 3:16-18 | John 3:16-19
+[abbreviation] jn 3:1 => Jn 3:1 | Jn 3:10

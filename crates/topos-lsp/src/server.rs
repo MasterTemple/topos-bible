@@ -588,6 +588,60 @@ mod tests {
         )
     }
 
+    /// The shared completion cases (topos-lib's tests/cases/complete.txt), as an editor asks
+    #[test]
+    fn completion_cases() {
+        let cases = include_str!("../../topos-lib/tests/cases/complete.txt");
+        let mut failures = vec![];
+        for line in cases
+            .lines()
+            .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
+        {
+            let (input, expected) = line.split_once(" =>").unwrap();
+            let (mut server, uri) = server(
+                input
+                    .trim_start_matches("[join] ")
+                    .trim_start_matches("[abbreviation] "),
+            );
+            let format = serde_json::json!({
+                "join_adjacent": input.starts_with("[join] "),
+                "book": if input.starts_with("[abbreviation] ") { "abbreviation" } else { "name" },
+            });
+            server
+                .configure(serde_json::json!({ "no-config": true, "psg-fmt": format }))
+                .unwrap();
+            let input = input
+                .trim_start_matches("[join] ")
+                .trim_start_matches("[abbreviation] ");
+            let character = input.encode_utf16().count() as u32;
+            let labels: Vec<String> = match server.completion(CompletionParams {
+                text_document_position: at(&uri, 0, character),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+                context: None,
+            }) {
+                Some(CompletionResponse::Array(items)) => {
+                    items.into_iter().map(|item| item.label).collect()
+                }
+                _ => vec![],
+            };
+            let expected: Vec<&str> = expected
+                .split(" | ")
+                .map(str::trim)
+                .filter(|e| !e.is_empty())
+                .collect();
+            let ok = if expected.is_empty() {
+                labels.is_empty()
+            } else {
+                labels.len() >= expected.len() && labels[..expected.len()] == expected[..]
+            };
+            if !ok {
+                failures.push(format!("{input:?}: expected {expected:?}, got {labels:?}"));
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
     #[test]
     fn completes_with_utf16_ranges() {
         // `𝄞` is 2 UTF-16 units, so `jn` starts at character 3

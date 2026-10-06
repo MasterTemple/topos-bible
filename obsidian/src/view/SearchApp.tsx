@@ -279,7 +279,13 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
               onRemove={removeFrom(row.key)}
               exclude={row.key === "excludeOverlap"}
             />
-            <ReferenceInput topos={topos} style={style} placeholder={row.placeholder} onSubmit={addTo(row.key)} />
+            <ReferenceInput
+              topos={topos}
+              style={style}
+              placeholder={row.placeholder}
+              onSubmit={addTo(row.key)}
+              joinAdjacent={plugin.settings.joinAdjacent}
+            />
           </FilterRow>
         ))}
         {filter.errors.length > 0 && (

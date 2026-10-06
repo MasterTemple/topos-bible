@@ -1,4 +1,4 @@
-# τόπος language server
+# τόπος Bible language server
 
 `topos-lsp` speaks the Language Server Protocol over stdin and stdout:
 

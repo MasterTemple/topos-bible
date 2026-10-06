@@ -959,6 +959,52 @@ impl<'a> Offsets<'a> {
 
 #[cfg(test)]
 mod tests {
+
+    /// The shared completion cases (topos-lib's tests/cases/complete.txt), through the bindings
+    /// (UTF-16 offsets, as JavaScript and Kotlin use)
+    #[test]
+    fn completion_cases() {
+        let topos = Topos::new();
+        let cases = include_str!("../../topos-lib/tests/cases/complete.txt");
+        let mut failures = vec![];
+        for line in cases
+            .lines()
+            .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
+        {
+            let (input, expected) = line.split_once(" =>").unwrap();
+            let mut format = ToposFormat::create();
+            if input.starts_with("[join] ") {
+                format = format.join_adjacent(true);
+            }
+            if input.starts_with("[abbreviation] ") {
+                format = format.book(BookStyle::Abbreviation);
+            }
+            let input = input
+                .trim_start_matches("[join] ")
+                .trim_start_matches("[abbreviation] ");
+            let cursor = input.encode_utf16().count() as u32;
+            let labels: Vec<String> = topos
+                .complete_with(input.into(), cursor, OffsetUnit::Utf16, &format, 0)
+                .into_iter()
+                .map(|c| c.label)
+                .collect();
+            let expected: Vec<&str> = expected
+                .split(" | ")
+                .map(str::trim)
+                .filter(|e| !e.is_empty())
+                .collect();
+            let ok = if expected.is_empty() {
+                labels.is_empty()
+            } else {
+                labels.len() >= expected.len() && labels[..expected.len()] == expected[..]
+            };
+            if !ok {
+                failures.push(format!("{input:?}: expected {expected:?}, got {labels:?}"));
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
     use super::*;
 
     fn references(matches: Vec<Match>) -> Vec<String> {

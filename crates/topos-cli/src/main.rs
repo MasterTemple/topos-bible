@@ -54,7 +54,7 @@ fn main() -> ExitCode {
                 for (name, query) in queries {
                     let query =
                         shlex::try_join(query.iter().map(String::as_str)).unwrap_or_default();
-                    println!("{name}\t{query}");
+                    output::emit(format!("{name}\t{query}"));
                 }
                 ExitCode::SUCCESS
             }
@@ -76,9 +76,9 @@ fn main() -> ExitCode {
         let json = args.mode == OutputMode::Json;
         for suggestion in complete::suggestions(&matcher, &text, &args.format_options()) {
             if json {
-                println!("{}", serde_json::to_string(&suggestion).unwrap_or_default());
+                output::emit(serde_json::to_string(&suggestion).unwrap_or_default());
             } else {
-                println!("{}", suggestion.text);
+                output::emit(suggestion.text);
             }
         }
         return ExitCode::SUCCESS;

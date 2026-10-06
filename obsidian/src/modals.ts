@@ -34,7 +34,9 @@ export class InsertReferenceModal extends SuggestModal<Choice> {
     const choices: Choice[] = [];
     const passage = query.trim() ? topos.parse(query, style) : null;
     if (passage) choices.push({ kind: "reference", text: styled(topos, passage, style) });
-    const completions = completionsBefore(topos, query, style, settings.suggestionLimit, "always");
+    const completions = completionsBefore(topos, query, style, settings.suggestionLimit, "always", {
+      joinAdjacent: settings.joinAdjacent,
+    });
     choices.push(...completions.map((completion) => ({ kind: "completion" as const, completion })));
     return choices;
   }

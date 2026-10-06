@@ -8,7 +8,10 @@ use std::ops::Range;
 use itertools::Itertools;
 
 use crate::{
-    data::{bible_data::BibleData, books::BookId},
+    data::{
+        bible_data::BibleData,
+        books::{BookId, Books},
+    },
     matcher::BibleMatcher,
     segments::{
         formatter::{BookStyle, FormatOptions},
@@ -58,6 +61,10 @@ impl BibleMatcher {
     - Book names complete from a prefix of any name or abbreviation (`1 Co` → `1 Corinthians`)
     - Chapters and verses complete from the book's versification
     - Each edit rewrites the whole reference in the style of [`CompleteOptions::format`]
+    - Completions that would leave the text as it is are left out (`John 3:1` doesn't offer
+      itself, but `jn 3:1` offers `John 3:1`)
+    - Every front end (the CLI, the language server, the bindings, and the editor plugins) uses
+      this as is; `tests/cases/complete.txt` checks each of them against the same cases
     - For LSP, convert edit ranges with [`LineIndex`](crate::matcher::LineIndex), whose positions
       have UTF-16 columns
     */
@@ -73,6 +80,7 @@ impl BibleMatcher {
         let before = &text[..cursor];
         let mut completions = book_completions(self.data(), before, &options.format);
         completions.extend(segment_completions(self.data(), before, &options.format));
+        completions.retain(|c| before[c.edit.range.clone()].trim_end() != c.edit.text.trim_end());
         if let Some(limit) = options.limit {
             completions.truncate(limit);
         }
@@ -156,9 +164,32 @@ fn typed_book_prefix(data: &BibleData, before: &str) -> Option<(usize, Vec<BookI
             .sorted_by_key(|(key, _)| key.len())
             .map(|(_, id)| *id)
             .unique()
+            .filter(|&id| offers_book(data, &before[start..], id))
             .collect();
         (!books.is_empty()).then_some((start, books))
     })
+}
+
+/**
+Whether typing `typed` should offer `book`: it is one of the book's abbreviations (`jn`), or it
+starts the book's name, display abbreviation, or OSIS id (`Jo`, `1 Co`)
+- Without this, any longer abbreviation that starts with an ordinary word would match it, so
+  `The` (from "the revelation") would offer Revelation in prose
+*/
+fn offers_book(data: &BibleData, typed: &str, book: BookId) -> bool {
+    let books = data.books();
+    if books.search(typed) == Some(book) {
+        return true;
+    }
+    let typed = Books::normalize_book_name(typed);
+    [
+        books.get_name(book),
+        books.get_abbrev(book),
+        books.get_osis(book),
+    ]
+    .into_iter()
+    .flatten()
+    .any(|name| Books::normalize_book_name(name).starts_with(&typed))
 }
 
 fn book_completions(data: &BibleData, before: &str, format: &FormatOptions) -> Vec<Completion> {
@@ -292,13 +323,14 @@ mod tests {
 
     #[test]
     fn narrows_by_the_number_being_typed() {
-        // John has 21 chapters, and John 3 has 36 verses
-        assert_eq!(labels("John 2"), ["John 2", "John 20", "John 21"]);
-        assert_eq!(labels("John 3"), ["John 3"]);
+        // John has 21 chapters, and John 3 has 36 verses; what is already typed isn't offered
+        assert_eq!(labels("John 2"), ["John 20", "John 21"]);
+        assert_eq!(labels("John 3"), Vec::<String>::new());
+        // Unless completing it changes how it's written
+        assert_eq!(labels("jn 3"), ["John 3"]);
         assert_eq!(
             labels("John 3:3"),
             [
-                "John 3:3",
                 "John 3:30",
                 "John 3:31",
                 "John 3:32",
@@ -308,7 +340,7 @@ mod tests {
                 "John 3:36"
             ]
         );
-        assert_eq!(labels("John 3:1-2")[0], "John 3:1-2");
+        assert_eq!(labels("John 3:1-2")[0], "John 3:1-20");
         assert_eq!(labels("John 3:").len(), 36);
     }
 

@@ -39,7 +39,7 @@ export class ReferenceSuggest extends EditorSuggest<Completion> {
       bookStyle(settings.style),
       settings.suggestionLimit,
       settings.bookCompletion,
-      { needsNumber: true },
+      { needsNumber: true, joinAdjacent: settings.joinAdjacent },
     );
   }
 

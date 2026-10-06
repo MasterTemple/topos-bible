@@ -367,7 +367,9 @@ fn segments_json(passage: &Passage) -> Vec<serde_json::Value> {
 }
 
 /// Prints a line, exiting quietly if stdout is closed (like `topos | head`)
-fn emit(line: String) {
+/// Prints a line; when the reader has gone (`topos ... | head`), exits quietly instead of
+/// panicking
+pub fn emit(line: String) {
     let mut out = io::stdout().lock();
     if writeln!(out, "{line}").is_err() {
         std::process::exit(0);

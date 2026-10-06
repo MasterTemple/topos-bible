@@ -110,6 +110,15 @@ export class ToposSettingTab extends PluginSettingTab {
             void save();
           }),
       );
+    new Setting(containerEl)
+      .setName("Join adjacent verses")
+      .setDesc("Complete 3:16,17,18 as 3:16-18 (like the CLI's --fmt-join-adjacent).")
+      .addToggle((t) =>
+        t.setValue(settings.joinAdjacent).onChange((value) => {
+          settings.joinAdjacent = value;
+          void save();
+        }),
+      );
 
     new Setting(containerEl).setName("Search").setHeading();
     new Setting(containerEl)
