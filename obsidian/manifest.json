@@ -1,7 +1,7 @@
 {
   "id": "topos-bible",
   "name": "Topos Bible",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minAppVersion": "1.5.0",
   "description": "Find, search, filter, and autocomplete Bible references, and open them in Literal Word.",
   "author": "MasterTemple",
