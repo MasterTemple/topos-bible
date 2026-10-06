@@ -10,9 +10,13 @@ use topos_lib::{
         bible_data::{BibleData, BibleDataInput},
         books::BookId,
         chapter_verses::ChapterVerses,
+        patch::DataPatch,
     },
-    filter::bible_filter::BibleFilter,
-    matcher::BibleMatcher,
+    filter::{
+        bible_filter::BibleFilter,
+        filters::{book::BookFilter, genre::GenreFilter, testament::TestamentFilter},
+    },
+    matcher::{BibleMatcher, context::BookContext},
     segments::{
         Passage as CorePassage, Segment, Segments,
         autocomplete::{CompleteOptions, CompletionKind as CoreKind},
@@ -147,6 +151,225 @@ pub struct Completion {
 pub enum ToposError {
     /// The config JSON could not be read or used
     InvalidConfig { message: String },
+    /// A query names a book, genre, or passage that doesn't exist
+    InvalidQuery { message: String },
+}
+
+/// A testament, for [`ToposQuery`]
+#[data]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Testament {
+    Old,
+    New,
+}
+
+/**
+Which references to keep, like the CLI's filter options. Build one by chaining: each method returns
+a new query, so a query can be reused and extended
+
+```ts
+const query = ToposQuery.create().newTestament().genre("Pauline Epistles").explicitOverlap("Romans 8");
+topos.searchWith(text, OffsetUnit.Utf16, query);
+```
+
+- Including a testament limits the search to it; included genres and books add up within it;
+  exclusions always win
+- The passage filters that keep references (inside, any, explicit, exact overlap) are joined with
+  OR; `excludeOverlap` then drops references
+*/
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ToposQuery {
+    pub testaments: Vec<Testament>,
+    pub exclude_testaments: Vec<Testament>,
+    /// Genre names or abbreviations (`Gospels`, `pauline`)
+    pub genres: Vec<String>,
+    pub exclude_genres: Vec<String>,
+    /// Book names or abbreviations (`John`, `1 Cor`)
+    pub books: Vec<String>,
+    pub exclude_books: Vec<String>,
+    /// Keep references entirely inside one of these passages (`-i`)
+    pub inside: Vec<String>,
+    /// Keep references that share any verse with one of these (`--any-overlap`)
+    pub any_overlap: Vec<String>,
+    /// Keep references that name a verse of one of these; whole chapters don't count (`-o`)
+    pub explicit_overlap: Vec<String>,
+    /// Keep references that are exactly one of these passages (`--exact-overlap`)
+    pub exact_overlap: Vec<String>,
+    /// Drop references that share any verse with one of these (`--exclude-overlap`)
+    pub exclude_overlap: Vec<String>,
+}
+
+fn with<T>(mut list: Vec<T>, value: T) -> Vec<T> {
+    list.push(value);
+    list
+}
+
+#[export]
+impl ToposQuery {
+    /// A query that keeps every reference
+    pub fn create() -> Self {
+        Self::default()
+    }
+
+    pub fn testament(&self, testament: Testament) -> Self {
+        Self {
+            testaments: with(self.testaments.clone(), testament),
+            ..self.clone()
+        }
+    }
+
+    /// Only the Old Testament (`--ot`)
+    pub fn old_testament(&self) -> Self {
+        self.testament(Testament::Old)
+    }
+
+    /// Only the New Testament (`--nt`)
+    pub fn new_testament(&self) -> Self {
+        self.testament(Testament::New)
+    }
+
+    pub fn exclude_testament(&self, testament: Testament) -> Self {
+        Self {
+            exclude_testaments: with(self.exclude_testaments.clone(), testament),
+            ..self.clone()
+        }
+    }
+
+    pub fn genre(&self, genre: String) -> Self {
+        Self {
+            genres: with(self.genres.clone(), genre),
+            ..self.clone()
+        }
+    }
+
+    pub fn exclude_genre(&self, genre: String) -> Self {
+        Self {
+            exclude_genres: with(self.exclude_genres.clone(), genre),
+            ..self.clone()
+        }
+    }
+
+    pub fn book(&self, book: String) -> Self {
+        Self {
+            books: with(self.books.clone(), book),
+            ..self.clone()
+        }
+    }
+
+    pub fn exclude_book(&self, book: String) -> Self {
+        Self {
+            exclude_books: with(self.exclude_books.clone(), book),
+            ..self.clone()
+        }
+    }
+
+    pub fn inside(&self, passage: String) -> Self {
+        Self {
+            inside: with(self.inside.clone(), passage),
+            ..self.clone()
+        }
+    }
+
+    pub fn any_overlap(&self, passage: String) -> Self {
+        Self {
+            any_overlap: with(self.any_overlap.clone(), passage),
+            ..self.clone()
+        }
+    }
+
+    pub fn explicit_overlap(&self, passage: String) -> Self {
+        Self {
+            explicit_overlap: with(self.explicit_overlap.clone(), passage),
+            ..self.clone()
+        }
+    }
+
+    pub fn exact_overlap(&self, passage: String) -> Self {
+        Self {
+            exact_overlap: with(self.exact_overlap.clone(), passage),
+            ..self.clone()
+        }
+    }
+
+    pub fn exclude_overlap(&self, passage: String) -> Self {
+        Self {
+            exclude_overlap: with(self.exclude_overlap.clone(), passage),
+            ..self.clone()
+        }
+    }
+}
+
+/**
+How to build a [`Topos`]: its data and book context, like the CLI's `--data`, `--merge-data`,
+`--remove-data`, `--context-book`, and `--context-heading`. Chain the methods, then pass it to
+[`ToposOptions::build`]
+
+```ts
+const options = ToposOptions.create().mergeData('{"books":[{"book":"John","abbreviations":["jhn"]}]}');
+const topos = options.build();
+```
+*/
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ToposOptions {
+    /// Custom data JSON that replaces the defaults (each part it has)
+    pub data: Option<String>,
+    /// JSON patches merged into the data, in order (names and values are added once each)
+    pub merge_data: Vec<String>,
+    /// JSON patches removed from the data, after merging (a book or genre listed alone is removed
+    /// entirely)
+    pub remove_data: Vec<String>,
+    /// The book that references without one (`3:16`) belong to
+    pub context_book: Option<String>,
+    /// A pattern for headings that set the book for what follows, like `^#+ {book}$`
+    pub context_heading: Option<String>,
+}
+
+#[export]
+impl ToposOptions {
+    /// The defaults: English book names and versification, no book context
+    pub fn create() -> Self {
+        Self::default()
+    }
+
+    pub fn data(&self, json: String) -> Self {
+        Self {
+            data: Some(json),
+            ..self.clone()
+        }
+    }
+
+    pub fn merge_data(&self, json: String) -> Self {
+        Self {
+            merge_data: with(self.merge_data.clone(), json),
+            ..self.clone()
+        }
+    }
+
+    pub fn remove_data(&self, json: String) -> Self {
+        Self {
+            remove_data: with(self.remove_data.clone(), json),
+            ..self.clone()
+        }
+    }
+
+    pub fn context_book(&self, book: String) -> Self {
+        Self {
+            context_book: Some(book),
+            ..self.clone()
+        }
+    }
+
+    pub fn context_heading(&self, pattern: String) -> Self {
+        Self {
+            context_heading: Some(pattern),
+            ..self.clone()
+        }
+    }
+
+    /// A [`Topos`] with these options (an error if the data or context can't be used)
+    pub fn build(&self) -> Result<Topos, ToposError> {
+        Topos::from_options(self)
+    }
 }
 
 /// Finds, parses, formats, and completes Bible references
@@ -176,22 +399,28 @@ impl Topos {
 
     /// Every reference in `text`
     pub fn search(&self, text: String, unit: OffsetUnit) -> Vec<Match> {
-        let offsets = Offsets::new(&text, unit);
-        self.matcher
-            .search(&text)
-            .into_iter()
-            .filter_map(|m| {
-                let bytes = m.location.bytes;
-                let line_start = text[..bytes.start].rfind('\n').map_or(0, |i| i + 1);
-                Some(Match {
-                    passage: self.passage(&m.psg, CoreBookStyle::Name)?,
-                    start: offsets.of_byte(bytes.start),
-                    end: offsets.of_byte(bytes.end),
-                    line: m.location.start.line as u32,
-                    column: offsets.of_byte(bytes.start) - offsets.of_byte(line_start) + 1,
-                })
-            })
-            .collect()
+        self.matches(&self.matcher, &text, unit)
+    }
+
+    /// The references in `text` that the query keeps
+    pub fn search_with(
+        &self,
+        text: String,
+        unit: OffsetUnit,
+        query: &ToposQuery,
+    ) -> Result<Vec<Match>, ToposError> {
+        let matcher = self.filter(query)?.create_matcher();
+        let matcher = match self.matcher.context() {
+            Some(context) => matcher.with_context(context.clone()),
+            None => matcher,
+        };
+        Ok(self.matches(&matcher, &text, unit))
+    }
+
+    /// Why nothing can match the query, if its filters contradict each other (like the Old
+    /// Testament and the Pauline Epistles)
+    pub fn contradiction(&self, query: &ToposQuery) -> Result<Option<String>, ToposError> {
+        Ok(self.filter(query)?.contradiction())
     }
 
     /// The first reference in `text`, read as one reference (`Jn 3:16` or `John.3.16`)
@@ -331,6 +560,116 @@ impl Default for Topos {
 }
 
 impl Topos {
+    /// Builds an instance from [`ToposOptions`]
+    fn from_options(options: &ToposOptions) -> Result<Self, ToposError> {
+        let invalid = |message: String| ToposError::InvalidConfig { message };
+        fn parse<T: serde::de::DeserializeOwned>(json: &str) -> Result<T, ToposError> {
+            serde_json::from_str(json).map_err(|e| ToposError::InvalidConfig {
+                message: e.to_string(),
+            })
+        }
+        let mut input = match &options.data {
+            Some(json) => parse(json)?,
+            None => BibleDataInput::defaults(),
+        };
+        for json in &options.merge_data {
+            input
+                .merge(parse::<DataPatch>(json)?)
+                .map_err(|e| invalid(e.to_string()))?;
+        }
+        for json in &options.remove_data {
+            input
+                .remove(parse::<DataPatch>(json)?)
+                .map_err(|e| invalid(e.to_string()))?;
+        }
+        let data = BibleData::new(input).map_err(|e| invalid(e.to_string()))?;
+        let context = match (&options.context_book, &options.context_heading) {
+            (Some(book), _) => {
+                let id = data
+                    .books()
+                    .search(book)
+                    .ok_or_else(|| invalid(format!("unknown book `{book}`")))?;
+                Some(BookContext::Book(id))
+            }
+            (None, Some(pattern)) => Some(
+                BookContext::headings(data.books(), pattern).map_err(|e| invalid(e.to_string()))?,
+            ),
+            (None, None) => None,
+        };
+        let matcher = BibleFilter::new(data).create_matcher();
+        Ok(Self {
+            matcher: match &context {
+                Some(context) => matcher.with_context(context.clone()),
+                None => matcher,
+            },
+        })
+    }
+
+    fn matches(&self, matcher: &BibleMatcher, text: &str, unit: OffsetUnit) -> Vec<Match> {
+        let offsets = Offsets::new(text, unit);
+        matcher
+            .search(text)
+            .into_iter()
+            .filter_map(|m| {
+                let bytes = m.location.bytes;
+                let line_start = text[..bytes.start].rfind('\n').map_or(0, |i| i + 1);
+                Some(Match {
+                    passage: self.passage(&m.psg, CoreBookStyle::Name)?,
+                    start: offsets.of_byte(bytes.start),
+                    end: offsets.of_byte(bytes.end),
+                    line: m.location.start.line as u32,
+                    column: offsets.of_byte(bytes.start) - offsets.of_byte(line_start) + 1,
+                })
+            })
+            .collect()
+    }
+
+    /// The query as a filter over this instance's data
+    fn filter(&self, query: &ToposQuery) -> Result<BibleFilter, ToposError> {
+        let invalid = |e: topos_lib::error::ToposError| ToposError::InvalidQuery {
+            message: e.to_string(),
+        };
+        let testament = |t: &Testament| match t {
+            Testament::Old => TestamentFilter::Old,
+            Testament::New => TestamentFilter::New,
+        };
+        let mut filter = BibleFilter::new(self.matcher.data().clone());
+        filter
+            .include_many(query.testaments.iter().map(testament))
+            .map_err(invalid)?;
+        filter
+            .include_many(query.genres.iter().map(GenreFilter::new))
+            .map_err(invalid)?;
+        filter
+            .include_many(query.books.iter().map(BookFilter::new))
+            .map_err(invalid)?;
+        filter
+            .exclude_many(query.exclude_testaments.iter().map(testament))
+            .map_err(invalid)?;
+        filter
+            .exclude_many(query.exclude_genres.iter().map(GenreFilter::new))
+            .map_err(invalid)?;
+        filter
+            .exclude_many(query.exclude_books.iter().map(BookFilter::new))
+            .map_err(invalid)?;
+        for passage in &query.inside {
+            filter.filter_inside(passage).map_err(invalid)?;
+        }
+        for passage in &query.any_overlap {
+            filter.filter_any_overlap(passage).map_err(invalid)?;
+        }
+        for passage in &query.explicit_overlap {
+            filter.filter_explicit_overlap(passage).map_err(invalid)?;
+        }
+        for passage in &query.exact_overlap {
+            filter.filter_exact_overlap(passage).map_err(invalid)?;
+        }
+        for passage in &query.exclude_overlap {
+            filter.filter_exclude_overlap(passage).map_err(invalid)?;
+        }
+        Ok(filter)
+    }
+
     fn versification(&self, passage: &CorePassage) -> Option<&ChapterVerses> {
         self.matcher
             .data()
@@ -478,6 +817,107 @@ impl<'a> Offsets<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn references(matches: Vec<Match>) -> Vec<String> {
+        matches.into_iter().map(|m| m.passage.reference).collect()
+    }
+
+    #[test]
+    fn queries_chain_and_filter() {
+        let topos = Topos::new();
+        let text = "John 3, John 3:14-18, John 2; 3:16, Rom 8:28, Gen 1:1".to_string();
+        let search = |query: &ToposQuery| {
+            references(
+                topos
+                    .search_with(text.clone(), OffsetUnit::Byte, query)
+                    .unwrap(),
+            )
+        };
+        let nt = ToposQuery::create().new_testament();
+        assert_eq!(
+            search(&nt.explicit_overlap("John 3:16".into())),
+            ["John 3:14-18", "John 2; 3:16"]
+        );
+        // Each method returns a new query, so `nt` is unchanged
+        assert_eq!(search(&nt).len(), 4);
+        assert_eq!(search(&nt.any_overlap("John 3:16".into())).len(), 3);
+        assert_eq!(
+            search(&ToposQuery::create().exact_overlap("Rom 8:28".into())),
+            ["Romans 8:28"]
+        );
+        assert_eq!(
+            search(
+                &ToposQuery::create()
+                    .genre("Pentateuch".into())
+                    .inside("Gen 1".into())
+            ),
+            ["Genesis 1:1"]
+        );
+        assert_eq!(
+            search(&nt.exclude_overlap("John 3".into())),
+            ["Romans 8:28"]
+        );
+
+        let contradiction = ToposQuery::create()
+            .old_testament()
+            .genre("Pauline Epistles".into());
+        assert!(topos.contradiction(&contradiction).unwrap().is_some());
+        assert_eq!(topos.contradiction(&nt).unwrap(), None);
+
+        let unknown = topos.search_with(
+            text,
+            OffsetUnit::Byte,
+            &ToposQuery::create().book("Jhon".into()),
+        );
+        assert!(
+            matches!(unknown, Err(ToposError::InvalidQuery { message }) if message.contains("Jhon"))
+        );
+    }
+
+    #[test]
+    fn options_merge_remove_and_set_context() {
+        let topos = ToposOptions::create()
+            .merge_data(r#"{ "books": [{ "book": "John", "abbreviations": ["jhn"] }] }"#.into())
+            .remove_data(r#"{ "books": [{ "book": "Jude" }] }"#.into())
+            .build()
+            .unwrap();
+        assert_eq!(
+            references(topos.search("Jhn 3:16 and Jude 5".into(), OffsetUnit::Byte)),
+            ["John 3:16"]
+        );
+        let conflict = ToposOptions::create()
+            .merge_data(r#"{ "books": [{ "book": "John", "abbreviations": ["gen"] }] }"#.into())
+            .build();
+        assert!(
+            matches!(conflict, Err(ToposError::InvalidConfig { message }) if message.contains("`gen`"))
+        );
+
+        let john = ToposOptions::create()
+            .context_book("John".into())
+            .build()
+            .unwrap();
+        assert_eq!(
+            references(john.search("As 3:16 says".into(), OffsetUnit::Byte)),
+            ["John 3:16"]
+        );
+        // The context applies to queries too
+        let query = ToposQuery::create().explicit_overlap("John 3".into());
+        assert_eq!(
+            references(
+                john.search_with("As 3:16 says".into(), OffsetUnit::Byte, &query)
+                    .unwrap()
+            ),
+            ["John 3:16"]
+        );
+        let headings = ToposOptions::create()
+            .context_heading("^# {book}$".into())
+            .build()
+            .unwrap();
+        assert_eq!(
+            references(headings.search("# Romans\nSee 8:28".into(), OffsetUnit::Byte)),
+            ["Romans 8:28"]
+        );
+    }
 
     #[test]
     fn search_reports_offsets_in_the_callers_unit() {

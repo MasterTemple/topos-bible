@@ -44,6 +44,8 @@ The package is imported as `topos_bible`.
 | `verse_ranges(passage)` | Each segment as a `VerseRange(start, end)`, with whole chapters expanded to their verses |
 | `verses(passage)` | Every verse in the passage, in order, as `ChapterVerse(chapter, verse)` |
 | `contains(outer, inner)` / `overlaps(a, b)` | Whether one passage contains, or shares any verse with, another |
+| `search_with(text, unit, query)` | The references a `ToposQuery` keeps |
+| `contradiction(query)` | Why nothing can match, if the query's filters contradict each other |
 
 - `Passage(book_id, book, reference, segments, osis)`, with `reference` written in the
   requested `BookStyle` (`NAME`, `ABBREVIATION`, or `OSIS`)
@@ -74,16 +76,42 @@ topos.verse_ranges(passage)  # whole chapters with real verse numbers: John 5 is
 len(topos.verses(passage))   # every verse, one by one
 ```
 
+### Queries and options
+
+Both are builders: each method returns a new value, like the CLI's options.
+
+```python
+from topos_bible import OffsetUnit, Topos, ToposOptions, ToposQuery
+
+query = (
+    ToposQuery.create()
+    .new_testament()                  # --nt; also old_testament(), testament(), exclude_testament()
+    .genre("Pauline Epistles")        # -g; also book(), exclude_genre(), exclude_book()
+    .explicit_overlap("Romans 8")     # -o: names a verse of Romans 8 (whole chapters don't count)
+    .exclude_overlap("Romans 8:28")   # also inside(), any_overlap(), exact_overlap()
+)
+matches = Topos().search_with(text, OffsetUnit.CHAR, query)
+
+topos = (
+    ToposOptions.create()
+    .merge_data('{"books":[{"book":"John","abbreviations":["jhn"]}]}')  # also data(), remove_data()
+    .context_book("John")                                              # also context_heading()
+    .build()
+)
+```
+
 ### Errors
 
 ```python
 from topos_bible import ToposErrorException
 
 try:
-    custom = Topos.with_config(open("bible.json").read())
+    custom = ToposOptions.create().data(open("bible.json").read()).build()
 except ToposErrorException as error:
     print(error.error.message)
 ```
+
+Invalid queries (an unknown book, genre, or passage) raise it too.
 
 `search` finds abbreviations (`Jn`, `1 Co`), ranges and lists (`5:1-3,5; 6:6`), `ff`, Roman
 numerals (`Matth. x, 8`), and words split across lines, while skipping false positives like

@@ -26,6 +26,51 @@ Every language gets the same object and types:
 | `verse_ranges(passage) -> [VerseRange]` | Each segment with both ends written out; whole chapters run from verse 1 to their last verse |
 | `verses(passage) -> [ChapterVerse]` | Every verse in the passage, in order |
 | `contains(outer, inner)` / `overlaps(a, b) -> bool` | Verse-by-verse containment and overlap |
+| `search_with(text, unit, query) -> [Match]` | The references a `ToposQuery` keeps (raises `ToposError.InvalidQuery` for an unknown book, genre, or passage) |
+| `contradiction(query) -> String?` | Why nothing can match, if the query's filters contradict each other |
+
+**Queries** (`ToposQuery`) choose which references to keep, like the CLI's filter options.
+Chain the methods; each returns a new query, so one can be reused and extended:
+
+```ts
+const nt = ToposQuery.create().newTestament();
+topos.searchWith(text, OffsetUnit.Utf16, nt.genre("Pauline Epistles").explicitOverlap("Romans 8"));
+```
+
+| Method | CLI | Keeps references that |
+|---|---|---|
+| `testament(t)`, `oldTestament()`, `newTestament()` | `-t`, `--ot`, `--nt` | are in the testament (it narrows the rest) |
+| `genre(name)`, `book(name)` | `-g`, `-b` | are in the genre or book (these add up) |
+| `excludeTestament`, `excludeGenre`, `excludeBook` | `--exclude-*` | aren't (exclusions always win) |
+| `inside(passage)` | `-i` | are entirely inside the passage |
+| `anyOverlap(passage)` | `--any-overlap` | share any verse with it |
+| `explicitOverlap(passage)` | `-o` | name a verse of it (whole chapters don't count) |
+| `exactOverlap(passage)` | `--exact-overlap` | are exactly it, however written |
+| `excludeOverlap(passage)` | `--exclude-overlap` | share no verse with it |
+
+The passage methods that keep references are joined with OR; `excludeOverlap` then drops.
+
+**Options** (`ToposOptions`) set up an instance, like the CLI's data and context options. Chain
+them, then `build()`:
+
+```ts
+const topos = ToposOptions.create()
+  .mergeData('{"books":[{"book":"John","abbreviations":["jhn"]}]}') // --merge-data
+  .removeData('{"books":[{"book":"Jude"}]}')                       // --remove-data
+  .contextBook("John")                                             // --context-book
+  .build();
+```
+
+| Method | CLI |
+|---|---|
+| `data(json)` | `--data`: replaces the defaults (each part the JSON has) |
+| `mergeData(json)` | `--merge-data`: adds names, books, genres, or chapter counts (each value once) |
+| `removeData(json)` | `--remove-data`: removes values, or a book or genre listed alone |
+| `contextBook(name)` | `--context-book`: bare references like `3:16` belong to this book |
+| `contextHeading(pattern)` | `--context-heading`: headings like `^#+ {book}$` set the book |
+
+`build()` raises `ToposError.InvalidConfig` when the data or context can't be used, such as a
+name that would mean two books.
 
 - `Passage { book_id, book, reference, segments, osis }`, written in the requested `BookStyle` (`Name`, `Abbreviation`, `Osis`)
 - `segments: [PassageSegment]`, each part of the reference as written: `Verses { start, end }`
@@ -47,8 +92,10 @@ Every language gets the same object and types:
 | Swift | `Utf16` (use `String.utf16` indices) |
 | Rust, C, raw bytes | `Byte` |
 
-**Errors.** An invalid config throws `ToposError.InvalidConfig` with the reason in Python,
-Swift, and Kotlin; in JavaScript `Topos.withConfig` returns `null` instead.
+**Errors.** `ToposError` is `InvalidConfig { message }` or `InvalidQuery { message }`. Python
+raises `ToposErrorException`; JavaScript throws `ToposErrorException`, with the error in its
+`value` (`e.value.message`). `Topos.with_config` is older: in JavaScript it returns `null` on bad
+input instead, so prefer `ToposOptions.create().data(json).build()`, which throws everywhere.
 
 ## Building
 
