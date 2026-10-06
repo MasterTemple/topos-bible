@@ -48,7 +48,12 @@ test("editor links follow the settings after a refresh", async () => {
   const { Topos } = await import("topos-bible");
   const topos = Topos.new();
   const settings = { ...DEFAULT_SETTINGS };
-  const plugin = { topos, settings, referenceUrl: (passage: any) => linkUrl(settings.linkTemplate, passage) };
+  const plugin = {
+    topos,
+    settings,
+    referenceUrl: (passage: any) => linkUrl(settings.linkTemplate, passage),
+    linkSite: () => "the site",
+  };
   const view = new EditorView({
     doc: "Read Jn 3:16 today",
     extensions: referenceDecorations(plugin),
@@ -64,10 +69,15 @@ test("editor links follow the settings after a refresh", async () => {
   view.dispatch({ effects: refreshReferences.of(null) });
   assert.deepEqual(links(), ["https://lets.bible/bible/john/3?v=16"]);
 
-  // No links: still underlined, with nothing to open
+  assert.equal(view.contentDOM.querySelector(".topos-reference")!.getAttribute("title"), "John 3:16, opens in the site");
+
+  // No links: nothing is highlighted
   settings.linkTemplate = "";
   view.dispatch({ effects: refreshReferences.of(null) });
-  assert.deepEqual(links(), [null]);
+  assert.deepEqual(links(), []);
+  settings.linkTemplate = DEFAULT_SETTINGS.linkTemplate;
+  view.dispatch({ effects: refreshReferences.of(null) });
+  assert.deepEqual(links(), ["https://app.literalword.com/43/3/16"]);
   settings.linkInEditor = false;
   view.dispatch({ effects: refreshReferences.of(null) });
   assert.deepEqual(links(), []);

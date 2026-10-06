@@ -17,6 +17,11 @@ export class ToposSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
+  /** Settings open in their own window, so redraw the notes behind it once more on closing */
+  hide(): void {
+    this.plugin.refreshLinks();
+  }
+
   display(): void {
     const { containerEl } = this;
     const settings = this.plugin.settings;

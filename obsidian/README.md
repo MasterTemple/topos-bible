@@ -45,7 +45,8 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
 - Autocomplete while typing: chapters after a book (`John ` → `John 1`…), verses after a colon,
   range ends after a dash, and book names (`1 Co` → `1 Corinthians`). Book names only complete
   for capitalized words by default, so ordinary prose isn't interrupted
-- References are highlighted; Ctrl/Cmd-click opens their links (a setting allows plain clicks)
+- References are highlighted; Ctrl/Cmd-click opens their links (a setting allows plain clicks).
+  With links turned off, they aren't highlighted
 - Right-click a reference: open its link, find references to those verses, copy as OSIS
 - In reading view, references are links
 

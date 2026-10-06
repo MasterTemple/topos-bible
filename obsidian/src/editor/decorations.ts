@@ -15,7 +15,8 @@ export const refreshReferences = StateEffect.define<null>();
 
 /**
  * Highlights references in the visible part of the editor, and opens their links on
- * click (Ctrl/Cmd-click by default, so a plain click still places the cursor).
+ * click (Ctrl/Cmd-click by default, so a plain click still places the cursor). Only
+ * references with a link are highlighted, so with links turned off there are none.
  */
 export function referenceDecorations(plugin: ToposPlugin) {
   class References implements PluginValue {
@@ -32,7 +33,8 @@ export function referenceDecorations(plugin: ToposPlugin) {
 
     build(view: EditorView): DecorationSet {
       const builder = new RangeSetBuilder<Decoration>();
-      if (!plugin.settings.linkInEditor) return builder.finish();
+      if (!plugin.settings.linkInEditor || !plugin.settings.linkTemplate.trim()) return builder.finish();
+      const site = plugin.linkSite();
       // Visible ranges widened to whole lines can overlap, and the builder needs sorted ranges
       let lastEnd = -1;
       for (const { from, to } of view.visibleRanges) {
@@ -42,12 +44,10 @@ export function referenceDecorations(plugin: ToposPlugin) {
         const text = view.state.doc.sliceString(start, end);
         for (const m of plugin.topos.search(text, OffsetUnit.Utf16)) {
           const url = plugin.referenceUrl(m.passage);
+          if (!url) continue;
           const mark = Decoration.mark({
             class: "topos-reference",
-            attributes: {
-              title: `${m.passage.reference} (${m.passage.osis})`,
-              ...(url ? { "data-topos-url": url } : {}),
-            },
+            attributes: { title: `${m.passage.reference}, opens in ${site}`, "data-topos-url": url },
           });
           if (start + m.start < lastEnd) continue;
           builder.add(start + m.start, start + m.end, mark);
