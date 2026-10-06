@@ -3,7 +3,7 @@ use itertools::Itertools;
 
 use crate::matcher::{
     instance::BibleMatch,
-    location::line_col::{LineColLocation, Position},
+    location::line_col::{ByteIndex, LineColLocation, Position},
     matcher::{BibleMatcher, MatchError, MatchResult, Matcher},
 };
 
@@ -18,7 +18,7 @@ impl From<Selection> for LineColLocation {
                 line: value.end.line,
                 column: value.end.column,
             },
-            bytes: todo!(),
+            bytes: ByteIndex::new(value.bytes.start, value.bytes.end),
         }
     }
 }
@@ -44,6 +44,7 @@ pub enum HTMLMatchError {
     FailedToGenerate,
 }
 
+#[derive(Clone, Debug)]
 pub struct HTMLLocation {
     pub line_col: LineColLocation,
     pub text_fragment: TextFragment,

@@ -4,7 +4,7 @@ members = [
     "crates/topos-lib",
     "crates/topos-parser",
     "crates/topos-ts",
-    "crates/topos-py", "crates/topos-pdf",
+    "crates/topos-py", "crates/topos-pdf", "crates/topos-ts-boltffi",
 ]
 resolver = "3"
 

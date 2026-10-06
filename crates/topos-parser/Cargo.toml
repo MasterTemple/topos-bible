@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 chumsky = "0.10.1"
-from_nested_tuple = { git = "https://github.com/MasterTemple/from_nested_tuple" }
+# from_nested_tuple = { git = "https://github.com/MasterTemple/from_nested_tuple" }
+from_nested_tuple = "0.1.2"
