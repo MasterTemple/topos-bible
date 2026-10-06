@@ -12,7 +12,9 @@
   cursor (`--exact-overlap`), however it's written
 - **Code actions**: on a reference, search the workspace for it: `Search "John 3:16" for
   explicit overlap`, `... for any overlap`, `... for exact overlap`, and `Search inside "John 3"`
-- **Diagnostics**: warnings for references that do not exist, like `John 3:99`
+- **Diagnostics**: an information diagnostic on each reference with how it's written in your
+  format and its OSIS id (`John 3:16 (John.3.16)`, code `reference`), and warnings for references
+  that do not exist, like `John 3:99` (code `missing`)
 
 Workspace searches cover every text file in the workspace folders, skipping hidden, binary, and
 ignored files (`.gitignore`, `.ignore`, `.toposignore`), like the CLI. Open files are searched
@@ -36,6 +38,7 @@ so one file configures both. It uses these keys and ignores the others:
 | `context-book`, `context-heading` | References without a book (`3:16`) |
 | `ext` | Extensions searched in the workspace, like `"md,txt"` (all text files by default) |
 | `inlay-hints` | `"changed"` (default), `"always"`, `"osis"`, or `"never"` |
+| `reference-diagnostics` | The diagnostic on each reference: `"info"` (default), `"hint"`, or `"never"` |
 
 The editor's settings override the file: as initialization options, or as `settings` (changed
 while the server runs, without a restart). They take the same keys, at the top level or under

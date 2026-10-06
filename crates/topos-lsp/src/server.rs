@@ -24,7 +24,7 @@ use topos_bible::{
 };
 
 use crate::{
-    settings::{self, Configured, InlayHints},
+    settings::{self, Configured, InlayHints, ReferenceDiagnostics},
     workspace,
 };
 
@@ -77,6 +77,7 @@ pub struct Server {
     /// How references are written: completions, hover, symbols, hints, and action titles
     format: FormatOptions,
     inlay_hints: InlayHints,
+    reference_diagnostics: ReferenceDiagnostics,
     /// Extensions searched in the workspace (empty for every text file)
     extensions: Vec<String>,
     documents: HashMap<Uri, String>,
@@ -94,6 +95,7 @@ impl Server {
             matcher,
             format: FormatOptions::default(),
             inlay_hints: InlayHints::default(),
+            reference_diagnostics: ReferenceDiagnostics::default(),
             extensions: vec![],
             documents: HashMap::new(),
             roots: vec![],
@@ -118,11 +120,13 @@ impl Server {
             matcher,
             format,
             inlay_hints,
+            reference_diagnostics,
             extensions,
         } = settings::settings(config, &editor)?.configure()?;
         self.matcher = matcher;
         self.format = format;
         self.inlay_hints = inlay_hints;
+        self.reference_diagnostics = reference_diagnostics;
         self.extensions = extensions;
         self.editor = editor;
         // New data can change what every file contains
@@ -212,21 +216,57 @@ impl Server {
         Some(CompletionResponse::Array(items))
     }
 
-    /// Warnings for references that do not exist, like `John 3:99`
+    /**
+    The document's diagnostics:
+    - Warnings for references that do not exist, like `John 3:99` (code `missing`)
+    - An information diagnostic on each reference, `John 3:16 (John.3.16)` (code `reference`;
+      a hint, or none, with the `reference-diagnostics` setting)
+    */
     pub fn diagnostics(&self, uri: &Uri) -> PublishDiagnosticsParams {
         let diagnostics = self.documents.get(uri).map_or_else(Vec::new, |text| {
             let index = LineIndex::new(text);
-            self.matcher
+            let diagnostic = |range, severity, code: &str, message| Diagnostic {
+                range,
+                severity: Some(severity),
+                code: Some(lsp_types::NumberOrString::String(code.into())),
+                source: Some(String::from("topos")),
+                message,
+                ..Diagnostic::default()
+            };
+            let mut diagnostics: Vec<Diagnostic> = self
+                .matcher
                 .problems(text)
                 .into_iter()
-                .map(|problem| Diagnostic {
-                    range: lsp_range(&index, problem.bytes.start, problem.bytes.end),
-                    severity: Some(DiagnosticSeverity::WARNING),
-                    source: Some(String::from("topos")),
-                    message: problem.message,
-                    ..Diagnostic::default()
+                .map(|problem| {
+                    let range = lsp_range(&index, problem.bytes.start, problem.bytes.end);
+                    diagnostic(
+                        range,
+                        DiagnosticSeverity::WARNING,
+                        "missing",
+                        problem.message,
+                    )
                 })
-                .collect()
+                .collect();
+            let severity = match self.reference_diagnostics {
+                ReferenceDiagnostics::Info => Some(DiagnosticSeverity::INFORMATION),
+                ReferenceDiagnostics::Hint => Some(DiagnosticSeverity::HINT),
+                ReferenceDiagnostics::Never => None,
+            };
+            if let Some(severity) = severity {
+                for m in self.matcher.search(text) {
+                    let bytes = m.location.bytes;
+                    let range = lsp_range(&index, bytes.start, bytes.end);
+                    let reference = self.reference(&m);
+                    let message = match m.psg.to_osis(self.matcher.data().books()) {
+                        Some(osis) if osis != reference => format!("{reference} ({osis})"),
+                        _ => reference,
+                    };
+                    diagnostics.push(diagnostic(range, severity, "reference", message));
+                }
+                // In document order, so they read top to bottom
+                diagnostics.sort_by_key(|d| (d.range.start.line, d.range.start.character));
+            }
+            diagnostics
         });
         PublishDiagnosticsParams::new(uri.clone(), diagnostics, None)
     }
@@ -493,16 +533,54 @@ mod tests {
     }
 
     #[test]
-    fn warns_about_references_that_do_not_exist() {
-        let (server, uri) = server("Fine: John 3:16\nBad: John 3:99");
-        let params = server.diagnostics(&uri);
-        assert_eq!(params.diagnostics.len(), 1);
-        let diagnostic = &params.diagnostics[0];
-        assert_eq!(diagnostic.message, "John 3:99 does not exist");
+    fn diagnostics_for_references_and_missing_verses() {
+        let (mut server, uri) = server("Fine: jn 3:16\nBad: John 3:99");
+        let summary = |server: &Server| -> Vec<(Option<DiagnosticSeverity>, String, Range)> {
+            server
+                .diagnostics(&uri)
+                .diagnostics
+                .into_iter()
+                .map(|d| (d.severity, d.message, d.range))
+                .collect()
+        };
         assert_eq!(
-            diagnostic.range,
-            Range::new(Position::new(1, 10), Position::new(1, 14))
+            summary(&server),
+            [
+                (
+                    Some(DiagnosticSeverity::INFORMATION),
+                    String::from("John 3:16 (John.3.16)"),
+                    Range::new(Position::new(0, 6), Position::new(0, 13))
+                ),
+                (
+                    Some(DiagnosticSeverity::WARNING),
+                    String::from("John 3:99 does not exist"),
+                    Range::new(Position::new(1, 10), Position::new(1, 14))
+                ),
+            ]
         );
+        // Codes tell them apart
+        let codes: Vec<_> = server
+            .diagnostics(&uri)
+            .diagnostics
+            .into_iter()
+            .map(|d| d.code)
+            .collect();
+        assert_eq!(
+            codes,
+            [
+                Some(lsp_types::NumberOrString::String("reference".into())),
+                Some(lsp_types::NumberOrString::String("missing".into()))
+            ]
+        );
+
+        server
+            .configure(serde_json::json!({ "no-config": true, "reference-diagnostics": "hint" }))
+            .unwrap();
+        assert_eq!(summary(&server)[0].0, Some(DiagnosticSeverity::HINT));
+        server
+            .configure(serde_json::json!({ "no-config": true, "reference_diagnostics": "never" }))
+            .unwrap();
+        assert_eq!(summary(&server).len(), 1);
     }
 
     /// A workspace folder with notes on disk, plus one open document

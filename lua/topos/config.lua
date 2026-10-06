@@ -10,7 +10,8 @@ M.defaults = {
     -- Show how each reference is written in your format (see `settings['inlay-hints']`)
     inlay_hints = true,
     -- Override ~/.config/topos/config.toml, with the same keys as the CLI:
-    -- { ['psg-fmt'] = { join_adjacent = true }, format = 'abbreviation', ['inlay-hints'] = 'always' }
+    -- { ['psg-fmt'] = { join_adjacent = true }, format = 'abbreviation', ['inlay-hints'] = 'always',
+    --   ['reference-diagnostics'] = 'hint' }
     settings = {},
   },
   -- Paths to the binaries; nil uses the plugin's own build, then your PATH

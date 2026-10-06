@@ -32,6 +32,19 @@ pub enum InlayHints {
     Never,
 }
 
+/// The diagnostic on each reference (alongside the warnings for ones that don't exist)
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ReferenceDiagnostics {
+    /// An information diagnostic: `John 3:16 (John.3.16)`
+    #[default]
+    #[serde(alias = "information")]
+    Info,
+    /// The same, as a hint (editors show these more quietly)
+    Hint,
+    Never,
+}
+
 /// One value or a list (`merge-data = "a.json"` or `["a.json", "b.json"]`)
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(untagged)]
@@ -82,6 +95,7 @@ pub struct Settings {
     /// text file)
     pub ext: OneOrMany,
     pub inlay_hints: InlayHints,
+    pub reference_diagnostics: ReferenceDiagnostics,
     /// Read this config file instead of `~/.config/topos/config.toml`
     pub config: Option<String>,
     /// Don't read a config file
@@ -93,6 +107,7 @@ pub struct Configured {
     pub matcher: BibleMatcher,
     pub format: FormatOptions,
     pub inlay_hints: InlayHints,
+    pub reference_diagnostics: ReferenceDiagnostics,
     pub extensions: Vec<String>,
 }
 
@@ -249,6 +264,7 @@ impl Settings {
             },
             format: self.format_options(),
             inlay_hints: self.inlay_hints,
+            reference_diagnostics: self.reference_diagnostics,
             extensions,
         })
     }

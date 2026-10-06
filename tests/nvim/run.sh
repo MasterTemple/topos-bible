@@ -14,6 +14,7 @@ printf 'John 3, John 2; 3:16, Rom 8:28, Luke 2:1\n' > "$WORK/ws/b.txt"
 printf 'See jn 3:16 here\n' > "$WORK/ws/open.txt"
 
 expected='lsp topos hints true
+diagnostic INFO reference John 3:16 (John.3.16)
 search Bible references 7
 query topos -g Gospels --exclude-book Luke 5
 explicit Search "John 3:16" for explicit overlap 4
@@ -33,9 +34,9 @@ run() {
 status=0
 check() {
   local name=$1 output=$2
-  if grep -q '^ERROR' <<<"$output" || [[ "$(head -n 10 <<<"$output")" != "$expected" ]]; then
+  if grep -q '^ERROR' <<<"$output" || [[ "$(head -n 11 <<<"$output")" != "$expected" ]]; then
     echo "FAIL ($name):"
-    diff <(echo "$expected") <(head -n 10 <<<"$output") || true
+    diff <(echo "$expected") <(head -n 11 <<<"$output") || true
     grep '^ERROR' <<<"$output" || true
     status=1
   else

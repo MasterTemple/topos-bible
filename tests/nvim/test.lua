@@ -15,6 +15,10 @@ vim.wait(5000, function() return #vim.lsp.get_clients({ bufnr = 0, name = "topos
 vim.wait(500)
 local client = vim.lsp.get_clients({ bufnr = 0, name = "topos" })[1]
 log("lsp", client and client.name, "hints", vim.lsp.inlay_hint.is_enabled({ bufnr = 0 }))
+vim.wait(3000, function() return #vim.diagnostic.get(0) > 0 end)
+for _, d in ipairs(vim.diagnostic.get(0)) do
+  log("diagnostic", vim.diagnostic.severity[d.severity], d.code, d.message)
+end
 local telescope = vim.env.WITH_TELESCOPE ~= nil
 local function results(cmd)
   local before = vim.fn.getqflist({ id = 0 }).id
