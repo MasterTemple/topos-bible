@@ -45,10 +45,12 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
 - Autocomplete while typing: chapters after a book (`John ` → `John 1`…), verses after a colon,
   range ends after a dash, and book names (`1 Co` → `1 Corinthians`). Book names only complete
   for capitalized words by default, so ordinary prose isn't interrupted
-- References are highlighted; Ctrl/Cmd-click opens their links (a setting allows plain clicks).
-  With links turned off, they aren't highlighted
+- References glow faintly with a dashed underline in your accent color (or one you pick), and
+  highlight on hover; Ctrl/Cmd-click opens their links (a setting allows plain clicks). With links
+  turned off, they aren't marked
 - Right-click a reference: open its link, find references to those verses, copy as OSIS
-- In reading view, references are links
+- In reading view, callouts, tables, and embedded notes, references are marked the same way, not
+  as ordinary links: Ctrl/Cmd-click opens them on desktop, and a tap on mobile
 
 **Commands**
 
@@ -65,7 +67,7 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
 | Normalize references in the selection or note | `jn 3:16` → `John 3:16`, in the chosen style |
 
 **Settings**: reference style (`John 3:16`, `Jn 3:16`, or `John.3.16`), where references open
-(see [Links](#links)), editor and reading-view links, whether editor clicks
+(see [Links](#links)), the references' color, editor and reading-view links, whether editor clicks
 need Ctrl/Cmd, autocomplete and book-name completion, number of suggestions, the reference format
 (the CLI's `--psg-fmt` fields: separators, joining adjacent verses, the chapter in single-chapter
 books, with a preview; used by completions, the sidebar, the dialogs, and normalizing), file

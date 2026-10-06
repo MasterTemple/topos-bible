@@ -65,8 +65,7 @@ export function referenceDecorations(plugin: ToposPlugin) {
         const target = (event.target as HTMLElement | null)?.closest<HTMLElement>(
           "[data-topos-url]",
         );
-        if (!target || !plugin.settings.linkInEditor) return false;
-        if (plugin.settings.clickNeedsModifier && !(event.ctrlKey || event.metaKey)) return false;
+        if (!target || !plugin.settings.linkInEditor || !plugin.clickOpens(event, true)) return false;
         event.preventDefault();
         window.open(target.dataset.toposUrl, "_blank");
         return true;

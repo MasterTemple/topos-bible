@@ -56,8 +56,10 @@ export class ToposSettingTab extends PluginSettingTab {
         }),
       );
     new Setting(containerEl)
-      .setName("Require Ctrl/Cmd to open from the editor")
-      .setDesc("Plain clicks place the cursor; Ctrl/Cmd-click opens the reference.")
+      .setName("Require Ctrl/Cmd to open references")
+      .setDesc(
+        "On desktop, plain clicks place the cursor (or do nothing in reading view); Ctrl/Cmd-click opens the reference. On mobile, a tap opens references outside the editor.",
+      )
       .addToggle((t) =>
         t.setValue(settings.clickNeedsModifier).onChange((value) => {
           settings.clickNeedsModifier = value;
@@ -72,6 +74,7 @@ export class ToposSettingTab extends PluginSettingTab {
           void save();
         }),
       );
+    this.referenceColor(containerEl);
 
     new Setting(containerEl).setName("Autocomplete").setHeading();
     new Setting(containerEl)
@@ -185,6 +188,34 @@ export class ToposSettingTab extends PluginSettingTab {
    * How references are written (the CLI's --psg-fmt fields), with a preview: completions, the
    * sidebar, the dialogs, and "Normalize references" all use it
    */
+  /** The references' color: the accent color until one is picked */
+  private referenceColor(containerEl: HTMLElement): void {
+    const settings = this.plugin.settings;
+    new Setting(containerEl)
+      .setName("Reference color")
+      .setDesc(
+        settings.referenceColor
+          ? "The glow, dashed underline, and hover highlight of references."
+          : "The glow, dashed underline, and hover highlight of references. Your accent color until you pick one.",
+      )
+      .addColorPicker((c) =>
+        c.setValue(settings.referenceColor || accentColor(containerEl)).onChange((value) => {
+          settings.referenceColor = value;
+          void this.plugin.saveSettings();
+        }),
+      )
+      .addExtraButton((b) =>
+        b
+          .setIcon("rotate-ccw")
+          .setTooltip("Use the accent color")
+          .onClick(() => {
+            settings.referenceColor = "";
+            void this.plugin.saveSettings();
+            this.display();
+          }),
+      );
+  }
+
   /** Where references open: a site, a template of your own, or nowhere */
   private links(containerEl: HTMLElement): void {
     const settings = this.plugin.settings;
@@ -371,5 +402,22 @@ export class ToposSettingTab extends PluginSettingTab {
         this.display();
       }),
     );
+  }
+}
+
+/** The theme's accent color as `#rrggbb` (what the color picker takes) */
+function accentColor(el: HTMLElement): string {
+  try {
+    const probe = el.createDiv();
+    probe.style.color = "var(--text-accent)";
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    // `rgb(216, 180, 254)`, or `color(srgb 0.85 0.71 1)` with 0-1 channels
+    const scale = color.startsWith("color(") ? 255 : 1;
+    const channels = (color.match(/\d*\.?\d+/g) ?? []).slice(0, 3).map((n) => Number(n) * scale);
+    if (channels.length < 3) return "#000000";
+    return `#${channels.map((n) => Math.round(n).toString(16).padStart(2, "0")).join("")}`;
+  } catch {
+    return "#000000";
   }
 }

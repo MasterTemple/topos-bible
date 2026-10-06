@@ -87,6 +87,7 @@ class FakeSetting {
   addTextArea(build: any) { return this.control("text", build); }
   addToggle(build: any) { return this.control("toggle", build); }
   addDropdown(build: any) { return this.control("dropdown", build); }
+  addColorPicker(build: any) { return this.control("color", build); }
   addSlider(build: any) { return this.control("slider", build); }
   addButton(build: any) { return this.control("button", build); }
   addExtraButton(build: any) { return this.control("button", build); }

@@ -1,11 +1,13 @@
-/* References in the editor and reading view */
-/* A faint highlight in the theme's accent color, a little stronger when it can be opened */
+/* References in the editor, reading view, callouts, and embeds: a soft glow and a dashed
+   underline in their color (the accent color unless one is set), highlighted on hover */
 .topos-reference {
-  background-color: color-mix(in srgb, var(--text-accent) 12%, transparent);
-  border-radius: var(--radius-s);
+  --topos-color: var(--topos-reference-color, var(--text-accent));
+  text-shadow: 1px 1px 4px color-mix(in srgb, var(--topos-color) 80%, transparent);
+  border-bottom: 1px dashed color-mix(in srgb, var(--topos-color) 50%, transparent);
+  transition: background-color 0.2s ease;
 }
-.cm-content .topos-reference[data-topos-url]:hover {
-  background-color: color-mix(in srgb, var(--text-accent) 22%, transparent);
+.topos-reference:hover {
+  background-color: color-mix(in srgb, var(--topos-color) 20%, transparent);
   cursor: pointer;
 }
 

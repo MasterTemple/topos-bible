@@ -69,6 +69,9 @@ export default class ToposPlugin extends Plugin {
     this.registerEditorExtension(referenceDecorations(this));
     this.registerMarkdownPostProcessor(linkReferences(this));
     this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor) => this.editorMenu(menu, editor)));
+    // The reference color is a CSS variable on each window's body (pop-out windows too)
+    this.applyColor();
+    this.registerEvent(this.app.workspace.on("window-open", (_win, win) => this.applyColor([win.document])));
     this.addCommands();
 
     this.app.workspace.onLayoutReady(() => {
@@ -92,6 +95,7 @@ export default class ToposPlugin extends Plugin {
   }
 
   onunload(): void {
+    for (const doc of this.documents()) doc.body.style.removeProperty("--topos-reference-color");
     this.generation++;
     clearTimeout(this.notifyTimer);
     this.cliRun?.stop();
@@ -169,6 +173,7 @@ export default class ToposPlugin extends Plugin {
    * where they link: open editors, reading views, and the sidebar
    */
   refreshLinks(): void {
+    this.applyColor();
     this.app.workspace.updateOptions();
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
       if (!(leaf.view instanceof MarkdownView)) continue;
@@ -387,6 +392,36 @@ export default class ToposPlugin extends Plugin {
       editor.setSelection(from, to);
       editor.scrollIntoView({ from, to }, true);
       editor.focus();
+    }
+  }
+
+  /**
+   * Whether a click on a reference opens it: on desktop, a Ctrl/Cmd-click (or any click, if the
+   * setting allows it); on mobile, which has no Ctrl, a tap outside the editor, or in it if
+   * plain clicks are allowed
+   */
+  clickOpens(event: MouseEvent, inEditor: boolean): boolean {
+    if (!Platform.isDesktop) return !inEditor || !this.settings.clickNeedsModifier;
+    return !this.settings.clickNeedsModifier || event.ctrlKey || event.metaKey;
+  }
+
+  /** The main window's document and each pop-out window's */
+  private documents(): Set<Document> {
+    const docs = new Set<Document>();
+    const main = (this.app.workspace as { containerEl?: HTMLElement }).containerEl?.ownerDocument;
+    if (main) docs.add(main);
+    this.app.workspace.iterateAllLeaves?.((leaf) => {
+      const doc = leaf.view?.containerEl?.ownerDocument;
+      if (doc) docs.add(doc);
+    });
+    return docs;
+  }
+
+  /** Sets the references' color in these windows (all of them by default) */
+  applyColor(docs: Iterable<Document> = this.documents()): void {
+    for (const doc of docs) {
+      if (this.settings.referenceColor) doc.body.style.setProperty("--topos-reference-color", this.settings.referenceColor);
+      else doc.body.style.removeProperty("--topos-reference-color");
     }
   }
 

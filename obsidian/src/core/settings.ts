@@ -16,8 +16,10 @@ export interface ToposSettings {
   linkInEditor: boolean;
   /** Turn references into links in reading view */
   linkInReading: boolean;
-  /** In the editor, only open references with Ctrl/Cmd-click */
+  /** On desktop, only open references with Ctrl/Cmd-click */
   clickNeedsModifier: boolean;
+  /** References' color, like `#d8b4fe` ("" uses the theme's accent color) */
+  referenceColor: string;
   /** Suggest chapters, verses, and books while typing */
   autocomplete: boolean;
   /** Book names in prose would trigger on every word, so by default they need a capital */
@@ -52,6 +54,7 @@ export const DEFAULT_SETTINGS: ToposSettings = {
   linkInEditor: true,
   linkInReading: true,
   clickNeedsModifier: true,
+  referenceColor: "",
   autocomplete: true,
   bookCompletion: "capitalized",
   suggestionLimit: 20,

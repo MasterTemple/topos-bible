@@ -34,8 +34,9 @@ verse) or grouped by book, which the CLI can't do.
   `1 Corinthians`); in prose that would fire on every word, so by default book names only
   complete when they start with a capital letter or a number.
 - **Clickable references**: references in the editor (live preview and source) and in reading
-  view are highlighted. Clicking (Ctrl/Cmd-click in the editor, so editing still works) opens
-  its link (Literal Word by default; see Links).
+  view (callouts, tables, and embeds too) are marked with a soft glow and a dashed underline in
+  the accent color (or a chosen one), not as ordinary links. Ctrl/Cmd-click on desktop (a tap on
+  mobile outside the editor) opens its link (Literal Word by default; see Links).
 - **Context menu** on a reference: open its link, copy as OSIS, find it in the vault.
 
 ### Commands

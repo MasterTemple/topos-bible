@@ -55,6 +55,7 @@ test("editor links follow the settings after a refresh", async () => {
     settings,
     referenceUrl: (passage: any) => linkUrl(settings.linkTemplate, passage),
     linkSite: () => "the site",
+    clickOpens: (event: MouseEvent) => event.ctrlKey,
   };
   const view = new EditorView({
     doc: "Read Jn 3:16 today",
@@ -91,11 +92,20 @@ test("editor links follow the settings after a refresh", async () => {
   const editorEl = document.createElement("div");
   editorEl.innerHTML =
     '<div class="cm-content"><div class="cm-embed-block cm-callout"><div class="callout-content">' +
-    '<a class="topos-reference external-link" href="https://old.example/43/3/16">Jn 3:16</a> and Rom 8:28</div></div>' +
+    '<span class="topos-reference topos-rendered" data-topos-url="https://old.example/43/3/16">Jn 3:16</span> and Rom 8:28</div></div>' +
     '<div class="cm-embed-block cm-table-widget"><div class="cm-editor"><div class="cm-line">Gen 1:1</div></div></div></div>';
-  const hrefs = () => [...editorEl.querySelectorAll("a.topos-reference")].map((a: any) => `${a.textContent} ${a.getAttribute("href")}`);
+  const hrefs = () =>
+    [...editorEl.querySelectorAll(".topos-rendered")].map((el: any) => `${el.textContent} ${el.getAttribute("data-topos-url")}`);
   relinkEditor(plugin, editorEl);
   assert.deepEqual(hrefs(), ["Jn 3:16 https://app.literalword.com/43/3/16", "Rom 8:28 https://app.literalword.com/45/8/28"]);
+  // Not links: a plain click does nothing, Ctrl-click opens the reference
+  const opened: string[] = [];
+  (window as any).open = (url: string) => opened.push(url);
+  const rom = editorEl.querySelectorAll(".topos-rendered")[1]!;
+  rom.dispatchEvent(new (window as any).MouseEvent("click", { bubbles: true }));
+  rom.dispatchEvent(new (window as any).MouseEvent("click", { bubbles: true, ctrlKey: true }));
+  assert.deepEqual(opened, ["https://app.literalword.com/45/8/28"]);
+  assert.equal(editorEl.querySelector("a.topos-reference"), null);
   settings.linkTemplate = "";
   relinkEditor(plugin, editorEl);
   assert.deepEqual(hrefs(), []);
