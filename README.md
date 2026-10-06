@@ -4,6 +4,17 @@
 
 Locate Bible verses in text, files, and entire directories!
 
+## Install
+
+```sh
+# The `topos` command-line tool
+cargo install --git https://github.com/MasterTemple/topos-bible topos-cli
+
+# The library, from JavaScript/TypeScript or Python
+npm install topos-bible
+pip install topos-bible
+```
+
 ## Crates
 
 | Crate | What it is |

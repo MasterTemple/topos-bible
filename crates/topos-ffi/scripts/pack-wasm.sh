@@ -3,5 +3,5 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 boltffi pack wasm --release
-cp packaging/README.md dist/wasm/pkg/README.md
+cp packaging/npm/README.md dist/wasm/pkg/README.md
 cp ../../LICENSE dist/wasm/pkg/LICENSE

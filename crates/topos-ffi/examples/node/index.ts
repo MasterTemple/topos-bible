@@ -1,7 +1,7 @@
 // Run with `npm install && npm start` after `boltffi pack wasm` (see ../../README.md)
-import { initialized, Topos, OffsetUnit, BookStyle, CompletionKind } from "topos-bible";
+// In Node and Bun the WebAssembly module is ready on import (browsers: `await initialized` first)
+import { Topos, OffsetUnit, BookStyle, CompletionKind } from "topos-bible";
 
-await initialized;
 const topos = Topos.new();
 
 // JavaScript strings are UTF-16, so ask for UTF-16 offsets

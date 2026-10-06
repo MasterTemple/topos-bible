@@ -8,7 +8,11 @@
 - **Document symbols**: every reference in the file, for outlines and pickers
 - **Diagnostics**: warnings for references that do not exist, like `John 3:99`
 
-Install with `cargo install --path crates/topos-lsp`.
+Install with:
+
+```sh
+cargo install --git https://github.com/MasterTemple/topos-bible topos-lsp
+```
 
 ## Neovim (0.11+)
 

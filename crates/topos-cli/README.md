@@ -4,7 +4,14 @@
 
 *Results are truncated. These examples use `-m table`; on a terminal the default output groups results by file, and when piped it prints `path:line:column: reference`.*
 
-Install with `cargo install --path crates/topos-cli` (add `--features pdf` to search PDFs).
+## Install
+
+```sh
+cargo install --git https://github.com/MasterTemple/topos-bible topos-cli
+```
+
+This installs the `topos` command. Add `--features pdf` to also search PDFs (it builds MuPDF,
+which takes a few minutes). From a clone, use `cargo install --path crates/topos-cli`.
 
 ### Default Search
 

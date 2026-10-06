@@ -14,7 +14,7 @@ package = root / "dist" / "python"
 if not (package / "setup.py").is_file():
     sys.exit(f"{package} has no setup.py; run `boltffi pack python --no-build` first")
 
-shutil.copy(root / "packaging" / "README.md", package / "README.md")
+shutil.copy(root / "packaging" / "python" / "README.md", package / "README.md")
 shutil.copy(root.parent.parent / "LICENSE", package / "LICENSE")
 (package / "setup.cfg").write_text(
     """[metadata]
