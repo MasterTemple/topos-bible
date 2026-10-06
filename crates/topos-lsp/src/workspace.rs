@@ -169,9 +169,11 @@ pub fn references(
 ) -> Vec<(Uri, Arc<Vec<Found>>)> {
     // Open documents by path: editors may percent-encode their URIs differently
     let open: HashSet<PathBuf> = documents.keys().filter_map(uri_to_path).collect();
+    // Unnamed documents (`file://`) are left out: there is no file to go to
     let results: Mutex<Vec<(Uri, Arc<Vec<Found>>)>> = Mutex::new(
         documents
             .iter()
+            .filter(|(uri, _)| !crate::server::is_unnamed(uri))
             .map(|(uri, text)| (uri.clone(), Arc::new(find(matcher, text))))
             .collect(),
     );

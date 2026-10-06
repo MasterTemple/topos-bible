@@ -79,6 +79,20 @@ impl BibleMatcher {
         }
         let before = &text[..cursor];
         let mut completions = book_completions(self.data(), before, &options.format);
+        // A book name is followed by its separator, unless the text after the cursor already
+        // starts with one: `1 Ti| 3:16` becomes `1 Timothy 3:16`, not `1 Timothy  3:16`
+        let after = &text[cursor..];
+        let separator = &options.format.book_separator;
+        let has_separator = !separator.is_empty()
+            && (after.starts_with(separator.as_str())
+                || (separator.trim().is_empty() && after.starts_with(char::is_whitespace)));
+        if has_separator {
+            for completion in &mut completions {
+                if let Some(name) = completion.edit.text.strip_suffix(separator.as_str()) {
+                    completion.edit.text = name.to_string();
+                }
+            }
+        }
         completions.extend(segment_completions(self.data(), before, &options.format));
         completions.retain(|c| before[c.edit.range.clone()].trim_end() != c.edit.text.trim_end());
         if let Some(limit) = options.limit {

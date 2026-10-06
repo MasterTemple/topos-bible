@@ -87,6 +87,7 @@ export function referenceChoices(
   const passage = topos.parse(value, style);
   const completions = completionsBefore(topos, value.slice(0, caret), style, MAX_OPTIONS, "always", {
     format,
+    after: value.slice(caret),
   });
   const choices: Choice[] = completions.map((completion) => ({ kind: "complete", completion }));
   if (!passage) return choices;

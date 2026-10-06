@@ -13,6 +13,7 @@ fn cases() -> Vec<(bool, bool, String, Vec<String>)> {
     include_str!("cases/complete.txt")
         .lines()
         .filter(|line| !line.trim().is_empty() && !line.starts_with('#'))
+        .filter(|line| !line.starts_with("apply: "))
         .map(|line| {
             let (input, expected) = line.split_once(" =>").expect("a case has `=>`");
             let join = input.starts_with("[join] ");
@@ -62,6 +63,34 @@ fn completion_cases() {
                 "{input:?}: expected {expected:?}, got {:?}",
                 &labels[..labels.len().min(4)]
             ));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// `apply:` cases: `|` is the cursor, and the text after the first completion is applied
+#[test]
+fn applied_completion_cases() {
+    let matcher = BibleMatcher::default();
+    let mut failures = vec![];
+    for line in include_str!("cases/complete.txt").lines() {
+        let Some(case) = line.strip_prefix("apply: ") else {
+            continue;
+        };
+        let (input, expected) = case.split_once(" => ").expect("a case has `=>`");
+        let cursor = input.find('|').expect("an apply case has a cursor");
+        let text = input.replacen('|', "", 1);
+        let completion = matcher
+            .complete(&text, cursor, &CompleteOptions::default())
+            .into_iter()
+            .next();
+        let applied = completion.map(|c| {
+            let mut applied = text.clone();
+            applied.replace_range(c.edit.range, &c.edit.text);
+            applied
+        });
+        if applied.as_deref() != Some(expected) {
+            failures.push(format!("{input:?}: expected {expected:?}, got {applied:?}"));
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));

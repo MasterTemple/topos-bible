@@ -962,6 +962,35 @@ impl<'a> Offsets<'a> {
 #[cfg(test)]
 mod tests {
 
+    /// The shared `apply:` completion cases (`|` is the cursor), through the bindings
+    #[test]
+    fn applied_completion_cases() {
+        let topos = Topos::new();
+        let cases = include_str!("../../topos-lib/tests/cases/complete.txt");
+        let mut failures = vec![];
+        for case in cases.lines().filter_map(|l| l.strip_prefix("apply: ")) {
+            let (input, expected) = case.split_once(" => ").unwrap();
+            let cursor = input[..input.find('|').unwrap()].encode_utf16().count() as u32;
+            let text = input.replacen('|', "", 1);
+            let format = ToposFormat::create();
+            let first = topos
+                .complete_with(text.clone(), cursor, OffsetUnit::Utf16, &format, 0)
+                .into_iter()
+                .next();
+            let applied = first.map(|c| {
+                let units: Vec<u16> = text.encode_utf16().collect();
+                let mut out = units[..c.start as usize].to_vec();
+                out.extend(c.text.encode_utf16());
+                out.extend(&units[c.end as usize..]);
+                String::from_utf16(&out).unwrap()
+            });
+            if applied.as_deref() != Some(expected) {
+                failures.push(format!("{input:?}: expected {expected:?}, got {applied:?}"));
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
     #[test]
     fn parses_like_search() {
         let topos = Topos::new();
@@ -985,6 +1014,7 @@ mod tests {
         for line in cases
             .lines()
             .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
+            .filter(|l| !l.starts_with("apply: "))
         {
             let (input, expected) = line.split_once(" =>").unwrap();
             let mut format = ToposFormat::create();

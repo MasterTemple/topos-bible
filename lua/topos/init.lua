@@ -160,10 +160,19 @@ function M.lsp_start()
   vim.notify(('topos: %s topos-lsp'):format(#running > 0 and 'restarted' or 'started'))
 end
 
+-- Reformat actions in unnamed buffers carry their edits, for the buffer they came from (an
+-- unnamed buffer's URI, `file://`, names no buffer a workspace edit could reach)
+local function apply_edits_command(command, ctx)
+  local client = vim.lsp.get_client_by_id(ctx.client_id)
+  local edits = command.arguments and command.arguments[1] and command.arguments[1].edits or {}
+  vim.lsp.util.apply_text_edits(edits, ctx.bufnr, client and client.offset_encoding or 'utf-16')
+end
+
 function M.setup(opts)
   config.set(opts)
   require('topos.commands').create()
   vim.lsp.commands['topos.search'] = search_command
+  vim.lsp.commands['topos.applyEdits'] = apply_edits_command
   local ok, telescope = pcall(require, 'telescope')
   if ok then
     pcall(telescope.load_extension, 'topos')

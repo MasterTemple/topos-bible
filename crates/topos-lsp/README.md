@@ -73,6 +73,11 @@ handler to show their results (see below; the plugin's is in `lua/topos/init.lua
 
 ## Code actions in other editors
 
+Reformat actions in an unnamed buffer (whose URI, `file://`, names no file) carry their edits as the
+`topos.applyEdits` command (`{ "edits": [TextEdit] }`) for the editor to apply to that buffer;
+in named files they are ordinary workspace edits. Completion lists are marked incomplete, so
+editors ask again as you type instead of filtering a stale list.
+
 LSP has no standard way for a server to open the editor's references list. The code actions
 run the `topos.search` command, which returns the matching locations
 (`workspace/executeCommand` with `{ "mode": "explicit-overlap" | "any-overlap" |

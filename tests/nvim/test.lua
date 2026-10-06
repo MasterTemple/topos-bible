@@ -76,6 +76,22 @@ vim.wait(5000, function() return #vim.lsp.get_clients({ bufnr = scratch, name = 
 vim.wait(3000, function() return #vim.diagnostic.get(scratch) > 0 end)
 local diagnostics = vim.diagnostic.get(scratch)
 log("unnamed after", #vim.lsp.get_clients({ bufnr = scratch, name = "topos" }), diagnostics[1] and diagnostics[1].message)
+-- Reformatting from a code action works in the unnamed buffer too
+do
+  local c = vim.lsp.get_clients({ bufnr = scratch, name = "topos" })[1]
+  local params = {
+    textDocument = { uri = vim.uri_from_bufnr(scratch) },
+    range = { start = { line = 0, character = 6 }, ["end"] = { line = 0, character = 6 } },
+    context = { diagnostics = {} },
+  }
+  local result = vim.lsp.buf_request_sync(scratch, "textDocument/codeAction", params, 3000) or {}
+  for _, r in pairs(result) do
+    for _, a in ipairs(r.result or {}) do
+      if a.title:find("^Reformat as") then c:exec_cmd(a.command, { bufnr = scratch }) end
+    end
+  end
+  log("unnamed reformat", vim.api.nvim_buf_get_lines(scratch, 0, 1, false)[1])
+end
 -- Editing the unnamed buffer updates its diagnostics
 vim.api.nvim_buf_set_lines(scratch, 0, -1, false, { "Now rom 8:28" })
 vim.api.nvim_exec_autocmds("TextChanged", { buffer = scratch })

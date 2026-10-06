@@ -32,14 +32,14 @@ export class ReferenceSuggest extends EditorSuggest<Completion> {
 
   private completions(editor: Editor, cursor: EditorPosition): Completion[] {
     const { settings, topos } = this.plugin;
-    const before = editor.getLine(cursor.line).slice(0, cursor.ch);
+    const line = editor.getLine(cursor.line);
     return completionsBefore(
       topos,
-      before,
+      line.slice(0, cursor.ch),
       bookStyle(settings.style),
       settings.suggestionLimit,
       settings.bookCompletion,
-      { needsNumber: true, format: settings.format },
+      { needsNumber: true, format: settings.format, after: line.slice(cursor.ch) },
     );
   }
 

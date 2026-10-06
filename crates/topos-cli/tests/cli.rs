@@ -895,6 +895,7 @@ fn completion_cases() {
     for line in cases
         .lines()
         .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
+        .filter(|l| !l.starts_with("apply: "))
     {
         let (input, expected) = line.split_once(" =>").unwrap();
         let mut args = vec!["--no-config", "-m", "json"];

@@ -31,6 +31,19 @@ use crate::{
 /// The command code actions run; its result is the matching locations
 pub const SEARCH_COMMAND: &str = "topos.search";
 
+/**
+The command reformat actions use in unnamed documents: `{ "edits": [TextEdit] }` for the
+editor to apply to the document the action came from
+- A workspace edit names its document by URI, and an unnamed document's (`file://`) names no
+  buffer an editor can find (Neovim makes a new one), so the edits go with the action instead
+*/
+pub const APPLY_EDITS_COMMAND: &str = "topos.applyEdits";
+
+/// Whether a URI names no file (an unnamed buffer's `file://`)
+pub fn is_unnamed(uri: &Uri) -> bool {
+    workspace::uri_to_path(uri).is_none_or(|path| path.as_os_str().is_empty())
+}
+
 /// The kinds of workspace search, like the CLI's passage filters
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -213,7 +226,12 @@ impl Server {
                 }
             })
             .collect();
-        Some(CompletionResponse::Array(items))
+        // Incomplete: the editor asks again as you type, instead of filtering this list itself
+        // (which filtered `1 Ti` against what was typed when it was made, `1 T`, and emptied it)
+        Some(CompletionResponse::List(lsp_types::CompletionList {
+            is_incomplete: true,
+            items,
+        }))
     }
 
     /**
@@ -467,12 +485,25 @@ impl Server {
                 new_text: formatted,
             })
         };
+        let unnamed = is_unnamed(uri);
         let action = |title: String, edits: Vec<TextEdit>| {
-            let changes = HashMap::from([(uri.clone(), edits)]);
+            let (edit, command) = if unnamed {
+                let arguments = serde_json::json!({ "edits": edits });
+                let command = Command::new(
+                    title.clone(),
+                    APPLY_EDITS_COMMAND.into(),
+                    Some(vec![arguments]),
+                );
+                (None, Some(command))
+            } else {
+                let changes = HashMap::from([(uri.clone(), edits)]);
+                (Some(lsp_types::WorkspaceEdit::new(changes)), None)
+            };
             CodeActionOrCommand::CodeAction(CodeAction {
                 title,
                 kind: Some(lsp_types::CodeActionKind::REFACTOR_REWRITE),
-                edit: Some(lsp_types::WorkspaceEdit::new(changes)),
+                edit,
+                command,
                 ..CodeAction::default()
             })
         };
@@ -615,6 +646,7 @@ mod tests {
         for line in cases
             .lines()
             .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
+            .filter(|l| !l.starts_with("apply: "))
         {
             let (input, expected) = line.split_once(" =>").unwrap();
             let (mut server, uri) = server(
@@ -639,7 +671,8 @@ mod tests {
                 partial_result_params: PartialResultParams::default(),
                 context: None,
             }) {
-                Some(CompletionResponse::Array(items)) => {
+                Some(CompletionResponse::List(list)) => {
+                    let items = list.items;
                     items.into_iter().map(|item| item.label).collect()
                 }
                 _ => vec![],
@@ -661,16 +694,57 @@ mod tests {
         assert!(failures.is_empty(), "{}", failures.join("\n"));
     }
 
+    /// The shared `apply:` completion cases (`|` is the cursor), as an editor asks
+    #[test]
+    fn applied_completion_cases() {
+        let cases = include_str!("../../topos-lib/tests/cases/complete.txt");
+        let mut failures = vec![];
+        for case in cases.lines().filter_map(|l| l.strip_prefix("apply: ")) {
+            let (input, expected) = case.split_once(" => ").unwrap();
+            let character = input[..input.find('|').unwrap()].encode_utf16().count() as u32;
+            let text = input.replacen('|', "", 1);
+            let (server, uri) = server(&text);
+            let first = match server.completion(CompletionParams {
+                text_document_position: at(&uri, 0, character),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+                context: None,
+            }) {
+                Some(CompletionResponse::List(list)) => list.items.into_iter().next(),
+                _ => None,
+            };
+            let applied = first.and_then(|item| match item.text_edit? {
+                lsp_types::CompletionTextEdit::Edit(edit) => {
+                    let index = LineIndex::new(&text);
+                    let start = index.offset_of_utf16(0, edit.range.start.character as usize)?;
+                    let end = index.offset_of_utf16(0, edit.range.end.character as usize)?;
+                    let mut applied = text.clone();
+                    applied.replace_range(start..end, &edit.new_text);
+                    Some(applied)
+                }
+                lsp_types::CompletionTextEdit::InsertAndReplace(_) => None,
+            });
+            if applied.as_deref() != Some(expected) {
+                failures.push(format!("{input:?}: expected {expected:?}, got {applied:?}"));
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
     #[test]
     fn completes_with_utf16_ranges() {
         // `𝄞` is 2 UTF-16 units, so `jn` starts at character 3
         let (server, uri) = server("intro\n𝄞 jn 3:1");
-        let Some(CompletionResponse::Array(items)) = server.completion(CompletionParams {
+        let Some(CompletionResponse::List(lsp_types::CompletionList {
+            items,
+            is_incomplete: true,
+        })) = server.completion(CompletionParams {
             text_document_position: at(&uri, 1, 9),
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
             context: None,
-        }) else {
+        })
+        else {
             panic!("no completions");
         };
         let first = &items[0];

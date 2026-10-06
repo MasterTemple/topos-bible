@@ -13,6 +13,8 @@ export type BookCompletion = "off" | "capitalized" | "always";
  * - `needsNumber`: in prose, `John ` alone doesn't list chapters until a number or a delimiter
  *   follows (`John 3`, `John 3:`, `John 3:16, `)
  * - `format`: how completions are written (separators, joined ranges, ...)
+ * - `after`: the text after the cursor on the line, so a book name doesn't get a second space
+ *   (`1 Ti| 3:16` completes to `1 Timothy 3:16`)
  */
 export function completionsBefore(
   topos: Topos,
@@ -20,10 +22,14 @@ export function completionsBefore(
   style: BookStyle,
   limit: number,
   books: BookCompletion,
-  { needsNumber = false, format = DEFAULT_FORMAT }: { needsNumber?: boolean; format?: FormatSettings } = {},
+  {
+    needsNumber = false,
+    format = DEFAULT_FORMAT,
+    after = "",
+  }: { needsNumber?: boolean; format?: FormatSettings; after?: string } = {},
 ): Completion[] {
   const completions = withFormat(format, style, (f) =>
-    topos.completeWith(before, before.length, OffsetUnit.Utf16, f, 0),
+    topos.completeWith(before + after, before.length, OffsetUnit.Utf16, f, 0),
   );
   const waiting = needsNumber && !/[\d:.,;\-–—]\s*$/.test(before);
   return completions
