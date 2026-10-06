@@ -15,9 +15,14 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
   narrows the rest (NT + Pauline Epistles is Paul's letters), included genres and books add up
   (Pentateuch + Revelation), and exclusions always win. The header shows how many filters are on
   and how many books they leave, and warns when they contradict each other: OT + Pauline
-  Epistles, Books: Genesis with Inside: Romans 8, or Inside: John 3:16 with Outside: John 3
-- Filter by passage: **Inside** (entirely within, like `-i`), **Overlapping** (shares a verse,
-  like `-o`), and **Outside** (`--outside`), each with as many passages as you like
+  Epistles, Books: Genesis with Inside: Romans 8, or Inside: John 3:16 with Not: John 3
+- Filter by passage, each with as many passages as you like:
+  - **Inside**: entirely within the passage (`-i`)
+  - **Names**: names one of its verses; a whole chapter like `John 3` doesn't count for
+    `John 3:16` (`-o`)
+  - **Overlaps**: shares any verse, whole chapters included (`--any-overlap`)
+  - **Exactly**: the same verses, however written (`--exact-overlap`)
+  - **Not**: shares no verse (`--exclude-overlap`)
 - Every filter input lists its options as soon as you click it (every book, then every chapter,
   then every verse, up to 176), narrowing as you type. In passage inputs, Enter adds a finished
   reference (`Add "John 3:16"` is the first choice) and Tab completes. Remove a chip with × or a
@@ -28,7 +33,8 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
   or open one with the *Open a saved search* command. Each is stored as the CLI's options, like
   `Sermons --nt -g "Pauline Epistles" -o "John 1"`, which you can also write or edit under
   *Settings → Saved searches*; the filter panel shows the current filters in that form. The same
-  text works as a CLI named query (`~/.config/topos/queries.toml`, `topos -q NAME`)
+  text works as a CLI named query (`~/.config/topos/queries.toml`, `topos -q NAME`). Saved searches
+  from before 0.4.0, when `-o` meant any overlap, are rewritten once to keep their meaning
 - Each result shows its line with the reference highlighted; click to jump there, or ↗ to open
   it in Literal Word
 - Results update as notes change

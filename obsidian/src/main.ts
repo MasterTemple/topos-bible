@@ -11,7 +11,7 @@ import {
 } from "obsidian";
 import type { Passage, Topos } from "topos-bible";
 import { OutdatedCliError } from "./core/cli.ts";
-import { parseQuery, type SavedQuery } from "./core/query.ts";
+import { migrateQuery, parseQuery, type SavedQuery } from "./core/query.ts";
 import { NO_FILTERS } from "./core/filters.ts";
 import { literalWordUrl } from "./core/literalWord.ts";
 import { applyReplacements, normalizeReferences, referenceAt } from "./core/references.ts";
@@ -100,6 +100,12 @@ export default class ToposPlugin extends Plugin {
   async loadSettings(): Promise<void> {
     this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) as Partial<ToposSettings>) };
     this.settings.queries = (this.settings.queries ?? []).filter((q) => q && typeof q.name === "string");
+    // Saved searches from before 0.4.0 used -o for any overlap
+    if ((this.settings.queryFormat ?? 1) < 2) {
+      this.settings.queries = this.settings.queries.map((q) => ({ ...q, query: migrateQuery(q.query) }));
+      this.settings.queryFormat = 2;
+      if (this.settings.queries.length > 0) await this.saveData(this.settings);
+    }
   }
 
   // Saved searches
@@ -362,7 +368,7 @@ export default class ToposPlugin extends Plugin {
 
   /** Opens the sidebar showing references that share a verse with this passage */
   async findInVault(passage: Passage): Promise<void> {
-    this.search.set({ filters: { ...NO_FILTERS, overlaps: [passage.osis] }, scope: "vault" });
+    this.search.set({ filters: { ...NO_FILTERS, anyOverlap: [passage.osis] }, scope: "vault" });
     await this.activateSearch();
   }
 

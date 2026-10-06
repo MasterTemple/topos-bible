@@ -85,9 +85,9 @@ test("the sidebar renders filtered, grouped results", async () => {
   assert.match(text(saved), /Delete/);
 
   // Passage filters narrow the results
-  assert.match(text(render({ overlaps: ["John 3"] }, "file")), /1 reference in 1 note/);
+  assert.match(text(render({ anyOverlap: ["John 3"] }, "file")), /1 reference in 1 note/);
   assert.match(text(render({ inside: ["John 1-3"] }, "file")), /2 references in 2 notes/);
-  assert.match(text(render({ outside: ["John 1-3"] }, "file")), /2 references in 2 notes.*Romans 8:28/);
+  assert.match(text(render({ excludeOverlap: ["John 1-3"] }, "file")), /2 references in 2 notes.*Romans 8:28/);
 
   // The context control (lines are read after the first render, so the server render has none)
   assert.match(render({}, "file", [], 2), /<option value="2" selected="">±2 lines<\/option>/);

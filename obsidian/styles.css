@@ -29,6 +29,14 @@
   flex-direction: column;
   gap: var(--size-4-2);
   font-size: var(--font-ui-small);
+  /* Only ever scroll vertically (clip, unlike hidden, doesn't make this a scroll container) */
+  min-width: 0;
+  overflow-x: clip;
+}
+/* Flex items don't shrink below their content by default, and a result's line never wraps, so
+   one long line would widen the whole sidebar (the horizontal scrolling on mobile) */
+.topos-search > * {
+  min-width: 0;
 }
 .topos-toolbar {
   display: flex;
@@ -38,6 +46,13 @@
 .topos-toolbar select {
   flex: 1 1 auto;
   min-width: 0;
+}
+/* border-box: with width 100%, padding and borders (larger on mobile) would stick out of the
+   column and widen the sidebar */
+.topos-search input,
+.topos-search select {
+  box-sizing: border-box;
+  max-width: 100%;
 }
 .topos-folder,
 .topos-input input {
@@ -144,7 +159,8 @@
 }
 .topos-filter-row {
   display: grid;
-  grid-template-columns: 6.5em 1fr;
+  /* minmax(0, ...): inputs and chips must not widen the column */
+  grid-template-columns: 6.5em minmax(0, 1fr);
   gap: var(--size-4-2);
   align-items: start;
   margin-top: var(--size-4-2);
@@ -187,6 +203,8 @@
   gap: var(--size-2-1);
   border-radius: var(--radius-s);
   padding: 0 0 0 var(--size-4-2);
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .topos-chip button {
   background: none;
@@ -245,6 +263,7 @@
 }
 .topos-group-name {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -276,6 +295,8 @@
 }
 .topos-hit-location {
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--text-faint);
   font-size: var(--font-ui-smaller);
 }
@@ -319,4 +340,12 @@
   white-space: pre-wrap;
   font-size: var(--font-ui-smaller);
   color: var(--text-error);
+}
+
+.topos-filter-hint {
+  display: block;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  font-weight: var(--font-normal);
+  line-height: 1.2;
 }

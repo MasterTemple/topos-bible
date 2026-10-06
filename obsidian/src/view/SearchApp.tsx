@@ -11,7 +11,7 @@ import { Chips, NameInput, ReferenceInput } from "./inputs.tsx";
 import type { Scope } from "./store.ts";
 
 /** The saved-search list's entry that clears the filters */
-const CLEAR = "\u0000clear";
+const CLEAR = "topos:clear-filters";
 
 /** How many results render before "Show more", so huge vaults stay responsive */
 const PAGE = 300;
@@ -272,18 +272,16 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
           <Chips values={state.filters.excludeBooks} onRemove={removeFrom("excludeBooks")} exclude />
           <NameInput options={bookOptions} placeholder="Psalms" onSubmit={addTo("excludeBooks")} />
         </FilterRow>
-        <FilterRow label="Inside" hint="entirely within">
-          <Chips values={state.filters.inside} onRemove={removeFrom("inside")} />
-          <ReferenceInput topos={topos} style={style} placeholder="Romans 8" onSubmit={addTo("inside")} />
-        </FilterRow>
-        <FilterRow label="Overlapping" hint="shares a verse with">
-          <Chips values={state.filters.overlaps} onRemove={removeFrom("overlaps")} />
-          <ReferenceInput topos={topos} style={style} placeholder="John 3:16-21" onSubmit={addTo("overlaps")} />
-        </FilterRow>
-        <FilterRow label="Outside" hint="shares no verse with">
-          <Chips values={state.filters.outside} onRemove={removeFrom("outside")} exclude />
-          <ReferenceInput topos={topos} style={style} placeholder="Psalm 23" onSubmit={addTo("outside")} />
-        </FilterRow>
+        {PASSAGE_ROWS.map((row) => (
+          <FilterRow key={row.key} label={row.label} hint={row.hint}>
+            <Chips
+              values={state.filters[row.key]}
+              onRemove={removeFrom(row.key)}
+              exclude={row.key === "excludeOverlap"}
+            />
+            <ReferenceInput topos={topos} style={style} placeholder={row.placeholder} onSubmit={addTo(row.key)} />
+          </FilterRow>
+        ))}
         {filter.errors.length > 0 && (
           <ul className="topos-errors">
             {filter.errors.map((error) => (
@@ -358,10 +356,22 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
   );
 }
 
+/** The passage filters, like the CLI's */
+const PASSAGE_ROWS: { key: ListKey; label: string; hint: string; placeholder: string }[] = [
+  { key: "inside", label: "Inside", hint: "entirely within", placeholder: "Romans 8" },
+  { key: "explicitOverlap", label: "Names", hint: "names its verses", placeholder: "John 3:16-21" },
+  { key: "anyOverlap", label: "Overlaps", hint: "any shared verse", placeholder: "John 3:16-21" },
+  { key: "exactOverlap", label: "Exactly", hint: "same verses", placeholder: "John 3:16" },
+  { key: "excludeOverlap", label: "Not", hint: "no shared verse", placeholder: "Psalm 23" },
+];
+
 function FilterRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div className="topos-filter-row">
-      <label title={hint}>{label}</label>
+      <label title={hint}>
+        {label}
+        {hint && <span className="topos-filter-hint">{hint}</span>}
+      </label>
       <div className="topos-filter-values">{children}</div>
     </div>
   );

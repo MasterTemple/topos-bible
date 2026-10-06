@@ -90,7 +90,7 @@ test("the sidebar's inputs and context lines work in a DOM", async () => {
     const text = () => container.textContent!.replace(/\s+/g, " ");
     assert.match(text(), /2 references in 2 notes/);
 
-    // Open the filters and focus the Overlapping input: every book is listed, and arrows move
+    // Open the filters and focus the "Names" input (explicit overlap): every book is listed, and arrows move
     const input = [...container.querySelectorAll("input")].find((i) => i.placeholder === "John 3:16-21")!;
     const key = (k: string) =>
       act(() => input.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, bubbles: true }) as never));
@@ -108,7 +108,7 @@ test("the sidebar's inputs and context lines work in a DOM", async () => {
     });
     assert.match(container.querySelector(".topos-dropdown li")!.textContent!, /Add "John 3"/);
     await key("Enter");
-    assert.deepEqual(plugin.search.get().filters.overlaps, ["John 3"]);
+    assert.deepEqual(plugin.search.get().filters.explicitOverlap, ["John 3"]);
     assert.match(text(), /1 reference in 1 note/);
 
     // "New search" in the saved-search list clears the filters
@@ -119,14 +119,14 @@ test("the sidebar's inputs and context lines work in a DOM", async () => {
       select.value = clear.value;
       select.dispatchEvent(new window.Event("change", { bubbles: true }) as never);
     });
-    assert.deepEqual(plugin.search.get().filters.overlaps, []);
+    assert.deepEqual(plugin.search.get().filters.explicitOverlap, []);
     assert.match(text(), /2 references in 2 notes/);
-    await act(async () => plugin.search.set({ filters: { ...plugin.search.get().filters, overlaps: ["John 3"] } }));
+    await act(async () => plugin.search.set({ filters: { ...plugin.search.get().filters, explicitOverlap: ["John 3"] } }));
 
     // Middle-click removes the chip
     const chip = [...container.querySelectorAll(".topos-chip")].find((c) => c.textContent!.startsWith("John 3"))!;
     await act(async () => chip.dispatchEvent(new window.MouseEvent("auxclick", { button: 1, bubbles: true }) as never));
-    assert.deepEqual(plugin.search.get().filters.overlaps, []);
+    assert.deepEqual(plugin.search.get().filters.explicitOverlap, []);
 
     // Context lines are read from the notes and shown around each result
     await act(async () => plugin.search.set({ context: 1 }));

@@ -25,9 +25,13 @@ const LIST_OPTIONS: Record<string, ListKey> = {
   "--exclude-book": "excludeBooks",
   "-i": "inside",
   "--inside": "inside",
-  "-o": "overlaps",
-  "--overlaps": "overlaps",
-  "--outside": "outside",
+  "--any-overlap": "anyOverlap",
+  "--overlaps": "anyOverlap",
+  "-o": "explicitOverlap",
+  "--explicit-overlap": "explicitOverlap",
+  "--exact-overlap": "exactOverlap",
+  "--exclude-overlap": "excludeOverlap",
+  "--outside": "excludeOverlap",
 };
 
 const TESTAMENT_OPTIONS: Record<string, "testaments" | "excludeTestaments"> = {
@@ -63,8 +67,11 @@ function testament(value: string): Testament | null {
   return null;
 }
 
-/** Reads the CLI's filter options; anything else is reported in `errors` */
-export function parseQuery(text: string): ParsedQuery {
+/**
+ * Reads the CLI's filter options; anything else is reported in `errors`. With `legacy`, `-o` has
+ * its meaning before 0.4.0 (any overlap), for migrating saved searches
+ */
+export function parseQuery(text: string, { legacy = false }: { legacy?: boolean } = {}): ParsedQuery {
   const filters: Filters = structuredClone(NO_FILTERS);
   const errors: string[] = [];
   let folder: string | null = null;
@@ -82,7 +89,7 @@ export function parseQuery(text: string): ParsedQuery {
       if (!filters.testaments.includes(t)) filters.testaments.push(t);
       continue;
     }
-    const list = LIST_OPTIONS[option];
+    const list = legacy && option === "-o" ? "anyOverlap" : LIST_OPTIONS[option];
     const testamentKey = TESTAMENT_OPTIONS[option];
     if (!list && !testamentKey) {
       if (option.startsWith("-")) errors.push(`Unknown option ${option}`);
@@ -121,9 +128,20 @@ export function formatQuery(filters: Filters, folder: string | null = null): str
     ["books", "-b"],
     ["excludeBooks", "--exclude-book"],
     ["inside", "-i"],
-    ["overlaps", "-o"],
-    ["outside", "--outside"],
+    ["anyOverlap", "--any-overlap"],
+    ["explicitOverlap", "-o"],
+    ["exactOverlap", "--exact-overlap"],
+    ["excludeOverlap", "--exclude-overlap"],
   ];
   for (const [key, option] of lists) for (const value of filters[key]) parts.push(option, quote(value));
   return parts.join(" ");
+}
+
+/**
+ * Rewrites a saved search from before 0.4.0, when `-o` meant any overlap and `--outside` was the
+ * exclusion, in today's options; one it can't read is left as it is
+ */
+export function migrateQuery(text: string): string {
+  const parsed = parseQuery(text, { legacy: true });
+  return parsed.errors.length > 0 ? text : formatQuery(parsed.filters, parsed.folder);
 }

@@ -33,6 +33,8 @@ export interface ToposSettings {
   context: number;
   /** Named searches, with the CLI's filter options */
   queries: SavedQuery[];
+  /** 2 once saved searches use 0.4.0's options (`-o` is explicit overlap) */
+  queryFormat?: number;
   /** Index the vault in a background thread, or with the topos CLI (desktop only) */
   engine: "builtin" | "cli";
   /** Path to the topos command ("" finds it in ~/.cargo/bin or PATH) */

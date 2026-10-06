@@ -14,13 +14,23 @@ export interface Filters {
   excludeTestaments: Testament[];
   excludeGenres: string[];
   excludeBooks: string[];
-  /** Keep references entirely inside one of these passages (like `-i`) */
+  /** Keep references entirely inside one of these passages (`-i`) */
   inside: string[];
-  /** Keep references that share a verse with one of these passages (like `-o`) */
-  overlaps: string[];
-  /** Drop references that share a verse with any of these passages (like `--outside`) */
-  outside: string[];
+  /** Keep references that share any verse with one of these passages (`--any-overlap`) */
+  anyOverlap: string[];
+  /**
+   * Keep references that name a verse of one of these passages: whole chapters in a reference
+   * don't count (`-o`)
+   */
+  explicitOverlap: string[];
+  /** Keep references that are exactly one of these passages (`--exact-overlap`) */
+  exactOverlap: string[];
+  /** Drop references that share any verse with one of these passages (`--exclude-overlap`) */
+  excludeOverlap: string[];
 }
+
+/** The filters that keep references by passage (joined with OR) */
+export const PASSAGE_INCLUSIONS = ["inside", "anyOverlap", "explicitOverlap", "exactOverlap"] as const;
 
 export const NO_FILTERS: Filters = {
   testaments: [],
@@ -30,8 +40,10 @@ export const NO_FILTERS: Filters = {
   excludeGenres: [],
   excludeBooks: [],
   inside: [],
-  overlaps: [],
-  outside: [],
+  anyOverlap: [],
+  explicitOverlap: [],
+  exactOverlap: [],
+  excludeOverlap: [],
 };
 
 /** Filters resolved against the book data, ready to test passages quickly */
@@ -41,8 +53,10 @@ export interface CompiledFilter {
   /** Why nothing can match, when the included genres and books are outside the testaments */
   conflict: string | null;
   inside: Passage[];
-  overlaps: Passage[];
-  outside: Passage[];
+  anyOverlap: Passage[];
+  explicitOverlap: Passage[];
+  exactOverlap: Passage[];
+  excludeOverlap: Passage[];
   /** Names or passages that could not be understood */
   errors: string[];
 }
@@ -106,8 +120,10 @@ export function compileFilters(topos: Topos, filters: Filters): CompiledFilter {
   }
 
   const inside = passages(filters.inside);
-  const overlaps = passages(filters.overlaps);
-  const outside = passages(filters.outside);
+  const anyOverlap = passages(filters.anyOverlap);
+  const explicitOverlap = passages(filters.explicitOverlap);
+  const exactOverlap = passages(filters.exactOverlap);
+  const excludeOverlap = passages(filters.excludeOverlap);
 
   let conflict: string | null = null;
   const list = (names: string[]) => `${names.join(", ")} ${names.length === 1 ? "is" : "are"}`;
@@ -115,8 +131,8 @@ export function compileFilters(topos: Topos, filters: Filters): CompiledFilter {
     const testaments = filters.testaments.map((t) => (t === "old" ? "Old" : "New")).join(" and ");
     conflict = `${list([...filters.genres, ...filters.books])} not in the ${testaments} Testament${filters.testaments.length === 1 ? "" : "s"}, so nothing can match`;
   } else {
-    // The inside and overlapping passages, with what was typed (unparsed ones are already errors)
-    const named = [...filters.inside, ...filters.overlaps].flatMap((text) => {
+    // The passages that keep references, with what was typed (unparsed ones are already errors)
+    const named = PASSAGE_INCLUSIONS.flatMap((key) => filters[key]).flatMap((text) => {
       const passage = topos.parse(text, 0);
       return passage ? [{ text, passage }] : [];
     });
@@ -125,25 +141,33 @@ export function compileFilters(topos: Topos, filters: Filters): CompiledFilter {
       conflict = `${list(named.map((p) => p.text))} in books that aren't searched, so nothing can match`;
     } else if (
       searched.length > 0 &&
-      searched.every(({ passage }) => outside.some((o) => topos.contains(o, passage)))
+      searched.every(({ passage }) => excludeOverlap.some((o) => topos.contains(o, passage)))
     ) {
-      conflict = `${list(searched.map((p) => p.text))} within the outside passages (${filters.outside.join(", ")}), so nothing can match`;
+      conflict = `${list(searched.map((p) => p.text))} within the excluded passages (${filters.excludeOverlap.join(", ")}), so nothing can match`;
     }
   }
 
-  return { books, conflict, inside, overlaps, outside, errors };
+  return { books, conflict, inside, anyOverlap, explicitOverlap, exactOverlap, excludeOverlap, errors };
+}
+
+/** The parts of a passage that name verses, leaving out whole chapters, or null if none do */
+export function explicitVerses(passage: Passage): Passage | null {
+  const segments = passage.segments.filter((segment) => segment.tag === "Verses");
+  return segments.length > 0 ? { ...passage, segments } : null;
 }
 
 /** Whether a found passage passes the filter */
 export function keep(topos: Topos, filter: CompiledFilter, passage: Passage): boolean {
   if (filter.books && !filter.books.has(passage.bookId)) return false;
-  const hasPassageInclusion = filter.inside.length + filter.overlaps.length > 0;
-  if (
-    hasPassageInclusion &&
-    !filter.inside.some((outer) => topos.contains(outer, passage)) &&
-    !filter.overlaps.some((other) => topos.overlaps(other, passage))
-  ) {
-    return false;
+  const hasPassageInclusion = PASSAGE_INCLUSIONS.some((key) => filter[key].length > 0);
+  if (hasPassageInclusion) {
+    const named = filter.explicitOverlap.length > 0 ? explicitVerses(passage) : null;
+    const included =
+      filter.inside.some((outer) => topos.contains(outer, passage)) ||
+      filter.anyOverlap.some((other) => topos.overlaps(other, passage)) ||
+      (named !== null && filter.explicitOverlap.some((other) => topos.overlaps(other, named))) ||
+      filter.exactOverlap.some((other) => topos.contains(other, passage) && topos.contains(passage, other));
+    if (!included) return false;
   }
-  return !filter.outside.some((other) => topos.overlaps(other, passage));
+  return !filter.excludeOverlap.some((other) => topos.overlaps(other, passage));
 }

@@ -12,7 +12,7 @@ CLI's search and filters as a sidebar, plus editor features the CLI can't have. 
 |---|---|
 | `topos [PATH]...` | Scope: whole vault, a folder, or the current file |
 | `-t/--nt/--ot`, `-g`, `-b`, `--exclude-*` | Testament, genre, and book filters (chips with autocomplete), each include or exclude |
-| `-i` / `-o` / `--outside` | Passage filters: inside, overlapping, or outside a passage (inputs with reference autocomplete) |
+| `-i` / `-o` / `--any-overlap` / `--exact-overlap` / `--exclude-overlap` | Passage filters: inside, names its verses, any shared verse, exactly, or no shared verse (inputs with reference autocomplete) |
 | `-m grouped`, `-C` | Results grouped by file, each with its line of context and the reference highlighted |
 | `-m count` / `--total-count` | Counts per file and in total |
 | `-f name\|abbreviation\|osis` | Reference style |
@@ -23,7 +23,7 @@ Filters update the results live. Included testaments narrow the included genres 
 which add up; exclusions always win (the same rules as the CLI, which warns about contradictory
 inclusions like `--ot -g "Pauline Epistles"`; the sidebar shows the warning even with the filter
 panel closed). Searches can be saved under a name, stored as CLI options (an optional folder plus
-`-t/--nt/--ot`, `-g`, `-b`, `--exclude-*`, `-i`, `-o`, `--outside`), and edited in the settings.
+`-t/--nt/--ot`, `-g`, `-b`, `--exclude-*`, and the passage filters), and edited in the settings.
 The sort order and grouping are remembered. Results can also be sorted canonically (by book, chapter, and
 verse) or grouped by book, which the CLI can't do.
 

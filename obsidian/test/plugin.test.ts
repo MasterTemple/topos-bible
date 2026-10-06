@@ -215,6 +215,18 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   assert.deepEqual(saved.at(-1).queries.map((q: any) => q.name), ["Sermons"]);
   assert.ok(plugin.commands.some((c: any) => c.id === "open-saved-search"));
 
+  // Saved searches from before 0.4.0 are migrated once (-o used to mean any overlap)
+  const loadData = plugin.loadData;
+  plugin.loadData = async () => ({ queries: [{ name: "Old", query: '-o "John 3" --outside "John 3:16"' }] });
+  await plugin.loadSettings();
+  assert.equal(plugin.settings.queries[0].query, '--any-overlap "John 3" --exclude-overlap "John 3:16"');
+  assert.equal(saved.at(-1).queryFormat, 2);
+  plugin.loadData = async () => ({ queries: [{ name: "New", query: '-o "John 3"' }], queryFormat: 2 });
+  await plugin.loadSettings();
+  assert.equal(plugin.settings.queries[0].query, '-o "John 3"');
+  plugin.loadData = loadData;
+  await plugin.loadSettings();
+
   // Commands that need a reference under the cursor are only available on one
   const copy = plugin.commands.find((c: any) => c.id === "copy-osis");
   assert.equal(copy.editorCheckCallback(true, fakeEditor("See Jn 3:16 here", 6)), true);

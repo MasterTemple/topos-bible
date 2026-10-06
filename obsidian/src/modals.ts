@@ -82,7 +82,7 @@ export class GoToReferenceModal extends SuggestModal<Hit> {
   getSuggestions(query: string): Hit[] {
     const { topos, index } = this.plugin;
     if (!query.trim() || !topos.parse(query, 0)) return [];
-    const filter = compileFilters(topos, { ...NO_FILTERS, overlaps: [query] });
+    const filter = compileFilters(topos, { ...NO_FILTERS, anyOverlap: [query] });
     return sortHits(
       index.all().filter((hit) => keep(topos, filter, hit.passage)),
       "bible",
