@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use crate::{
     matcher::{BibleMatcher, text::SearchText},
-    segments::{grammar::SegmentList, resolve::Resolver},
+    segments::{grammar::SegmentList, resolve::Resolver, verse_bounds::VerseBounds},
 };
 
 /// A reference that is written like one but does not exist (`John 3:99`)
@@ -11,6 +11,8 @@ pub struct Problem {
     /// Byte range of the segment that does not exist
     pub bytes: Range<usize>,
     pub message: String,
+    /// What does exist: `John 3 has 36 verses`, or `John has 21 chapters`
+    pub detail: Option<String>,
 }
 
 impl BibleMatcher {
@@ -48,9 +50,29 @@ impl BibleMatcher {
                 continue;
             };
             let bytes = cur.end() + node.start.span.start..cur.end() + node.complete_end();
+            // The first chapter, or verse in a chapter, that is past the end
+            let detail = versification.and_then(|versification| {
+                let chapters = versification.get_chapter_count();
+                let ends = [
+                    (segment.starting_chapter(), segment.starting_verse()),
+                    (
+                        segment.ending_chapter(),
+                        segment.ending_verse().unwrap_or(0),
+                    ),
+                ];
+                ends.into_iter().find_map(|(chapter, verse)| {
+                    if chapter > chapters {
+                        let s = if chapters == 1 { "" } else { "s" };
+                        return Some(format!("{name} has {chapters} chapter{s}"));
+                    }
+                    let verses = versification.get_last_verse(chapter)?;
+                    (verse > verses).then(|| format!("{name} {chapter} has {verses} verses"))
+                })
+            });
             problems.push(Problem {
                 bytes: text.original_range(bytes),
                 message: format!("{name} {segment} does not exist"),
+                detail,
             });
         }
         problems
@@ -59,6 +81,31 @@ impl BibleMatcher {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn says_what_exists() {
+        let detail = |text: &str| -> Vec<Option<String>> {
+            BibleMatcher::default()
+                .problems(text)
+                .into_iter()
+                .map(|p| p.detail)
+                .collect()
+        };
+        assert_eq!(detail("John 3:99"), [Some("John 3 has 36 verses".into())]);
+        assert_eq!(
+            detail("John 3:30-40"),
+            [Some("John 3 has 36 verses".into())]
+        );
+        assert_eq!(detail("John 25:1"), [Some("John has 21 chapters".into())]);
+        assert_eq!(
+            detail("John 21:1-22:3"),
+            [Some("John has 21 chapters".into())]
+        );
+        assert_eq!(
+            detail("Obadiah 2:1"),
+            [Some("Obadiah has 1 chapter".into())]
+        );
+    }
+
     use super::*;
 
     fn problems(text: &str) -> Vec<(String, String)> {

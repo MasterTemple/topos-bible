@@ -111,8 +111,10 @@ The pickers are `search`, `query`, `explicit_overlap`, `any_overlap`,
 
 Go to references (|grr|, or Telescope's `lsp_references`) lists every
 reference in the workspace that is exactly the one under the cursor. The code
-actions (|gra|) search for it by explicit overlap, any overlap, exact overlap,
-or inside it, and open the results like the commands do. Each reference has an
+actions (|gra|) reformat it the way completion writes it (or every reference
+in the file), or search for it by explicit overlap, any overlap, exact
+overlap, or inside it, opening the results like the commands do. Hovering a
+reference that doesn't exist says what does (`John 3 has 36 verses`). Each reference has an
 information diagnostic with how it's written in your format (`John 3:16`);
 references that don't exist get a warning. Inlay
 hints show the formatted reference where it's written differently.

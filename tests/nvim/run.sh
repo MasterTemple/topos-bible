@@ -23,7 +23,8 @@ any Search "John 3" for any overlap 5
 inside Search inside "John 3" 4
 complete flags "Pauline Epistles"
 complete ref 3:10|3:11|3:12
-code action Search "John 3:16" for any overlap Search "John 3:16" for any overlap 5'
+code action Search "John 3:16" for any overlap Search "John 3:16" for any overlap 5
+reformat Reformat as "John 3:16" See John 3:16 here'
 
 run() {
   rm -f "$WORK/out.txt"
@@ -34,9 +35,9 @@ run() {
 status=0
 check() {
   local name=$1 output=$2
-  if grep -q '^ERROR' <<<"$output" || [[ "$(head -n 11 <<<"$output")" != "$expected" ]]; then
+  if grep -q '^ERROR' <<<"$output" || [[ "$(head -n 12 <<<"$output")" != "$expected" ]]; then
     echo "FAIL ($name):"
-    diff <(echo "$expected") <(head -n 11 <<<"$output") || true
+    diff <(echo "$expected") <(head -n 12 <<<"$output") || true
     grep '^ERROR' <<<"$output" || true
     status=1
   else

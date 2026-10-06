@@ -278,9 +278,13 @@ impl Server {
         Some((found, index))
     }
 
-    /// The reference under the cursor, normalized, with its OSIS id
+    /// The reference under the cursor, normalized, with its OSIS id; or, on a reference that
+    /// doesn't exist, what does (`John 3 has 36 verses`)
     pub fn hover(&self, params: HoverParams) -> Option<Hover> {
         let position = params.text_document_position_params;
+        if let Some(hover) = self.problem_hover(&position.text_document.uri, position.position) {
+            return Some(hover);
+        }
         let (found, index) = self.reference_at(&position.text_document.uri, position.position)?;
         let bytes = found.location.bytes;
         let osis = found
@@ -293,6 +297,28 @@ impl Server {
                 value: format!("**{}**\n\nOSIS: `{osis}`", self.reference(&found)),
             }),
             range: Some(lsp_range(&index, bytes.start, bytes.end)),
+        })
+    }
+
+    fn problem_hover(&self, uri: &Uri, position: Position) -> Option<Hover> {
+        let text = self.documents.get(uri)?;
+        let index = LineIndex::new(text);
+        let cursor = index.offset_of_utf16(position.line as usize, position.character as usize)?;
+        let problem = self
+            .matcher
+            .problems(text)
+            .into_iter()
+            .find(|p| p.bytes.start <= cursor && cursor <= p.bytes.end)?;
+        let value = match &problem.detail {
+            Some(detail) => format!("**{}**\n\n{detail}", problem.message),
+            None => format!("**{}**", problem.message),
+        };
+        Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value,
+            }),
+            range: Some(lsp_range(&index, problem.bytes.start, problem.bytes.end)),
         })
     }
 
@@ -364,12 +390,19 @@ impl Server {
         Some(hints)
     }
 
-    /// For the reference under the cursor, one search of the workspace per [`SearchMode`]
+    /**
+    For the reference under the cursor:
+    - Reformat it, if it isn't written the way completion would write it (and, when several
+      references in the document are, reformat them all)
+    - One search of the workspace per [`SearchMode`]
+    */
     pub fn code_actions(&self, params: CodeActionParams) -> Option<Vec<CodeActionOrCommand>> {
-        let (found, _) = self.reference_at(&params.text_document.uri, params.range.start)?;
+        let uri = &params.text_document.uri;
+        let (found, index) = self.reference_at(uri, params.range.start)?;
         let reference = self.reference(&found);
         let passage = self.parseable(&found.psg);
-        let actions = SearchMode::ALL
+        let mut actions = self.reformat_actions(uri, &found, &index);
+        let searches = SearchMode::ALL
             .into_iter()
             .map(|mode| {
                 let title = mode.title(&reference);
@@ -389,7 +422,59 @@ impl Server {
                 .into()
             })
             .collect::<Option<Vec<CodeActionOrCommand>>>()?;
+        actions.extend(searches);
         Some(actions)
+    }
+
+    /// `Reformat as "John 3:16"` for this reference, and for every reference in the document
+    /// that is written differently, when there are several
+    // `WorkspaceEdit::changes` is keyed by `Uri`, which clippy counts as a mutable key
+    #[allow(clippy::mutable_key_type)]
+    fn reformat_actions(
+        &self,
+        uri: &Uri,
+        found: &BibleMatch,
+        index: &LineIndex,
+    ) -> Vec<CodeActionOrCommand> {
+        let Some(text) = self.documents.get(uri) else {
+            return vec![];
+        };
+        // Each reference written differently from the configured format, with its rewrite
+        let rewrite = |m: &BibleMatch| {
+            let bytes = m.location.bytes;
+            let formatted = self.reference(m);
+            (text[bytes.start..bytes.end] != formatted).then(|| TextEdit {
+                range: lsp_range(index, bytes.start, bytes.end),
+                new_text: formatted,
+            })
+        };
+        let action = |title: String, edits: Vec<TextEdit>| {
+            let changes = HashMap::from([(uri.clone(), edits)]);
+            CodeActionOrCommand::CodeAction(CodeAction {
+                title,
+                kind: Some(lsp_types::CodeActionKind::REFACTOR_REWRITE),
+                edit: Some(lsp_types::WorkspaceEdit::new(changes)),
+                ..CodeAction::default()
+            })
+        };
+        let mut actions = vec![];
+        if let Some(edit) = rewrite(found) {
+            actions.push(action(
+                format!("Reformat as \"{}\"", edit.new_text),
+                vec![edit],
+            ));
+        }
+        let all: Vec<TextEdit> = self
+            .matcher
+            .search(text)
+            .iter()
+            .filter_map(rewrite)
+            .collect();
+        if all.len() > 1 {
+            let title = format!("Reformat all {} references in this file", all.len());
+            actions.push(action(title, all));
+        }
+        actions
     }
 
     /// Go to references: every reference in the workspace that is exactly the one under the
@@ -773,6 +858,69 @@ mod tests {
             .configure(serde_json::json!({ "no-config": true, "psg-fmt": { "joins": true } }))
             .unwrap_err();
         assert!(err.contains("joins"), "{err}");
+    }
+
+    #[test]
+    fn reformats_and_explains_missing_verses() {
+        let (server, uri) = server("See jn 3:16 and rom 8:28, John 1:1\nBad: John 3:99");
+        let actions = |line: u32, character: u32| -> Vec<(String, Vec<TextEdit>)> {
+            server
+                .code_actions(CodeActionParams {
+                    text_document: TextDocumentIdentifier::new(uri.clone()),
+                    range: Range::new(
+                        Position::new(line, character),
+                        Position::new(line, character),
+                    ),
+                    context: lsp_types::CodeActionContext::default(),
+                    work_done_progress_params: WorkDoneProgressParams::default(),
+                    partial_result_params: PartialResultParams::default(),
+                })
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|a| match a {
+                    CodeActionOrCommand::CodeAction(action) => {
+                        let edits = action
+                            .edit
+                            .and_then(|e| e.changes)
+                            .map(|changes| changes.into_values().flatten().collect())?;
+                        Some((action.title, edits))
+                    }
+                    CodeActionOrCommand::Command(_) => None,
+                })
+                .collect()
+        };
+        let on_jn = actions(0, 5);
+        assert_eq!(on_jn.len(), 2);
+        assert_eq!(on_jn[0].0, "Reformat as \"John 3:16\"");
+        assert_eq!(
+            on_jn[0].1,
+            [TextEdit::new(
+                Range::new(Position::new(0, 4), Position::new(0, 11)),
+                "John 3:16".into()
+            )]
+        );
+        // Every reference written differently (John 1:1 already is)
+        assert_eq!(on_jn[1].0, "Reformat all 2 references in this file");
+        assert_eq!(on_jn[1].1.len(), 2);
+        // A reference already in the format gets no reformat for itself
+        let on_john = actions(0, 28);
+        assert_eq!(on_john.len(), 1);
+        assert_eq!(on_john[0].0, "Reformat all 2 references in this file");
+
+        // Hovering a verse that doesn't exist says what does
+        let hover = server
+            .hover(HoverParams {
+                text_document_position_params: at(&uri, 1, 11),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .unwrap();
+        let HoverContents::Markup(markup) = hover.contents else {
+            panic!("no markup");
+        };
+        assert_eq!(
+            markup.value,
+            "**John 3:99 does not exist**\n\nJohn 3 has 36 verses"
+        );
     }
 
     #[test]

@@ -4,14 +4,17 @@
 
 - **Completion**: book names (`1 Co` → `1 Corinthians`), then chapters and verses from the
   book's versification; each completion rewrites the whole reference (`jn 3:1` → `John 3:16`)
-- **Hover**: the reference under the cursor, normalized, with its OSIS id
+- **Hover**: the reference under the cursor, normalized, with its OSIS id; on one that doesn't
+  exist, what does (`John 3 has 36 verses`, `John has 21 chapters`)
 - **Inlay hints**: after each reference, how it's written in your format (where that differs,
   like `jn 3:16` → `John 3:16`), or its OSIS id
 - **Document symbols**: every reference in the file, for outlines and pickers
 - **Go to references**: every reference in the workspace that is exactly the one under the
   cursor (`--exact-overlap`), however it's written
-- **Code actions**: on a reference, search the workspace for it: `Search "John 3:16" for
-  explicit overlap`, `... for any overlap`, `... for exact overlap`, and `Search inside "John 3"`
+- **Code actions**: on a reference, reformat it the way completion writes it (`Reformat as
+  "John 3:16"`, and `Reformat all N references in this file` when several differ), or search the
+  workspace for it: `Search "John 3:16" for explicit overlap`, `... for any overlap`,
+  `... for exact overlap`, and `Search inside "John 3"`
 - **Diagnostics**: an information diagnostic on each reference with how it's written in your
   format (`John 3:16`, code `reference`), and warnings for references that do not exist, like
   `John 3:99` (code `missing`)

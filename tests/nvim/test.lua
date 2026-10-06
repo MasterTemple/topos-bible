@@ -51,9 +51,16 @@ log("complete flags", table.concat(vim.fn.getcompletion("ToposQuery -g Pau", "cm
 log("complete ref", table.concat(vim.list_slice(vim.fn.getcompletion("ToposExplicitOverlap John 3:1", "cmdline"), 1, 3), "|"))
 local ca = vim.lsp.util.make_range_params(0, client.offset_encoding); ca.context = { diagnostics = {} }
 local actions = vim.lsp.buf_request_sync(0, "textDocument/codeAction", ca, 5000)
-local action
-for _, r in pairs(actions) do action = r.result[2] end
+local action, reformat
+for _, r in pairs(actions) do
+  for _, a in ipairs(r.result) do
+    if a.title:find("for any overlap") then action = a end
+    if a.title:find("^Reformat as") then reformat = a end
+  end
+end
 log("code action", action.title, results(function() client:exec_cmd(action.command, { bufnr = 0 }) end))
+vim.lsp.util.apply_workspace_edit(reformat.edit, client.offset_encoding)
+log("reformat", reformat.title, vim.api.nvim_get_current_line())
 if telescope then
   log("telescope ext", results(function() require("telescope").extensions.topos.explicit_overlap({ passage = "Rom 8:28" }) end))
   log("telescope ext query", results(function() require("telescope").extensions.topos.query({ args = '-g "Pauline Epistles"' }) end))
