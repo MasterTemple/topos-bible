@@ -361,3 +361,41 @@ fn named_queries() {
     );
     let _ = std::fs::remove_dir_all(&home);
 }
+
+#[test]
+fn first_run_writes_default_files() {
+    let home = scratch("first-run");
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_topos"))
+            .args(args)
+            .env("XDG_CONFIG_HOME", &home)
+            .stdin(Stdio::null())
+            .output()
+            .unwrap()
+    };
+    // --no-config leaves the config folder alone
+    run(&["--text", "John 3:16", "--no-config"]);
+    assert!(!home.join("topos").exists());
+
+    let first = run(&[
+        "--text",
+        "John 3:16 and Romans 8:28",
+        "-q",
+        "pauline",
+        "-m",
+        "quickfix",
+    ]);
+    assert_eq!(stdout(&first), ":1:15: Romans 8:28\n");
+    let config = std::fs::read_to_string(home.join("topos/config.toml")).unwrap();
+    assert!(config.contains("# cache = true"), "{config}");
+    assert_eq!(
+        stdout(&run(&["--list-queries"])),
+        "pauline\t--nt -g 'Pauline Epistles'\n"
+    );
+
+    // Existing files are kept
+    std::fs::write(home.join("topos/queries.toml"), "mine = '-b John'\n").unwrap();
+    run(&["--text", "x"]);
+    assert_eq!(stdout(&run(&["--list-queries"])), "mine\t-b John\n");
+    let _ = std::fs::remove_dir_all(&home);
+}

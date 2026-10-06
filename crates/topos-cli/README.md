@@ -180,6 +180,8 @@ topos --exclude-testament new -m table
 ## Config
 
 Default options go in `~/.config/topos/config.toml` (or `$XDG_CONFIG_HOME/topos/config.toml`).
+The first run writes a commented `config.toml` and a `queries.toml` with a sample query there if
+they don't exist (it never overwrites them, and doesn't touch the folder with `--no-config`).
 Each key is a long option name; the command line overrides them. Use `--config PATH` to read another file instead, or `--no-config` to read none.
 
 ```toml
