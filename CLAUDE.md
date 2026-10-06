@@ -10,6 +10,7 @@ Finds and parses Bible references in text and documents, reporting where each on
 - `topos-formats`: the `Format` trait / `search_format::<L>()` for html, srt (also WebVTT and SBV), epub, json, xml, and pdf (feature `pdf`, MuPDF 0.8).
 - `topos-cli`: binary `topos`. Paths are positional; text comes from `--text` or piped stdin. Default options come from `~/.config/topos/config.toml` (`--config PATH` reads another file, `--no-config` skips it). `-i` keeps references inside a passage, `-o` keeps overlapping ones. `--data` takes custom Bible data JSON. `--cache` is opt-in.
 - `topos-lsp`: completion, hover, document symbols, diagnostics (`lsp-server` 0.10).
+- `obsidian/`: an Obsidian plugin (TypeScript, React sidebar) built on the `topos-bible` npm package, with the WebAssembly embedded via esbuild aliases. `src/core/` has no Obsidian imports and is tested with `node --test`; `test/plugin.test.ts` loads the built `main.js` against a stand-in for Obsidian's API. The plan is in `doc/obsidian-plugin.md`.
 - `topos-ffi`: the BoltFFI 0.31 façade, the only bindings crate. Offsets are in the caller's unit (byte, char, UTF-16). `boltffi.toml` was made with `boltffi init`. Build with `boltffi pack python`, or `npm install && npm run pack:wasm` for WASM. Its README and `examples/` (Node, Python) are verified; the Swift and Kotlin snippets are not.
 
 ## Commands

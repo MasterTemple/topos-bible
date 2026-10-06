@@ -15,15 +15,47 @@ export function completionsBefore(
   style: BookStyle,
   limit: number,
   books: BookCompletion,
+  { needsNumber = false }: { needsNumber?: boolean } = {},
 ): Completion[] {
-  const completions = topos.complete(before, before.length, OffsetUnit.Utf16, style, limit);
-  return completions.filter((c) => {
+  // Narrow by the number being typed: `John 3` offers 3 and 30-39, not every chapter. The
+  // engine's suggestions ignore it, so ask for all of them and filter here.
+  const typedNumber = /(\d+)$/.exec(before)?.[1] ?? "";
+  // In prose, `John ` alone should not open a list of chapters: wait for a number or a
+  // delimiter (`John 3`, `John 3:`, `John 3:16, `)
+  if (needsNumber && !/[\d:.,;\-–—]\s*$/.test(before)) {
+    return completeBooksOnly(topos, before, style, limit, books);
+  }
+  const completions = topos.complete(before, before.length, OffsetUnit.Utf16, style, 0);
+  return completions
+    .filter((c) => c.kind === CompletionKind.Book || endsWithNumber(c.text, typedNumber))
+    .filter((c) => {
     if (c.kind !== CompletionKind.Book) return true;
     if (books === "off") return false;
     const typed = before.slice(c.start, c.end).trim();
     if (books === "capitalized" && !/^[\p{Lu}\d]/u.test(typed)) return false;
     return startsBook(topos, typed, c.label);
-  });
+  })
+    .slice(0, limit || undefined);
+}
+
+/** Only book-name completions (for the start of a reference in prose) */
+function completeBooksOnly(
+  topos: Topos,
+  before: string,
+  style: BookStyle,
+  limit: number,
+  books: BookCompletion,
+): Completion[] {
+  return completionsBefore(topos, before, style, limit, books).filter(
+    (c) => c.kind === CompletionKind.Book,
+  );
+}
+
+/** Whether the last number in `text` starts with `typed` (`John 3:16` for `1` or `16`) */
+function endsWithNumber(text: string, typed: string): boolean {
+  if (!typed) return true;
+  const last = /(\d+)\D*$/.exec(text)?.[1] ?? "";
+  return last.startsWith(typed);
 }
 
 function startsBook(topos: Topos, typed: string, label: string): boolean {

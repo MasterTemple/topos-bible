@@ -126,6 +126,24 @@ test("completions skip book names for ordinary words", () => {
   assert.equal(labels("see 1 Co")[0], "1 Corinthians");
 });
 
+test("completions narrow by the number being typed", () => {
+  const labels = (before: string, needsNumber = false) =>
+    completionsBefore(topos, before, BookStyle.Name, 100, "capitalized", { needsNumber }).map(
+      (c) => c.label,
+    );
+  // John has 21 chapters
+  assert.deepEqual(labels("John 2"), ["John 2", "John 20", "John 21"]);
+  assert.deepEqual(labels("John 3"), ["John 3"]);
+  assert.deepEqual(labels("John 3:3").slice(0, 3), ["John 3:3", "John 3:30", "John 3:31"]);
+  assert.equal(labels("John 3:").length, 36);
+  // In the editor, `John ` alone does not list chapters, but a number or delimiter does
+  assert.deepEqual(labels("I asked John ", true), []);
+  assert.deepEqual(labels("see John 2", true), ["John 2", "John 20", "John 21"]);
+  assert.equal(labels("see John 3:", true).length, 36);
+  assert.equal(labels("see John 3:16, ", true)[0], "John 3:16,17");
+  assert.ok(labels("see 1 Co", true).includes("1 Corinthians"));
+});
+
 test("applying a completion", () => {
   const text = "see gen 1:";
   const [first] = completionsBefore(topos, text, BookStyle.Name, 5, "capitalized");

@@ -30,6 +30,8 @@ export function referenceDecorations(plugin: ToposPlugin) {
     build(view: EditorView): DecorationSet {
       const builder = new RangeSetBuilder<Decoration>();
       if (!plugin.settings.linkInEditor) return builder.finish();
+      // Visible ranges widened to whole lines can overlap, and the builder needs sorted ranges
+      let lastEnd = -1;
       for (const { from, to } of view.visibleRanges) {
         // Whole lines, so references are not cut at the edge of the viewport
         const start = view.state.doc.lineAt(from).from;
@@ -44,7 +46,9 @@ export function referenceDecorations(plugin: ToposPlugin) {
               ...(url ? { "data-topos-url": url } : {}),
             },
           });
+          if (start + m.start < lastEnd) continue;
           builder.add(start + m.start, start + m.end, mark);
+          lastEnd = start + m.end;
         }
       }
       return builder.finish();
