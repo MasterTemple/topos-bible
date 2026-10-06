@@ -40,7 +40,9 @@ try {
 }
 ```
 
-- Offsets and counts are `UInt`
+- `passage.segments` is a `List<VerseRange>`, each with `startChapter`, `startVerse`,
+  `endChapter`, and `endVerse` always filled in (a whole chapter runs to its last verse)
+- Offsets and counts are `UInt` (chapters and verses are `UByte`)
 - **Offsets:** pass `OffsetUnit.UTF16`, which matches Kotlin and Java string indices
   (`BYTE` and `CHAR` also exist)
 

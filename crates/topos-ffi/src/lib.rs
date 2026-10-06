@@ -38,15 +38,29 @@ pub enum BookStyle {
     Osis,
 }
 
+/// An inclusive range of verses with every field filled in, so `3:16-18` is 3:16 to 3:18
+#[data]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VerseRange {
+    pub start_chapter: u8,
+    pub start_verse: u8,
+    pub end_chapter: u8,
+    /// A whole chapter ends at its last verse (`John 3` is 3:1 to 3:36); `0` only when a custom
+    /// config has no verse counts for the book
+    pub end_verse: u8,
+}
+
 #[data]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Passage {
     /// 1 for Genesis through 66 for Revelation (with the default data)
     pub book_id: u8,
     pub book: String,
-    /// `John 3:16-18`
+    /// `John 3:16-18,20-4:2`
     pub reference: String,
-    /// `John.3.16-John.3.18`
+    /// One range per segment: `[3:16-3:18, 3:20-4:2]`
+    pub segments: Vec<VerseRange>,
+    /// `John.3.16-John.3.18 John.3.20-John.4.2`
     pub osis: String,
 }
 
@@ -194,10 +208,22 @@ impl Topos {
             book: style,
             ..FormatOptions::default()
         };
+        let versification = data.chapter_verses().get_chapter_verses(&passage.book);
+        let segments = passage
+            .ranges(versification)
+            .into_iter()
+            .map(|r| VerseRange {
+                start_chapter: r.start_chapter,
+                start_verse: r.start_verse,
+                end_chapter: r.end_chapter,
+                end_verse: r.end_verse,
+            })
+            .collect();
         Some(Passage {
             book_id: passage.book.0,
             book: data.books().get_name(passage.book)?.clone(),
             reference: options.passage(passage, data)?,
+            segments,
             osis: passage.to_osis(data.books()).unwrap_or_default(),
         })
     }
@@ -297,6 +323,27 @@ mod tests {
         assert_eq!(completions.len(), 2);
         assert_eq!((completions[0].start, completions[0].end), (2, 8));
         assert_eq!(completions[0].text, "Genesis 1:1");
+    }
+
+    #[test]
+    fn passages_list_explicit_ranges() {
+        let topos = Topos::new();
+        let passage =
+            &topos.search("Read John 3:16-18,20-4:2".into(), OffsetUnit::Utf16)[0].passage;
+        assert_eq!(passage.reference, "John 3:16-18,20-4:2");
+        let range = |sc, sv, ec, ev| VerseRange {
+            start_chapter: sc,
+            start_verse: sv,
+            end_chapter: ec,
+            end_verse: ev,
+        };
+        assert_eq!(passage.segments, [range(3, 16, 3, 18), range(3, 20, 4, 2)]);
+        assert_eq!(passage.osis, "John.3.16-John.3.18 John.3.20-John.4.2");
+
+        let whole = topos.parse("Jude 1".into(), BookStyle::Name);
+        assert_eq!(whole.unwrap().segments, [range(1, 1, 1, 25)]);
+        let chapter = topos.parse("John 3".into(), BookStyle::Name).unwrap();
+        assert_eq!(chapter.segments, [range(3, 1, 3, 36)]);
     }
 
     #[test]

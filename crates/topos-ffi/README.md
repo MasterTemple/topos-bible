@@ -24,7 +24,12 @@ Every language gets the same object and types:
 | `parse(reference, style) -> Passage?` | One reference (`Jn 3:16` or OSIS `John.3.16`) |
 | `complete(text, cursor, unit, style, limit) -> [Completion]` | Completions for the reference ending at `cursor` (`limit` 0 means no limit) |
 
-- `Passage { book_id, book, reference, osis }`, written in the requested `BookStyle` (`Name`, `Abbreviation`, `Osis`)
+- `Passage { book_id, book, reference, segments, osis }`, written in the requested `BookStyle` (`Name`, `Abbreviation`, `Osis`)
+- `segments: [VerseRange]`, one per part of the reference, each with `start_chapter`,
+  `start_verse`, `end_chapter`, and `end_verse` always filled in. A whole chapter runs from
+  verse 1 to its last verse (`John 3` is 3:1-3:36); `end_verse` is `0` only when a custom config
+  has no verse counts for the book. Field names follow each language (`startChapter` in
+  TypeScript, Swift, and Kotlin)
 - `Match { passage, start, end, line, column }`
 - `Completion { label, kind, start, end, text }`: accept it by replacing `start..end` with `text`
 

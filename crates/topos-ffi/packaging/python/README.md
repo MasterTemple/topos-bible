@@ -42,8 +42,12 @@ The package is imported as `topos_bible`.
 | `parse(reference, style)` | One reference (`Jn 3:16` or OSIS `John.3.16`) as a `Passage`, or `None` |
 | `complete(text, cursor, unit, style, limit)` | Completions for the reference ending at `cursor` (`limit` 0 means no limit) |
 
-- `Passage(book_id, book, reference, osis)`, with `reference` written in the requested
-  `BookStyle` (`NAME`, `ABBREVIATION`, or `OSIS`)
+- `Passage(book_id, book, reference, segments, osis)`, with `reference` written in the
+  requested `BookStyle` (`NAME`, `ABBREVIATION`, or `OSIS`)
+- `segments` lists each part of the reference as a `VerseRange(start_chapter, start_verse,
+  end_chapter, end_verse)`, always fully filled in: `John 3:16-18,20-4:2` gives
+  `(3, 16, 3, 18)` and `(3, 20, 4, 2)`, and a whole chapter (`John 3`) runs from verse 1 to its
+  last verse (`(3, 1, 3, 36)`)
 - `Completion(label, kind, start, end, text)`, where `kind` is a `CompletionKind`
   (`BOOK`, `CHAPTER`, or `VERSE`)
 - **Offsets:** pass `OffsetUnit.CHAR` so offsets match Python string indices (`BYTE` and

@@ -39,8 +39,10 @@ do {
 }
 ```
 
-- `Passage { bookId, book, reference, osis }`, `Match { passage, start, end, line, column }`,
-  and `Completion { label, kind, start, end, text }` are value types
+- `Passage { bookId, book, reference, segments, osis }`, `Match { passage, start, end, line,
+  column }`, and `Completion { label, kind, start, end, text }` are value types
+- `segments` is `[VerseRange]`, each with `startChapter`, `startVerse`, `endChapter`, and
+  `endVerse` always filled in (a whole chapter runs to its last verse)
 - **Offsets:** pass `.utf16` and use `String.utf16` indices (`.byte` and `.char` also exist)
 
 This snippet follows the generated bindings but has not been compiled in CI. See the

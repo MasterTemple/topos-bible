@@ -52,8 +52,12 @@ const topos = Topos.new();
 | `complete(text, cursor, unit, style, limit)` | Completions for the reference ending at `cursor` (`limit` 0 means no limit) |
 | `dispose()` | Frees the Rust object now instead of waiting for garbage collection |
 
-- `Passage { book_id, book, reference, osis }`, with `reference` written in the requested
-  `BookStyle` (`Name`, `Abbreviation`, or `Osis`)
+- `Passage { bookId, book, reference, segments, osis }`, with `reference` written in the
+  requested `BookStyle` (`Name`, `Abbreviation`, or `Osis`)
+- `segments` lists each part of the reference as a `VerseRange { startChapter, startVerse,
+  endChapter, endVerse }`, always fully filled in: `John 3:16-18,20-4:2` is
+  `[{3, 16, 3, 18}, {3, 20, 4, 2}]`, and a whole chapter (`John 3`) runs from verse 1 to its
+  last verse (`{3, 1, 3, 36}`)
 - `Completion { label, kind, start, end, text }`, where `kind` is a `CompletionKind`
   (`Book`, `Chapter`, or `Verse`)
 - **Offsets:** pass `OffsetUnit.Utf16` so offsets match JavaScript string indices (`Byte` and
