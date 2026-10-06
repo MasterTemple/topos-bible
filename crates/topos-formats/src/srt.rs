@@ -4,7 +4,7 @@ use topos_lib::matcher::{BibleMatch, BibleMatcher};
 
 use crate::{Format, FormatError};
 
-/// Where a match is in a subtitle file
+/// Where a match is in a subtitle file (SubRip `.srt`, WebVTT `.vtt`, or SubViewer `.sbv`)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SRTLocation {
     /// The id of the cue the match starts in
@@ -24,14 +24,18 @@ pub struct SRTTimeStamp {
 }
 
 impl SRTTimeStamp {
-    /// `00:22:57,920` (a `.` before the milliseconds is accepted too)
+    /// `00:22:57,920`, `00:22:57.920` (WebVTT and SBV), or `22:57.920` (WebVTT, without hours)
     pub fn parse(s: &str) -> Option<Self> {
         let (hms, millis) = s.trim().split_once([',', '.'])?;
-        let mut hms = hms.split(':').map(|n| n.trim().parse().ok());
-        let (hours, minutes, seconds) = (hms.next()??, hms.next()??, hms.next()??);
-        if hms.next().is_some() {
-            return None;
-        }
+        let parts: Vec<u32> = hms
+            .split(':')
+            .map(|n| n.trim().parse().ok())
+            .collect::<Option<_>>()?;
+        let (hours, minutes, seconds) = match parts[..] {
+            [hours, minutes, seconds] => (hours, minutes, seconds),
+            [minutes, seconds] => (0, minutes, seconds),
+            _ => return None,
+        };
         Some(Self {
             hours,
             minutes,
@@ -85,20 +89,40 @@ impl<'a> SRTDocument<'a> {
         let block = &input[span.clone()];
         let mut lines = block.split_inclusive('\n');
         let first = lines.next()?;
-        // The id line is optional
-        let (id, timing) = match first.trim().trim_start_matches('\u{FEFF}').parse() {
-            Ok(id) => (id, lines.next()?),
-            Err(_) => (0, first),
+        // The id line is optional, and in WebVTT it may be text (only numbers are kept)
+        let (id, timing, (start, end)) = match Self::parse_timing(first) {
+            Some(times) => (0, first, times),
+            None => {
+                let timing = lines.next()?;
+                let id = first
+                    .trim()
+                    .trim_start_matches('\u{FEFF}')
+                    .parse()
+                    .unwrap_or(0);
+                (id, timing, Self::parse_timing(timing)?)
+            }
         };
-        let (start, end) = timing.split_once("-->")?;
         let text_start = (timing.as_ptr() as usize - block.as_ptr() as usize) + timing.len();
         Some(SRTCue {
             id,
-            start: SRTTimeStamp::parse(start)?,
-            end: SRTTimeStamp::parse(end)?,
+            start,
+            end,
             text: block[text_start..].trim_end(),
             span,
         })
+    }
+
+    /**
+    - SRT and WebVTT: `00:00:01,000 --> 00:00:02,000`, where WebVTT may add cue settings after
+      the end (`align:start`)
+    - SBV: `0:00:01.000,0:00:02.000`
+    */
+    fn parse_timing(line: &str) -> Option<(SRTTimeStamp, SRTTimeStamp)> {
+        let (start, end) = match line.split_once("-->") {
+            Some((start, end)) => (start, end.split_whitespace().next()?),
+            None => line.trim().split_once(',')?,
+        };
+        Some((SRTTimeStamp::parse(start)?, SRTTimeStamp::parse(end)?))
     }
 
     /// The cue that contains this byte offset
@@ -165,6 +189,21 @@ mod tests {
         let doc = SRTDocument::parse("WEBVTT\n\n00:00:01,000 --> 00:00:02,000\nJohn 1:1\n");
         assert_eq!(doc.cues.len(), 1);
         assert_eq!(doc.cues[0].id, 0);
+    }
+
+    #[test]
+    fn parses_webvtt_and_sbv() {
+        let vtt = "WEBVTT\n\nintro\n00:01.000 --> 00:04.250 align:start\nSee John 3:16\n";
+        let doc = SRTDocument::parse(vtt);
+        assert_eq!(doc.cues.len(), 1);
+        assert_eq!(doc.cues[0].end.millis, 250);
+        assert_eq!(doc.cues[0].text, "See John 3:16");
+
+        let sbv = "0:00:01.000,0:00:03.500\nSee John 3:16\n\n0:00:04.000,0:00:05.000\nand more\n";
+        let doc = SRTDocument::parse(sbv);
+        assert_eq!(doc.cues.len(), 2);
+        assert_eq!(doc.cues[0].end.seconds, 3);
+        assert_eq!(doc.cues[1].text, "and more");
     }
 
     #[test]

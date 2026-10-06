@@ -1,9 +1,9 @@
 //! Search documents for Bible references and report where each one is in that document's terms:
-//! a text fragment for HTML, a cue and timestamps for subtitles, a CFI for EPUB, a page and
-//! rectangles for PDF.
+//! a text fragment for HTML, a cue and timestamps for subtitles (SRT, WebVTT, SBV), a CFI for
+//! EPUB, a page and rectangles for PDF, a JSON Pointer for JSON, and an element path for XML.
 //!
-//! Each format is behind a feature of the same name (`html`, `srt`, and `epub` by default; `pdf`
-//! needs MuPDF).
+//! Each format is behind a feature of the same name (all on by default except `pdf`, which needs
+//! MuPDF).
 
 use topos_lib::matcher::{BibleMatch, BibleMatcher};
 
@@ -11,10 +11,14 @@ use topos_lib::matcher::{BibleMatch, BibleMatcher};
 pub mod epub;
 #[cfg(feature = "html")]
 pub mod html;
+#[cfg(feature = "json")]
+pub mod json;
 #[cfg(feature = "pdf")]
 pub mod pdf;
 #[cfg(feature = "srt")]
 pub mod srt;
+#[cfg(feature = "xml")]
+pub mod xml;
 
 /// A location type that a document format can report matches with
 pub trait Format: Sized {
@@ -59,4 +63,10 @@ pub enum FormatError {
     #[cfg(feature = "pdf")]
     #[error("PDF: {0}")]
     Pdf(#[from] pdf::PDFMatchError),
+    #[cfg(feature = "json")]
+    #[error("JSON: {0}")]
+    Json(#[from] json::JSONMatchError),
+    #[cfg(feature = "xml")]
+    #[error("XML: {0}")]
+    Xml(#[from] xml::XMLMatchError),
 }
