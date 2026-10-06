@@ -1,15 +1,22 @@
 //! Searching the whole workspace: every text file under the workspace folders (respecting
 //! `.gitignore`, `.ignore`, and `.toposignore`, and skipping hidden and binary files, like the
-//! CLI), with open documents' unsaved text instead of what is on disk.
+//! CLI), with open documents' unsaved text instead of what is on disk, and a cache of each
+//! file's references.
 
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     str::FromStr,
+    sync::{Arc, Mutex},
+    time::SystemTime,
 };
 
-use ignore::WalkBuilder;
-use lsp_types::Uri;
+use ignore::{WalkBuilder, WalkState};
+use lsp_types::{Range, Uri};
+use topos_bible::{
+    matcher::{BibleMatcher, LineIndex},
+    segments::Passage,
+};
 
 /// Larger files are skipped (a book-length text is a few MB)
 const MAX_FILE_SIZE: u64 = 50 * 1024 * 1024;
@@ -60,23 +67,117 @@ pub fn uri_to_path(uri: &Uri) -> Option<PathBuf> {
     Some(PathBuf::from(path))
 }
 
-/// The text of every file to search: open documents first (their unsaved text), then the files
-/// under `roots` with one of `extensions` (any extension if empty)
+/// A reference found in a file: where it is (in LSP positions) and what it is
+#[derive(Clone, Debug)]
+pub struct Found {
+    pub range: Range,
+    pub passage: Passage,
+}
+
+/// Each file's references, found once and reused while the file is unchanged
+struct Entry {
+    size: u64,
+    modified: Option<SystemTime>,
+    found: Arc<Vec<Found>>,
+}
+
+/**
+A cache of every workspace file's references, before any filter (searches filter them), so a
+search reads and parses only the files that changed since the last one
+- Files are matched by size and modification time, like the CLI's `--cache`
+- [`Cache::clear`] when the data changes, since that changes what is found
+*/
+#[derive(Default)]
+pub struct Cache {
+    files: Mutex<HashMap<PathBuf, Entry>>,
+}
+
+impl Cache {
+    pub fn clear(&self) {
+        if let Ok(mut files) = self.files.lock() {
+            files.clear();
+        }
+    }
+
+    fn get(&self, path: &Path, size: u64, modified: Option<SystemTime>) -> Option<Arc<Vec<Found>>> {
+        let files = self.files.lock().ok()?;
+        let entry = files.get(path)?;
+        (entry.size == size && entry.modified == modified).then(|| entry.found.clone())
+    }
+
+    fn insert(
+        &self,
+        path: PathBuf,
+        size: u64,
+        modified: Option<SystemTime>,
+        found: Arc<Vec<Found>>,
+    ) {
+        if let Ok(mut files) = self.files.lock() {
+            files.insert(
+                path,
+                Entry {
+                    size,
+                    modified,
+                    found,
+                },
+            );
+        }
+    }
+
+    /// Forgets files that are gone (or no longer searched)
+    fn retain(&self, seen: &HashSet<PathBuf>) {
+        if let Ok(mut files) = self.files.lock() {
+            files.retain(|path, _| seen.contains(path));
+        }
+    }
+
+    #[cfg(test)]
+    pub fn len(&self) -> usize {
+        self.files.lock().map_or(0, |files| files.len())
+    }
+}
+
+/// The references in a text, with LSP ranges
+pub fn find(matcher: &BibleMatcher, text: &str) -> Vec<Found> {
+    let index = LineIndex::new(text);
+    matcher
+        .search(text)
+        .into_iter()
+        .map(|m| {
+            let bytes = m.location.bytes;
+            Found {
+                range: crate::server::lsp_range(&index, bytes.start, bytes.end),
+                passage: m.psg,
+            }
+        })
+        .collect()
+}
+
+/**
+Every reference in the workspace, by file: open documents as they are in the editor (unsaved
+text included), then the files under `roots` with one of `extensions` (any if empty), from the
+cache when unchanged. Files are walked in parallel
+*/
 // `Uri` caches its parsed parts, which clippy counts as a mutable key; its text never changes
 #[allow(clippy::mutable_key_type)]
-pub fn texts(
+pub fn references(
     roots: &[PathBuf],
     documents: &HashMap<Uri, String>,
     extensions: &[String],
-) -> Vec<(Uri, String)> {
+    matcher: &BibleMatcher,
+    cache: &Cache,
+) -> Vec<(Uri, Arc<Vec<Found>>)> {
     // Open documents by path: editors may percent-encode their URIs differently
     let open: HashSet<PathBuf> = documents.keys().filter_map(uri_to_path).collect();
-    let mut texts: Vec<(Uri, String)> = documents
-        .iter()
-        .map(|(uri, text)| (uri.clone(), text.clone()))
-        .collect();
+    let results: Mutex<Vec<(Uri, Arc<Vec<Found>>)>> = Mutex::new(
+        documents
+            .iter()
+            .map(|(uri, text)| (uri.clone(), Arc::new(find(matcher, text))))
+            .collect(),
+    );
+    let seen: Mutex<HashSet<PathBuf>> = Mutex::new(HashSet::new());
     let Some((first, rest)) = roots.split_first() else {
-        return texts;
+        return results.into_inner().unwrap_or_default();
     };
     let mut builder = WalkBuilder::new(first);
     for root in rest {
@@ -85,33 +186,55 @@ pub fn texts(
     builder
         .add_custom_ignore_filename(".toposignore")
         .max_filesize(Some(MAX_FILE_SIZE));
-    for entry in builder.build().flatten() {
-        if !entry.file_type().is_some_and(|t| t.is_file()) {
-            continue;
-        }
-        let path = entry.path();
-        let extension = path.extension().and_then(|e| e.to_str());
-        if !extensions.is_empty()
-            && !extension.is_some_and(|e| extensions.iter().any(|x| x.eq_ignore_ascii_case(e)))
-        {
-            continue;
-        }
-        if open.contains(path) {
-            continue;
-        }
-        let Some(uri) = path_to_uri(path) else {
-            continue;
-        };
-        let Ok(bytes) = std::fs::read(path) else {
-            continue;
-        };
-        // Like ripgrep, skip files that look binary
-        if bytes[..bytes.len().min(8192)].contains(&0) {
-            continue;
-        }
-        texts.push((uri, String::from_utf8_lossy(&bytes).into_owned()));
-    }
-    texts
+    builder.build_parallel().run(|| {
+        Box::new(|entry| {
+            let Ok(entry) = entry else {
+                return WalkState::Continue;
+            };
+            let path = entry.path();
+            let wanted = entry.file_type().is_some_and(|t| t.is_file())
+                && !open.contains(path)
+                && (extensions.is_empty()
+                    || path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .is_some_and(|e| extensions.iter().any(|x| x.eq_ignore_ascii_case(e))));
+            if !wanted {
+                return WalkState::Continue;
+            }
+            let (Some(uri), Ok(meta)) = (path_to_uri(path), entry.metadata()) else {
+                return WalkState::Continue;
+            };
+            if let Ok(mut seen) = seen.lock() {
+                seen.insert(path.to_path_buf());
+            }
+            let (size, modified) = (meta.len(), meta.modified().ok());
+            let found = match cache.get(path, size, modified) {
+                Some(found) => found,
+                None => {
+                    let Ok(bytes) = std::fs::read(path) else {
+                        return WalkState::Continue;
+                    };
+                    // Like ripgrep, skip files that look binary (cached as having none)
+                    let found = if bytes[..bytes.len().min(8192)].contains(&0) {
+                        Arc::new(vec![])
+                    } else {
+                        Arc::new(find(matcher, &String::from_utf8_lossy(&bytes)))
+                    };
+                    cache.insert(path.to_path_buf(), size, modified, found.clone());
+                    found
+                }
+            };
+            if !found.is_empty()
+                && let Ok(mut results) = results.lock()
+            {
+                results.push((uri, found));
+            }
+            WalkState::Continue
+        })
+    });
+    cache.retain(&seen.into_inner().unwrap_or_default());
+    results.into_inner().unwrap_or_default()
 }
 
 #[cfg(test)]

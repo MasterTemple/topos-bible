@@ -84,6 +84,8 @@ pub struct Server {
     roots: Vec<PathBuf>,
     /// The editor's settings (initialization options, then the latest configuration)
     editor: Map<String, Value>,
+    /// Each workspace file's references, reused while it is unchanged
+    cache: workspace::Cache,
 }
 
 impl Server {
@@ -96,6 +98,7 @@ impl Server {
             documents: HashMap::new(),
             roots: vec![],
             editor: Map::new(),
+            cache: workspace::Cache::default(),
         }
     }
 
@@ -122,6 +125,8 @@ impl Server {
         self.inlay_hints = inlay_hints;
         self.extensions = extensions;
         self.editor = editor;
+        // New data can change what every file contains
+        self.cache.clear();
         Ok(())
     }
 
@@ -387,21 +392,23 @@ impl Server {
         }
         .map_err(|e| e.to_string())?;
         let query = filter.create_matcher();
-        let mut texts = workspace::texts(&self.roots, &self.documents, &self.extensions);
-        texts.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
-        let mut locations = vec![];
-        for (uri, text) in texts {
-            let index = LineIndex::new(&text);
-            for m in self.matcher.search(&text) {
-                if query.keeps(&m.psg) {
-                    let bytes = m.location.bytes;
-                    locations.push(Location::new(
-                        uri.clone(),
-                        lsp_range(&index, bytes.start, bytes.end),
-                    ));
-                }
-            }
-        }
+        let mut files = workspace::references(
+            &self.roots,
+            &self.documents,
+            &self.extensions,
+            &self.matcher,
+            &self.cache,
+        );
+        files.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
+        let locations = files
+            .iter()
+            .flat_map(|(uri, found)| {
+                found
+                    .iter()
+                    .filter(|f| query.keeps(&f.passage))
+                    .map(|f| Location::new(uri.clone(), f.range))
+            })
+            .collect();
         Ok(locations)
     }
 
@@ -428,7 +435,7 @@ fn lsp_position(index: &LineIndex, offset: usize) -> Position {
     Position::new(position.line as u32 - 1, position.utf16_column as u32 - 1)
 }
 
-fn lsp_range(index: &LineIndex, start: usize, end: usize) -> Range {
+pub fn lsp_range(index: &LineIndex, start: usize, end: usize) -> Range {
     Range::new(lsp_position(index, start), lsp_position(index, end))
 }
 
@@ -614,6 +621,30 @@ mod tests {
         let any = run(1);
         assert!(any.contains(&"b.txt: John 3".to_string()), "{any:?}");
         assert_eq!(any.len(), 5);
+
+        // The files' references are cached (the binary one too, as having none)
+        assert_eq!(server.cache.len(), 3);
+        let exact = |server: &Server| {
+            let locations = server
+                .search(SearchMode::ExactOverlap, "Romans 8:28")
+                .unwrap();
+            locations.len()
+        };
+        assert_eq!(exact(&server), 1);
+        // Same size and time: the cache is used, so the edit isn't seen yet
+        let b = dir.join("b.txt");
+        let modified = std::fs::metadata(&b).unwrap().modified().unwrap();
+        std::fs::write(&b, "John 3, John 2; 3:16, Rom 8:29").unwrap();
+        let file = std::fs::File::options().write(true).open(&b).unwrap();
+        file.set_modified(modified).unwrap();
+        assert_eq!(exact(&server), 1);
+        // A real change is read again
+        std::fs::write(&b, "Nothing here now").unwrap();
+        assert_eq!(exact(&server), 0);
+        // Deleted files are forgotten
+        std::fs::remove_file(&b).unwrap();
+        exact(&server);
+        assert_eq!(server.cache.len(), 2);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
