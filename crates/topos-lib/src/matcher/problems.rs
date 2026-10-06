@@ -2,7 +2,11 @@ use std::ops::Range;
 
 use crate::{
     matcher::{BibleMatcher, text::SearchText},
-    segments::{grammar::SegmentList, resolve::Resolver, verse_bounds::VerseBounds},
+    segments::{
+        grammar::SegmentList,
+        resolve::{Resolver, TOO_LARGE},
+        verse_bounds::VerseBounds,
+    },
 };
 
 /// A reference that is written like one but does not exist (`John 3:99`)
@@ -69,9 +73,24 @@ impl BibleMatcher {
                     (verse > verses).then(|| format!("{name} {chapter} has {verses} verses"))
                 })
             });
+            // A number too large to hold (`6:280`, read as 255) is quoted as written
+            let source = &text.as_str()[bytes.clone()];
+            let clamped = node
+                .parts()
+                .filter_map(|p| p.number)
+                .chain([node.start])
+                .any(|n| {
+                    n.value == TOO_LARGE
+                        && &text.as_str()[cur.end()..][n.span.start..n.span.end] != "255"
+                });
+            let written = if clamped {
+                source.to_string()
+            } else {
+                segment.to_string()
+            };
             problems.push(Problem {
                 bytes: text.original_range(bytes),
-                message: format!("{name} {segment} does not exist"),
+                message: format!("{name} {written} does not exist"),
                 detail,
             });
         }
@@ -103,6 +122,16 @@ mod tests {
         assert_eq!(
             detail("Obadiah 2:1"),
             [Some("Obadiah has 1 chapter".into())]
+        );
+        // Numbers too large to be any verse are verses that don't exist, not the end of the
+        // reference (which would leave `1 Timothy 6`)
+        assert_eq!(
+            problems("1 Timothy 6:280"),
+            [("6:280".into(), "1 Timothy 6:280 does not exist".into())]
+        );
+        assert_eq!(
+            detail("1 Timothy 6:280"),
+            [Some("1 Timothy 6 has 21 verses".into())]
         );
     }
 

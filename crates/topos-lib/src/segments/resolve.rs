@@ -1,12 +1,16 @@
 use crate::{
     data::chapter_verses::ChapterVerses,
     segments::{
-        grammar::{Following, Number, NumberKind, SegmentNode},
+        grammar::{DelimiterKind, Following, Number, NumberKind, SegmentNode},
         passage::Segments,
         segment::Segment,
         verse_bounds::VerseBounds,
     },
 };
+
+/// The lexer's value for a number too large to be any chapter or verse (256 to 999); no book has
+/// a chapter or verse 255, so this never names a real one
+pub const TOO_LARGE: u8 = u8::MAX;
 
 /**
 Turns parsed [`SegmentNode`]s into [`Segments`], deciding what each number means
@@ -53,11 +57,16 @@ impl<'a> Resolver<'a> {
         let mut used = 0;
         let mut end = 0;
         for node in nodes {
-            // Only a `.` can be dropped, since it may end a sentence rather than start a verse
+            // Only a `.` can be dropped, since it may end a sentence rather than start a verse, or
+            // a range to a number too large to be a verse (`24:9 — 800,000`), which is something
+            // else; a large verse after a `:` (`6:280`) is a verse that doesn't exist
             let parts: Vec<_> = node.parts().collect();
-            let keeps = (0..parts.len())
-                .rev()
-                .filter(|&keep| parts[keep].delimiter.actual == '.');
+            let keeps = (0..parts.len()).rev().filter(|&keep| {
+                let part = parts[keep];
+                part.delimiter.actual == '.'
+                    || (part.delimiter.kind == DelimiterKind::Range
+                        && part.number.is_some_and(|n| n.value == TOO_LARGE))
+            });
             let accepted = std::iter::once(parts.len()).chain(keeps).find_map(|keep| {
                 let node = node.truncated(keep);
                 let segment = self.resolve_node(&node, prev_node.as_ref(), segments.last())?;

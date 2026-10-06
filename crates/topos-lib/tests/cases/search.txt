@@ -110,3 +110,11 @@ Gen 1.5° =>
 John 3:16, 5% of people => John 3:16
 Ps 23 at 50% => Psalms 23
 Is. 53.5 => Isaiah 53:5
+
+# Numbers too large to be any verse (256-999): after a `:` the verse doesn't exist (like 6:180);
+# at the end of a range they're something else, so the reference ends before the dash
+1 Timothy 6:280 =>
+1 Timothy 6:180 =>
+2 Samuel 24:9 — 800,000 + 500,000 => 2 Samuel 24:9
+John 3:16-300 => John 3:16
+Mark 2:3, 2025 => Mark 2:3

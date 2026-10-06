@@ -90,7 +90,11 @@ fn lex_decimal(s: &str, start: usize) -> Option<(Number, usize)> {
     if digits > MAX_DIGITS {
         return None;
     }
-    let value: u8 = s[..digits].parse().ok()?;
+    // Up to 999, clamped to 255: no book has a chapter or verse that high (Psalm 119 has 176
+    // verses), so `6:280` is a verse that doesn't exist, like `6:180`, rather than not a number
+    // (which would quietly leave `1 Timothy 6`)
+    let value = u8::try_from(s[..digits].parse::<u16>().ok()?)
+        .unwrap_or(crate::segments::resolve::TOO_LARGE);
 
     // A subverse letter must end the word (`16a`)
     let after = &s[digits..];
