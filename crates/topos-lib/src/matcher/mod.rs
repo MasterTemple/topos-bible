@@ -1,4 +1,5 @@
 pub mod bible_matcher;
+pub mod context;
 pub mod instance;
 pub mod location;
 pub mod matches;

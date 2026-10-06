@@ -62,14 +62,27 @@ impl Matcher for LineColLocation {
         let mut filtered = matcher.filter();
         let text = SearchText::new(input);
         let lookup = LineColLookup::new(input);
+        let data = matcher.data();
 
-        let mut candidates = matcher.data().books().candidates(text.as_str()).peekable();
-        while let Some(cur) = candidates.next() {
-            let next_start = candidates.peek().map(|next| next.start());
-            let Some(found) = FoundPassage::find(matcher.data(), text.as_str(), cur, next_start)
-            else {
-                continue;
-            };
+        let starts: Vec<_> = data.books().candidates(text.as_str()).collect();
+        let mut found: Vec<FoundPassage> = starts
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, cur)| {
+                let next_start = starts.get(idx + 1).map(|next| next.start());
+                FoundPassage::find(data, text.as_str(), *cur, next_start)
+            })
+            .collect();
+
+        // References without a book name, when the document's book is known
+        if let Some(context) = matcher.context() {
+            let taken: Vec<_> = found.iter().map(|f| f.bytes.clone()).collect();
+            let book_starts: Vec<_> = starts.iter().map(|s| s.start()).collect();
+            found.extend(context.find_bare(data, text.as_str(), &taken, &book_starts));
+            found.sort_by_key(|f| f.bytes.start);
+        }
+
+        for found in found {
             let bytes = text.original_range(found.bytes);
             let location = LineColLocation::new(&lookup, bytes.start, bytes.end);
             filtered.try_add(BibleMatch {

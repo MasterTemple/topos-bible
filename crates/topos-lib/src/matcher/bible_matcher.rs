@@ -2,6 +2,7 @@ use crate::{
     data::bible_data::BibleData,
     filter::bible_filter::BibleFilter,
     matcher::{
+        context::BookContext,
         instance::BibleMatch,
         location::{epub::EPUBMatchError, html::HTMLMatchError, srt::SRTMatchError},
         matches::{ComplexFilter, FilteredBibleMatches},
@@ -17,6 +18,8 @@ pub struct BibleMatcher {
     data: BibleData,
     /// Every book is always matched (so `1 John` is never mistaken for `John`), then filtered here
     complex_filter: ComplexFilter,
+    /// When set, references without a book name (`1:1-5`) are matched too
+    context: Option<BookContext>,
 }
 
 // TODO: I should have a search method for each type of Location
@@ -25,7 +28,18 @@ impl BibleMatcher {
         Self {
             data,
             complex_filter,
+            context: None,
         }
+    }
+
+    /// Also match references without a book name, using this context for their book
+    pub fn with_context(mut self, context: BookContext) -> Self {
+        self.context = Some(context);
+        self
+    }
+
+    pub fn context(&self) -> Option<&BookContext> {
+        self.context.as_ref()
     }
 
     pub fn data(&self) -> &BibleData {

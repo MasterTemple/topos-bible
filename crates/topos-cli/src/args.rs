@@ -5,7 +5,7 @@ use topos_lib::{
         bible_filter::BibleFilter,
         filters::{book::BookFilter, genre::GenreFilter, testament::TestamentFilter},
     },
-    matcher::bible_matcher::BibleMatcher,
+    matcher::{bible_matcher::BibleMatcher, context::BookContext},
 };
 
 use crate::outputs::OutputMode;
@@ -76,6 +76,19 @@ pub struct Args {
         help = "Forbid search from matching a verse range (e.g. John 3:4-5)"
     )]
     pub outside: Option<Vec<String>>,
+
+    #[clap(
+        long = "context-book",
+        help = "Treat the input as being about this book, so references like 3:16 match"
+    )]
+    pub context_book: Option<String>,
+
+    #[clap(
+        long = "context-heading",
+        help = "Lines matching this pattern set the book for following references, like '^#+ {book}$'",
+        conflicts_with = "context_book"
+    )]
+    pub context_heading: Option<String>,
 
     // TODO: actually implement this
     #[clap(long = "config", help = "Use a custom configuration file")]
@@ -168,6 +181,21 @@ impl TryFrom<Args> for BibleMatcher {
             }
         }
 
-        Ok(filter.create_matcher())
+        let matcher = filter.create_matcher();
+        let books = matcher.data().books();
+        let context = if let Some(book) = &args.context_book {
+            let book = books
+                .search(book)
+                .ok_or_else(|| format!("Unknown book {book:?}"))?;
+            Some(BookContext::Book(book))
+        } else if let Some(pattern) = &args.context_heading {
+            Some(BookContext::headings(books, pattern)?)
+        } else {
+            None
+        };
+        Ok(match context {
+            Some(context) => matcher.with_context(context),
+            None => matcher,
+        })
     }
 }

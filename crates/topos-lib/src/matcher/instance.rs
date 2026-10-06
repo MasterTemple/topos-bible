@@ -86,31 +86,55 @@ impl FoundPassage {
         cur: Match<'_>,
         next_start: Option<usize>,
     ) -> Option<Self> {
-        let book_id = data.books().search(cur.as_str())?;
+        let book = data.books().search(cur.as_str())?;
+        let window = &text[cur.end()..next_start.unwrap_or(text.len())];
+        let list = SegmentList::parse(window);
+        let (found, has_verse) = Self::resolve(data, book, cur.end(), &list)?;
+        // Abbreviations that are also words (`is`) need an explicit verse (`Is 1:1`)
+        if !has_verse && data.books().is_ambiguous(cur.as_str()) {
+            return None;
+        }
+        Some(Self {
+            bytes: cur.start()..found.bytes.end,
+            ..found
+        })
+    }
 
-        let segment_window = match next_start {
-            Some(next_start) => &text[cur.end()..next_start],
-            None => &text[cur.end()..],
-        };
+    /// A reference without a book name (`1:1-5`), which must start with `chapter:verse`
+    pub fn find_bare(
+        data: &BibleData,
+        book: BookId,
+        text: &str,
+        window: Range<usize>,
+    ) -> Option<Self> {
+        let list = SegmentList::parse(&text[window.clone()]);
+        let first = list.nodes.first()?;
+        if first.start_verse.is_none_or(|p| p.delimiter.actual != ':') {
+            return None;
+        }
+        Self::resolve(data, book, window.start, &list).map(|(found, _)| found)
+    }
 
-        let list = SegmentList::parse(segment_window);
-        let versification = data.chapter_verses().get_chapter_verses(&book_id);
+    /// Resolves segments parsed at byte `start`, and whether they have an explicit verse
+    fn resolve(
+        data: &BibleData,
+        book: BookId,
+        start: usize,
+        list: &SegmentList,
+    ) -> Option<(Self, bool)> {
+        let versification = data.chapter_verses().get_chapter_verses(&book);
         let resolved = Resolver::for_book(versification).resolve(&list.nodes);
         if resolved.used == 0 {
             return None;
         }
-        // Abbreviations that are also words (`is`) need an explicit verse (`Is 1:1`)
         let has_verse = list.nodes[..resolved.used]
             .iter()
             .any(|node| node.start_verse.is_some());
-        if !has_verse && data.books().is_ambiguous(cur.as_str()) {
-            return None;
-        }
-
-        Some(Self {
+        let found = Self {
             // Only the text that resolved is part of the match
-            bytes: cur.start()..cur.end() + resolved.end,
-            psg: resolved.segments.with_book(book_id),
-        })
+            bytes: start..start + resolved.end,
+            psg: resolved.segments.with_book(book),
+        };
+        Some((found, has_verse))
     }
 }

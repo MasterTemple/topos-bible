@@ -52,6 +52,8 @@ pub struct Books {
 /// `John` and `Song of Songs` over `Song`
 #[derive(Clone, Debug)]
 struct BookRegexes {
+    /// The alternation of every book name (escaped, longest first), without flags or groups
+    pattern: String,
     /// A book name for searching text (see [`Books::candidates`])
     candidate: Regex,
     /// A book on its own, for autocomplete
@@ -72,6 +74,7 @@ impl BookRegexes {
         };
         let books = keys.into_iter().map(|k| regex::escape(k)).join("|");
         Ok(Self {
+            pattern: books.clone(),
             candidate: Regex::new(&format!(r"(?i){b}((?:{books})\.?)"))?,
             book: Regex::new(&format!(r"(?i){b}((?:{books}){b}\.?)"))?,
             passage: Regex::new(&format!(r"(?i){b}((?:{books})){b}\.?(.*)"))?,
@@ -127,6 +130,11 @@ impl Books {
                     .next()
                     .is_some_and(|b| b.is_ascii_digit() || roman::is_numeral(b))
             })
+    }
+
+    /// The alternation of every book name and abbreviation (escaped, longest first, lowercase)
+    pub fn pattern(&self) -> &str {
+        &self.regexes.pattern
     }
 
     /// Whether this name is an abbreviation that is also a common word (`is`, `am`)
