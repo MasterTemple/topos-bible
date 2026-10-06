@@ -41,8 +41,9 @@ commands from this directory. Outputs go to `dist/` (gitignored).
 | Swift | `boltffi pack apple` | macOS with Xcode | `dist/apple` (XCFramework and `Package.swift`) |
 | Kotlin | `boltffi pack android` | Android NDK | `dist/android` (`jniLibs` and Kotlin sources) |
 
-`npm install` here only installs what `boltffi pack wasm` needs to type-check the generated
-code (`@boltffi/runtime`, `@types/node`, TypeScript); the script puts that `tsc` on the `PATH`.
+`npm install` here only installs what `boltffi pack wasm` runs: `wasm-opt` (binaryen) and what
+it needs to type-check the generated code (`@boltffi/runtime`, `@types/node`, TypeScript). The npm
+scripts put those tools on the `PATH`.
 Package names and the Kotlin package (`io.github.mastertemple.topos`) are set in
 [`boltffi.toml`](./boltffi.toml).
 

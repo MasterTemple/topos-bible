@@ -115,10 +115,9 @@ jobs:
         with:
           path: ~/.cargo/bin/boltffi*
           key: boltffi-${{ env.BOLTFFI_VERSION }}-ubuntu
-      - name: Install BoltFFI and wasm-opt
-        run: |
-          command -v boltffi || cargo install boltffi_cli --version "$BOLTFFI_VERSION" --locked
-          sudo apt-get update && sudo apt-get install -y binaryen
+      # wasm-opt comes from the binaryen npm package (Ubuntu's is too old)
+      - name: Install BoltFFI
+        run: command -v boltffi || cargo install boltffi_cli --version "$BOLTFFI_VERSION" --locked
       - name: Build the package and run the example against it
         working-directory: crates/topos-ffi
         run: |
