@@ -30,14 +30,14 @@ The phases are in order, and each one leaves the repo working.
 ## Phase 2: One parser and a resolve stage
 
 - [x] One lexer/parser that produces a lossless syntax tree with spans, replacing minimal, verbose and the autocomplete regexes (`segments/grammar`)
-- [ ] A resolver stage with a `Context` (see architecture; `segments::resolve` exists, without document context yet)
-  - [ ] Parse older formats / Roman numerals / sub-verses: `Matth. x, 8` [#5](https://github.com/MasterTemple/topos/issues/5)
-  - [ ] `cf` and `ff` [#10](https://github.com/MasterTemple/topos/issues/10)
-  - [ ] Support dashes in book names for justified text [#11](https://github.com/MasterTemple/topos/issues/11)
-  - [ ] Contextual parsing: verse headings in a document about one book [#6](https://github.com/MasterTemple/topos/issues/6)
-- [ ] Confidence scoring plus `ambiguous` abbreviations in the book data: Reduce false positives (`"is"` for Isaiah) [#3](https://github.com/MasterTemple/topos/issues/3)
-- [ ] One `ToposError` enum, and no `unwrap` in library code
-- [ ] Byte spans as the source of truth, with a `LineIndex` that gives byte, char and UTF-16 columns
+- [x] A resolver stage (`segments::resolve`) and document context (`matcher::context`)
+  - [x] Parse older formats / Roman numerals / sub-verses: `Matth. x, 8` [#5](https://github.com/MasterTemple/topos/issues/5)
+  - [x] `cf` and `ff` [#10](https://github.com/MasterTemple/topos/issues/10)
+  - [x] Support dashes in book names for justified text [#11](https://github.com/MasterTemple/topos/issues/11)
+  - [x] Contextual parsing: verse headings in a document about one book [#6](https://github.com/MasterTemple/topos/issues/6)
+- [x] Rules plus `ambiguous` abbreviations in the book data (instead of a numeric confidence score): Reduce false positives (`"is"` for Isaiah) [#3](https://github.com/MasterTemple/topos/issues/3)
+- [x] One `ToposError` enum, and no `unwrap` in library code (except the PDF module, rewritten in Phase 3)
+- [x] Byte spans as the source of truth, with a `LineIndex` that gives byte, char and UTF-16 columns
 
 ## Phase 3: Crate split and formats
 
