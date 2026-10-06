@@ -1,7 +1,7 @@
 use std::io::{self, IsTerminal, Write};
 
 use serde_json::json;
-use topos_lib::{
+use topos_bible::{
     data::bible_data::BibleData,
     segments::{Passage, Segment, verse_bounds::VerseBounds},
 };
@@ -22,7 +22,7 @@ pub struct Printer {
     mode: OutputMode,
     color: bool,
     format: ReferenceFormat,
-    options: topos_lib::segments::formatter::FormatOptions,
+    options: topos_bible::segments::formatter::FormatOptions,
     data: BibleData,
     context: (usize, usize),
     rows: Vec<[String; 5]>,

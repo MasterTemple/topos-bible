@@ -70,7 +70,7 @@ runs the native [`topos`](../crates/topos-cli) command over the vault folder ins
 faster for very large vaults and can cache results between runs (`--cache`):
 
 ```sh
-cargo install --git https://github.com/MasterTemple/topos-bible topos-cli
+cargo install topos-bible-cli
 ```
 
 The plugin looks for `~/.cargo/bin/topos`, then `topos` on your PATH; set the path in the settings
@@ -106,7 +106,7 @@ includes these bindings, the dependency can point at the npm version instead.
   bundled worker (in a Node worker thread), the sidebar in a DOM (happy-dom: inputs, chips,
   context lines), the built plugin against a stand-in for Obsidian's
   API (loading, indexing with both engines, commands, and autocomplete), and the sidebar rendered
-  to HTML. The CLI tests use `../target/debug/topos` (`cargo build -p topos-cli`) and are skipped
+  to HTML. The CLI tests use `../target/debug/topos` (`cargo build -p topos-bible-cli`) and are skipped
   without it
 - `npm run typecheck`
 

@@ -11,7 +11,7 @@ use lsp_types::{
     },
     request::{Completion, DocumentSymbolRequest, HoverRequest, Request as LspRequest},
 };
-use topos_lib::matcher::BibleMatcher;
+use topos_bible::matcher::BibleMatcher;
 
 use crate::server::Server;
 

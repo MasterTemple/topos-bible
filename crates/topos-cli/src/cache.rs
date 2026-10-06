@@ -18,7 +18,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use topos_lib::data::books::BookId;
+use topos_bible::data::books::BookId;
 
 use crate::search::Hit;
 

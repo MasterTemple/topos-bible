@@ -1,5 +1,5 @@
-use topos_formats::{SearchFormat, srt::SRTLocation};
-use topos_lib::{error::AnyResult, matcher::BibleMatcher};
+use topos_bible::{error::AnyResult, matcher::BibleMatcher};
+use topos_bible_formats::{SearchFormat, srt::SRTLocation};
 
 /// A real transcript (with multi-line cues): every match must be located in a cue
 #[test]

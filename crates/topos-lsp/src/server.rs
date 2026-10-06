@@ -8,7 +8,7 @@ use lsp_types::{
     Position, PublishDiagnosticsParams, Range, ServerCapabilities, SymbolKind,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Uri,
 };
-use topos_lib::{
+use topos_bible::{
     matcher::{BibleMatch, BibleMatcher, LineIndex},
     segments::autocomplete::{CompleteOptions, CompletionKind},
 };

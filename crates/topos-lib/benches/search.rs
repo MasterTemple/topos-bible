@@ -2,7 +2,7 @@
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use std::hint::black_box;
-use topos_lib::{
+use topos_bible::{
     matcher::BibleMatcher,
     segments::{Segments, autocomplete::CompleteOptions},
 };

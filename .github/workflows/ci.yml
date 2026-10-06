@@ -19,7 +19,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --check
       - run: cargo test
-      - run: cargo test -p topos-lib --no-default-features
+      - run: cargo test -p topos-bible --no-default-features
       - run: cargo clippy --all-targets
 
   pdf:
@@ -30,4 +30,4 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # Builds MuPDF from source, which links fontconfig
       - run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev
-      - run: cargo test -p topos-formats --features pdf
+      - run: cargo test -p topos-bible-formats --features pdf

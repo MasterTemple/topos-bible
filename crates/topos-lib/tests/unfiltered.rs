@@ -1,7 +1,7 @@
 //! Filtering unfiltered results must give exactly what a filtered search finds (the CLI's cache
 //! relies on it), and passages must survive the cache's binary format.
 
-use topos_lib::{
+use topos_bible::{
     filter::{
         bible_filter::BibleFilter,
         filters::{book::BookFilter, genre::GenreFilter, testament::TestamentFilter},

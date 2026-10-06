@@ -1,5 +1,5 @@
-use topos_formats::{SearchFormat, html::HTMLLocation};
-use topos_lib::{error::AnyResult, matcher::BibleMatcher};
+use topos_bible::{error::AnyResult, matcher::BibleMatcher};
+use topos_bible_formats::{SearchFormat, html::HTMLLocation};
 
 /**
 ```js

@@ -1,9 +1,13 @@
 [package]
-name = "topos-lib"
-version = "0.2.0"
+name = "topos-bible"
+version = "0.3.0"
 edition = "2024"
 license.workspace = true
 repository.workspace = true
+description = "Find, parse, and autocomplete Bible references in text, with exact locations"
+readme = "README.md"
+keywords = ["bible", "verse", "reference", "parser", "autocomplete"]
+categories = ["text-processing", "parser-implementations"]
 
 [dependencies]
 derive_more = { version = "2.0.1", features = ["deref", "deref_mut", "from", "into_iterator"] }

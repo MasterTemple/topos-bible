@@ -125,7 +125,7 @@ export class ToposSettingTab extends PluginSettingTab {
       new Setting(containerEl)
         .setName("Search engine")
         .setDesc(
-          "Built in: indexes in a background thread, everywhere. topos CLI: runs the native command-line tool, which is faster for very large vaults (install it with cargo install --git https://github.com/MasterTemple/topos-bible topos-cli). Edits are always indexed by the built-in engine.",
+          "Built in: indexes in a background thread, everywhere. topos CLI: runs the native command-line tool, which is faster for very large vaults (install it with cargo install topos-bible-cli). Edits are always indexed by the built-in engine.",
         )
         .addDropdown((d) =>
           d

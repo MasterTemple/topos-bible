@@ -4,7 +4,7 @@ use crate::complete;
 
 use clap::{Parser, ValueEnum, ValueHint};
 use clap_complete::engine::ArgValueCompleter;
-use topos_lib::{
+use topos_bible::{
     data::{
         bible_data::{BibleData, BibleDataInput},
         patch::DataPatch,

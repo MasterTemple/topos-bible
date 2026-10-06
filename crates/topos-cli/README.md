@@ -7,7 +7,7 @@
 ## Install
 
 ```sh
-cargo install --git https://github.com/MasterTemple/topos-bible topos-cli
+cargo install topos-bible-cli
 ```
 
 This installs the `topos` command. Add `--features pdf` to also search PDFs (it builds MuPDF,

@@ -68,7 +68,7 @@ test("the worker searches files like the main thread", async () => {
 
 const cli = join(import.meta.dirname, "../../target/debug/topos");
 
-test("the CLI and the built-in engine find the same references", { skip: !existsSync(cli) && "build topos-cli first" }, async () => {
+test("the CLI and the built-in engine find the same references", { skip: !existsSync(cli) && "build topos-bible-cli first" }, async () => {
   const vault = mkdtempSync(join(tmpdir(), "topos-vault-"));
   mkdirSync(join(vault, "sub"));
   const notes: Record<string, string> = {

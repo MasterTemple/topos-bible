@@ -1,6 +1,7 @@
 [package]
 name = "topos-lsp"
-version = "0.2.0"
+version = "0.3.0"
+publish = false
 edition = "2024"
 license.workspace = true
 repository.workspace = true
@@ -15,4 +16,4 @@ lsp-server = "0.10.0"
 lsp-types = "0.97.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
-topos-lib = { path = "../topos-lib" }
+topos-bible = { path = "../topos-lib" }

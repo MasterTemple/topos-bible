@@ -10,15 +10,15 @@ use std::{
 use crate::cache::{Cache, Cached};
 use ignore::{WalkBuilder, WalkState};
 use std::collections::BTreeSet;
-use topos_formats::{
-    SearchFormat,
-    epub::CfiLocation,
-    srt::{SRTDocument, SRTTimeStamp},
-};
-use topos_lib::{
+use topos_bible::{
     data::books::BookId,
     matcher::{BibleMatcher, Position},
     segments::Passage,
+};
+use topos_bible_formats::{
+    SearchFormat,
+    epub::CfiLocation,
+    srt::{SRTDocument, SRTTimeStamp},
 };
 
 /// What to search
@@ -241,7 +241,7 @@ fn search_file(matcher: &BibleMatcher, path: &Path) -> Result<Option<FileHits>, 
         Some("pdf") => {
             let doc = mupdf::Document::open(path).map_err(|e| e.to_string())?;
             let matches = matcher
-                .search_format::<topos_formats::pdf::PDFLocation>(&doc)
+                .search_format::<topos_bible_formats::pdf::PDFLocation>(&doc)
                 .map_err(|e| e.to_string())?;
             let hits = matches
                 .into_iter()

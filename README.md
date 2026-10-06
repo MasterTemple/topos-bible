@@ -8,20 +8,21 @@ Locate Bible verses in text, files, and entire directories!
 
 ```sh
 # The `topos` command-line tool
-cargo install --git https://github.com/MasterTemple/topos-bible topos-cli
+cargo install topos-bible-cli
 
-# The library, from JavaScript/TypeScript or Python
+# The library, from Rust, JavaScript/TypeScript, or Python
+cargo add topos-bible
 npm install topos-bible
 pip install topos-bible
 ```
 
 ## Crates
 
-| Crate | What it is |
+| Crate (folder) | What it is |
 |---|---|
-| [`topos-lib`](./crates/topos-lib) | The core: book data, the segment grammar, resolving, searching, formatting, OSIS, and autocomplete |
-| [`topos-formats`](./crates/topos-formats) | Locations in HTML, SRT/WebVTT/SBV, EPUB, JSON, XML, and PDF (`pdf` feature) |
-| [`topos-cli`](./crates/topos-cli/README.md) | `topos`, a ripgrep-style search tool |
+| [`topos-bible`](./crates/topos-lib/README.md) (`topos-lib`) | The core: book data, the segment grammar, resolving, searching, formatting, OSIS, and autocomplete |
+| [`topos-bible-formats`](./crates/topos-formats/README.md) (`topos-formats`) | Locations in HTML, SRT/WebVTT/SBV, EPUB, JSON, XML, and PDF (`pdf` feature) |
+| [`topos-bible-cli`](./crates/topos-cli/README.md) (`topos-cli`) | `topos`, a ripgrep-style search tool |
 | [`topos-lsp`](./crates/topos-lsp/README.md) | A language server: completion, hover, and document symbols |
 | [`topos-ffi`](./crates/topos-ffi) | Bindings for TypeScript/WASM, Python, Swift, and Kotlin via [BoltFFI](https://boltffi.dev) |
 | [`obsidian`](./obsidian/README.md) | An Obsidian plugin: verse search with filters, autocomplete, and Literal Word links |

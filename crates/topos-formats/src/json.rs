@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 use serde_json::Value;
-use topos_lib::matcher::{BibleMatch, BibleMatcher};
+use topos_bible::matcher::{BibleMatch, BibleMatcher};
 
 use crate::{Format, FormatError};
 

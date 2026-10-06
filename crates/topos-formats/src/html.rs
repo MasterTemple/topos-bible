@@ -1,22 +1,22 @@
-use htmloc::{FragmentEngine, GenerateOptions, Selection, TextFragment};
+use crate::htmloc::{FragmentEngine, GenerateOptions, Selection, TextFragment};
 use itertools::Itertools;
 
-use topos_lib::matcher::{BibleMatch, BibleMatcher, LineColLocation};
+use topos_bible::matcher::{BibleMatch, BibleMatcher, LineColLocation};
 
 use crate::{Format, FormatError};
 
 fn selection(val: LineColLocation) -> Selection {
     {
         Selection {
-            start: htmloc::Position {
+            start: crate::htmloc::Position {
                 line: val.start.line,
                 column: val.start.column,
             },
-            end: htmloc::Position {
+            end: crate::htmloc::Position {
                 line: val.end.line,
                 column: val.end.column,
             },
-            bytes: htmloc::ByteIndex {
+            bytes: crate::htmloc::ByteIndex {
                 start: val.bytes.start,
                 end: val.bytes.end,
             },

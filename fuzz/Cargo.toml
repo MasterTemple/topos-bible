@@ -9,7 +9,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-topos-lib = { path = "../crates/topos-lib" }
+topos-bible = { path = "../crates/topos-lib" }
 
 # Keep this out of the main workspace (run with `cargo fuzz run search`)
 [workspace]

@@ -1,6 +1,6 @@
 //! Runs every case in `tests/cases/search.txt` and reports all failures at once.
 
-use topos_lib::matcher::BibleMatcher;
+use topos_bible::matcher::BibleMatcher;
 
 struct Case<'a> {
     line: usize,

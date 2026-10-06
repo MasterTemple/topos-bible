@@ -1,6 +1,7 @@
 [package]
 name = "topos-ffi"
-version = "0.2.0"
+version = "0.3.0"
+publish = false
 edition = "2024"
 license.workspace = true
 repository.workspace = true
@@ -9,9 +10,10 @@ description = "Bindings for TypeScript/WASM, Python, Swift, and Kotlin (via Bolt
 [lib]
 # Matches the published package name (topos-bible), which BoltFFI uses for artifacts
 name = "topos_bible"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
 boltffi = "0.31.0"
 serde_json = { workspace = true }
-topos-lib = { path = "../topos-lib" }
+# Named topos_lib here: this crate's own library is topos_bible (the package name BoltFFI uses)
+topos-lib = { package = "topos-bible", path = "../topos-lib" }

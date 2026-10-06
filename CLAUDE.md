@@ -4,19 +4,21 @@ Finds and parses Bible references in text and documents, reporting where each on
 
 ## Crates
 
-- `topos-lib` (core, no native deps). Pipeline: book candidates → `segments::grammar` (lexer and parser that never fails, lossless `SegmentList` with byte spans) → `segments::resolve` (what numbers mean, plus versification checks) → filter → `LineColLocation`.
+Crates are named by package (folder in parentheses); `topos-bible`, `topos-bible-formats`, and `topos-bible-cli` are published to crates.io, the others are `publish = false`.
+
+- `topos-bible` (`crates/topos-lib`, core, no native deps; its README is the crate docs and its examples are doc tests). Pipeline: book candidates → `segments::grammar` (lexer and parser that never fails, lossless `SegmentList` with byte spans) → `segments::resolve` (what numbers mean, plus versification checks) → filter → `LineColLocation`.
   - `BibleMatcher::search(text)`, `complete(text, cursor, opts)` (returns `TextEdit`s), `problems(text)` (references that don't exist)
   - `FormatOptions` (formatting), `segments::osis` (OSIS and BCV keys), `matcher::context` (bare `1:1` references with a book context)
-- `topos-formats`: the `Format` trait / `search_format::<L>()` for html, srt (also WebVTT and SBV), epub, json, xml, and pdf (feature `pdf`, MuPDF 0.8).
-- `topos-cli`: binary `topos`. Paths are positional; text comes from `--text` or piped stdin. Default options come from `~/.config/topos/config.toml` (`--config PATH` reads another file, `--no-config` skips it). `-i` keeps references inside a passage, `-o` keeps overlapping ones. `--data` takes custom Bible data JSON. `--cache` is opt-in and stores unfiltered results (one postcard entry per file, with a bitset of the books it mentions), filtered per search with `BibleMatcher::keeps`; `tests/unfiltered.rs` checks that equals a filtered search.
+- `topos-bible-formats` (`crates/topos-formats`): the `Format` trait / `search_format::<L>()` for html, srt (also WebVTT and SBV), epub, json, xml, and pdf (feature `pdf`, MuPDF 0.8). `htmloc` (text fragments) is a module here, formerly a git dependency.
+- `topos-bible-cli` (`crates/topos-cli`): binary `topos`. Paths are positional; text comes from `--text` or piped stdin. Default options come from `~/.config/topos/config.toml` (`--config PATH` reads another file, `--no-config` skips it). `-i` keeps references inside a passage, `-o` keeps overlapping ones. `--data` takes custom Bible data JSON. `--cache` is opt-in and stores unfiltered results (one postcard entry per file, with a bitset of the books it mentions), filtered per search with `BibleMatcher::keeps`; `tests/unfiltered.rs` checks that equals a filtered search.
 - `topos-lsp`: completion, hover, document symbols, diagnostics (`lsp-server` 0.10).
 - `obsidian/`: an Obsidian plugin (TypeScript, React sidebar) built on the `topos-bible` npm package, with the WebAssembly embedded via esbuild aliases. `src/core/` has no Obsidian imports and is tested with `node --test`; `test/plugin.test.ts` loads the built `main.js` against a stand-in for Obsidian's API. The plan is in `doc/obsidian-plugin.md`.
-- `topos-ffi`: the BoltFFI 0.31 façade, the only bindings crate. Offsets are in the caller's unit (byte, char, UTF-16). `boltffi.toml` was made with `boltffi init`. Build with `boltffi pack python`, or `npm install && npm run pack:wasm` for WASM. Its README and `examples/` (Node, Python) are verified; the Swift and Kotlin snippets are not.
+- `topos-ffi`: the BoltFFI 0.31 façade (its library is `topos_bible` for the packages, so it depends on the core as `topos_lib`), the only bindings crate. Offsets are in the caller's unit (byte, char, UTF-16). `boltffi.toml` was made with `boltffi init`. Build with `boltffi pack python`, or `npm install && npm run pack:wasm` for WASM. Its README and `examples/` (Node, Python) are verified; the Swift and Kotlin snippets are not.
 
 ## Commands
 
-- `cargo test`. CI also runs `cargo fmt --check`, `cargo clippy --all-targets` with `-D warnings` on stable, and `cargo test -p topos-formats --features pdf`.
-- `cargo bench -p topos-lib` (Criterion), `cd fuzz && cargo +nightly fuzz run search`.
+- `cargo test`. CI also runs `cargo fmt --check`, `cargo clippy --all-targets` with `-D warnings` on stable, and `cargo test -p topos-bible-formats --features pdf`.
+- `cargo bench -p topos-bible` (Criterion), `cd fuzz && cargo +nightly fuzz run search`.
 - Use `rg` and `fd`, not `grep` and `find`.
 
 ## Conventions and lessons

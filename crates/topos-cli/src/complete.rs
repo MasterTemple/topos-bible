@@ -7,7 +7,7 @@
 use std::ffi::OsStr;
 
 use clap_complete::engine::CompletionCandidate;
-use topos_lib::{
+use topos_bible::{
     data::books::BookId,
     matcher::BibleMatcher,
     segments::{
