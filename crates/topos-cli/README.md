@@ -302,11 +302,37 @@ COMPLETE=fish topos | source
 
 Quote references (`-o "John 3:16"`): bash splits words at `:`.
 
+## Choosing files
+
+Like ripgrep, `topos` skips files ignored by `.gitignore` (inside Git repositories), `.ignore`, and
+`.toposignore`, as well as hidden files and binary files. Files named on the command line are
+always searched.
+
+| Option | Effect |
+|---|---|
+| `--hidden`, `-.` | Search hidden files and directories |
+| `--no-ignore` | Don't respect any ignore files |
+| `--no-ignore-vcs` | Don't respect Git's ignore files (but keep `.ignore` and `.toposignore`) |
+| `--no-ignore-parent` | Don't respect ignore files in parent directories |
+| `--no-require-git` | Respect `.gitignore` outside Git repositories too |
+| `--ignore-file PATH` | Also ignore the paths in this file |
+| `-u`, `-uu`, `-uuu` | `--no-ignore`, then also `--hidden`, then also `--binary` |
+| `--binary` | Search files that look binary as text |
+| `--glob GLOB`, `--iglob GLOB` | Include (or with `!`, exclude) matching paths; globs override ignore files and hidden |
+| `--ext md,txt`, `--exclude-ext pdf` | Only, or never, these extensions |
+| `-d NUM`, `--max-depth NUM` | Descend at most this many directories |
+| `--max-filesize SIZE` | Skip larger files (`500K`, `10M`, `1G`) |
+| `-L`, `--follow` | Follow symbolic links |
+| `--one-file-system` | Stay on the file system of each path given |
+
+To see which files a search would cover, `--files` lists them without searching. `-l` lists the
+files with references, and `--files-without-match` lists the ones without.
+
 ## File types
 
 - `.pdf` (with the `pdf` feature) reports the page, and `.epub` reports a CFI
 - `.srt`, `.vtt`, and `.sbv` also report the cue's start time
-- Everything else is searched as text; binary files and files ignored by `.gitignore` are skipped
+- Everything else is searched as text; binary files are skipped (see `--binary`)
 
 ## Usage
 
@@ -454,6 +480,60 @@ Options:
 
       --ext <EXT>
           Only search files with these extensions when walking directories (e.g. md,txt); files named on the command line are always searched
+
+      --exclude-ext <EXT>
+          Don't search files with these extensions when walking directories (e.g. pdf,epub)
+
+      --glob <GLOB>
+          Include or exclude paths matching a glob (`!` excludes), like `--glob '*.md' --glob '!drafts/**'`; can be repeated. Like ripgrep, globs override ignore files and --hidden
+
+      --iglob <GLOB>
+          Like --glob, ignoring case (when a path matches both, the --iglob wins)
+
+  -., --hidden
+          Search hidden files and directories (names starting with `.`)
+
+      --no-ignore
+          Don't respect ignore files (.gitignore, .ignore, .toposignore, and Git's global and exclude files)
+
+      --no-ignore-vcs
+          Don't respect Git's ignore files (.gitignore, the global gitignore, .git/info/exclude)
+
+      --no-ignore-parent
+          Don't respect ignore files in parent directories
+
+      --no-require-git
+          Respect .gitignore files outside of Git repositories too
+
+      --ignore-file <PATH>
+          Also ignore the paths in this file (gitignore syntax); can be repeated
+
+  -u, --unrestricted...
+          Search more: -u is --no-ignore, -uu adds --hidden, -uuu adds --binary
+
+      --binary
+          Search files that look binary as text (normally they are skipped)
+
+  -L, --follow
+          Follow symbolic links
+
+  -d, --max-depth <NUM>
+          Descend at most this many directories below the paths given (0 searches only them)
+
+      --max-filesize <SIZE>
+          Skip files larger than this, like 500K, 10M, or 1G
+
+      --one-file-system
+          Don't cross into other file systems (like mounted drives)
+
+      --files
+          Print the files that would be searched, without searching them
+
+  -l, --files-with-matches
+          Print only the paths of files with references
+
+      --files-without-match
+          Print only the paths of searched files without references
 
   -h, --help
           Print help (see a summary with '-h')

@@ -92,8 +92,77 @@ pub struct Searcher {
     pub cached: Option<CachedSearch>,
     /// Keep the text of cached files (for context lines)
     pub needs_text: bool,
-    /// Lowercase extensions to search when walking directories (empty searches every file)
+    /// Which files are walked
+    pub walk: WalkOptions,
+    /// Search files that look binary as text
+    pub binary: bool,
+    /// `--files`: report the files that would be searched (with no hits), without searching
+    pub list_only: bool,
+}
+
+/// How directories are walked (the path options)
+#[derive(Default)]
+pub struct WalkOptions {
+    pub hidden: bool,
+    pub no_ignore: bool,
+    pub no_ignore_vcs: bool,
+    pub no_ignore_parent: bool,
+    pub no_require_git: bool,
+    pub ignore_files: Vec<PathBuf>,
+    pub follow: bool,
+    pub max_depth: Option<usize>,
+    pub max_filesize: Option<u64>,
+    pub one_file_system: bool,
+    pub overrides: Option<ignore::overrides::Override>,
+    /// Lowercase extensions to search (empty searches every file)
     pub extensions: Vec<String>,
+    /// Lowercase extensions to skip
+    pub exclude_extensions: Vec<String>,
+}
+
+impl WalkOptions {
+    /// A walker over `paths` with these options, like ripgrep's
+    pub fn builder(&self, paths: &[PathBuf]) -> Result<WalkBuilder, String> {
+        let mut builder = WalkBuilder::new(&paths[0]);
+        for path in &paths[1..] {
+            builder.add(path);
+        }
+        let vcs = !self.no_ignore && !self.no_ignore_vcs;
+        builder
+            .hidden(!self.hidden)
+            .ignore(!self.no_ignore)
+            .git_ignore(vcs)
+            .git_global(vcs)
+            .git_exclude(vcs)
+            .parents(!self.no_ignore && !self.no_ignore_parent)
+            .require_git(!self.no_require_git)
+            .follow_links(self.follow)
+            .max_depth(self.max_depth)
+            .max_filesize(self.max_filesize)
+            .same_file_system(self.one_file_system);
+        if !self.no_ignore {
+            builder.add_custom_ignore_filename(".toposignore");
+        }
+        for file in &self.ignore_files {
+            if let Some(err) = builder.add_ignore(file) {
+                return Err(format!("{}: {err}", file.display()));
+            }
+        }
+        if let Some(overrides) = &self.overrides {
+            builder.overrides(overrides.clone());
+        }
+        Ok(builder)
+    }
+
+    /// Whether `--ext` and `--exclude-ext` allow this file
+    fn wants(&self, path: &Path) -> bool {
+        let extension = path.extension().and_then(|e| e.to_str());
+        let listed = |list: &[String]| {
+            extension.is_some_and(|e| list.iter().any(|ext| ext.eq_ignore_ascii_case(e)))
+        };
+        (self.extensions.is_empty() || listed(&self.extensions))
+            && !listed(&self.exclude_extensions)
+    }
 }
 
 /// Searching with a cache of unfiltered results
@@ -128,10 +197,13 @@ pub fn search(searcher: Arc<Searcher>, input: Input) -> mpsc::Receiver<FileResul
 }
 
 fn walk(searcher: Arc<Searcher>, paths: Vec<PathBuf>, sender: mpsc::Sender<FileResult>) {
-    let mut builder = WalkBuilder::new(&paths[0]);
-    for path in &paths[1..] {
-        builder.add(path);
-    }
+    let builder = match searcher.walk.builder(&paths) {
+        Ok(builder) => builder,
+        Err(err) => {
+            let _ = sender.send(Err((None, err)));
+            return;
+        }
+    };
     builder.build_parallel().run(|| {
         let searcher = searcher.clone();
         let sender = sender.clone();
@@ -141,9 +213,14 @@ fn walk(searcher: Arc<Searcher>, paths: Vec<PathBuf>, sender: mpsc::Sender<FileR
                     return WalkState::Continue;
                 }
                 // Files named on the command line (depth 0) are always searched
-                Ok(entry) if entry.depth() > 0 && !searcher.wants(entry.path()) => {
+                Ok(entry) if entry.depth() > 0 && !searcher.walk.wants(entry.path()) => {
                     return WalkState::Continue;
                 }
+                Ok(entry) if searcher.list_only => Ok(FileHits {
+                    path: Some(entry.path().to_path_buf()),
+                    text: None,
+                    hits: vec![],
+                }),
                 Ok(entry) => match searcher.search_file(entry.path()) {
                     Ok(Some(hits)) => Ok(hits),
                     Ok(None) => return WalkState::Continue,
@@ -160,16 +237,6 @@ fn walk(searcher: Arc<Searcher>, paths: Vec<PathBuf>, sender: mpsc::Sender<FileR
 }
 
 impl Searcher {
-    /// Whether `--ext` allows this file
-    fn wants(&self, path: &Path) -> bool {
-        self.extensions.is_empty()
-            || path.extension().and_then(|e| e.to_str()).is_some_and(|e| {
-                self.extensions
-                    .iter()
-                    .any(|ext| ext.eq_ignore_ascii_case(e))
-            })
-    }
-
     /**
     Uses the cache when the file has not changed
     - The cache holds unfiltered results, so they are filtered here, whatever the filters
@@ -178,7 +245,7 @@ impl Searcher {
     */
     fn search_file(&self, path: &Path) -> Result<Option<FileHits>, String> {
         let Some(cached) = &self.cached else {
-            return search_file(&self.matcher, path);
+            return search_file(&self.matcher, path, self.binary);
         };
         let keep = |hits: Vec<Hit>| -> Vec<Hit> {
             hits.into_iter()
@@ -186,7 +253,12 @@ impl Searcher {
                 .collect()
         };
         match cached.cache.get(path, cached.possible_books.as_ref()) {
-            Some(Cached::NoMatch) => Ok(None),
+            // No hits, but still a searched file (for --files-without-match)
+            Some(Cached::NoMatch) => Ok(Some(FileHits {
+                path: Some(path.to_path_buf()),
+                text: None,
+                hits: vec![],
+            })),
             Some(Cached::Hits(hits)) => {
                 let hits = keep(hits);
                 let text = (self.needs_text && !hits.is_empty())
@@ -197,7 +269,7 @@ impl Searcher {
                 Ok(Some(FileHits { path, text, hits }))
             }
             None => {
-                let found = search_file(&cached.unfiltered, path)?;
+                let found = search_file(&cached.unfiltered, path, self.binary)?;
                 cached
                     .cache
                     .insert(path, found.as_ref().map_or(&[], |f| &f.hits));
@@ -211,7 +283,11 @@ impl Searcher {
 }
 
 /// `Ok(None)` for files that are skipped (binary files without a supported format)
-fn search_file(matcher: &BibleMatcher, path: &Path) -> Result<Option<FileHits>, String> {
+fn search_file(
+    matcher: &BibleMatcher,
+    path: &Path,
+    binary: bool,
+) -> Result<Option<FileHits>, String> {
     let extension = path
         .extension()
         .and_then(|e| e.to_str())
@@ -261,7 +337,7 @@ fn search_file(matcher: &BibleMatcher, path: &Path) -> Result<Option<FileHits>, 
         _ => {
             let bytes = fs::read(path).map_err(|e| e.to_string())?;
             // Like ripgrep, skip files that look binary
-            if bytes[..bytes.len().min(8192)].contains(&0) {
+            if !binary && bytes[..bytes.len().min(8192)].contains(&0) {
                 return Ok(None);
             }
             let text = String::from_utf8_lossy(&bytes).into_owned();

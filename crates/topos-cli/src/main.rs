@@ -98,16 +98,21 @@ fn main() -> ExitCode {
         .then(|| Cache::open(&args.fingerprint()))
         .flatten()
         .map(|cache| CachedSearch::new(cache, &matcher));
+    let walk = match args.walk_options() {
+        Ok(walk) => walk,
+        Err(err) => {
+            eprintln!("topos: {err}");
+            return ExitCode::from(2);
+        }
+    };
     let searcher = Arc::new(Searcher {
         matcher,
-        cached,
+        // --files never searches, so it never needs the cache
+        cached: cached.filter(|_| !args.files),
         needs_text: before + after > 0 || printer.needs_text(),
-        extensions: args
-            .extensions
-            .iter()
-            .map(|ext| ext.trim().trim_start_matches('.').to_ascii_lowercase())
-            .filter(|ext| !ext.is_empty())
-            .collect(),
+        walk,
+        binary: args.search_binary(),
+        list_only: args.files,
     });
     let results = search(searcher.clone(), input);
     let mut files: Vec<_> = vec![];
@@ -115,10 +120,7 @@ fn main() -> ExitCode {
     for result in results {
         match result {
             Ok(file) if args.sort => files.push(file),
-            Ok(file) => {
-                found |= !file.hits.is_empty();
-                printer.file(&file);
-            }
+            Ok(file) => found |= printer.file(&file),
             Err((path, err)) => {
                 failed = true;
                 match path {
@@ -130,8 +132,7 @@ fn main() -> ExitCode {
     }
     files.sort_by(|a, b| a.path.cmp(&b.path));
     for file in &files {
-        found |= !file.hits.is_empty();
-        printer.file(file);
+        found |= printer.file(file);
     }
     printer.finish();
     if let Some(cached) = &searcher.cached {

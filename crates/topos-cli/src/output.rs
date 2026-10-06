@@ -28,6 +28,18 @@ pub struct Printer {
     rows: Vec<[String; 5]>,
     printed_group: bool,
     total: usize,
+    paths: Option<PathsOnly>,
+}
+
+/// Printing paths instead of references
+#[derive(Clone, Copy)]
+enum PathsOnly {
+    /// `--files`: every file that would be searched
+    Files,
+    /// `-l`
+    WithMatches,
+    /// `--files-without-match`
+    WithoutMatch,
 }
 
 impl Printer {
@@ -54,6 +66,15 @@ impl Printer {
             rows: vec![],
             printed_group: false,
             total: 0,
+            paths: if args.files {
+                Some(PathsOnly::Files)
+            } else if args.files_with_matches {
+                Some(PathsOnly::WithMatches)
+            } else if args.files_without_match {
+                Some(PathsOnly::WithoutMatch)
+            } else {
+                None
+            },
         }
     }
 
@@ -62,15 +83,34 @@ impl Printer {
         self.mode == OutputMode::Json
     }
 
-    pub fn file(&mut self, file: &FileHits) {
-        if file.hits.is_empty() {
-            return;
-        }
+    /// Prints a file's results; returns whether it counts as found (for the exit code)
+    pub fn file(&mut self, file: &FileHits) -> bool {
         let path = file
             .path
             .as_ref()
             .map(|p| p.display().to_string())
             .unwrap_or_default();
+        // --files, -l, and --files-without-match print only paths
+        let list = match self.paths {
+            Some(PathsOnly::Files) => true,
+            Some(PathsOnly::WithMatches) => !file.hits.is_empty(),
+            Some(PathsOnly::WithoutMatch) => file.hits.is_empty(),
+            None => {
+                if file.hits.is_empty() {
+                    return false;
+                }
+                self.hits(&path, file);
+                return true;
+            }
+        };
+        if list {
+            let _ = writeln!(io::stdout(), "{}", self.paint(PATH, &path));
+        }
+        list
+    }
+
+    fn hits(&mut self, path: &str, file: &FileHits) {
+        let path = path.to_string();
         match self.mode {
             OutputMode::Auto | OutputMode::Grouped => self.grouped(&path, file),
             OutputMode::Quickfix => {

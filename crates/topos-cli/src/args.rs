@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use crate::complete;
+use crate::{complete, search::WalkOptions};
 
 use clap::{Parser, ValueEnum, ValueHint};
 use clap_complete::engine::ArgValueCompleter;
@@ -192,6 +192,80 @@ pub struct Args {
     /// named on the command line are always searched
     #[arg(long = "ext", value_name = "EXT", value_delimiter = ',')]
     pub extensions: Vec<String>,
+
+    /// Don't search files with these extensions when walking directories (e.g. pdf,epub)
+    #[arg(long, value_name = "EXT", value_delimiter = ',')]
+    pub exclude_ext: Vec<String>,
+
+    /// Include or exclude paths matching a glob (`!` excludes), like `--glob '*.md' --glob
+    /// '!drafts/**'`; can be repeated. Like ripgrep, globs override ignore files and --hidden
+    #[arg(long, value_name = "GLOB")]
+    pub glob: Vec<String>,
+
+    /// Like --glob, ignoring case (when a path matches both, the --iglob wins)
+    #[arg(long, value_name = "GLOB")]
+    pub iglob: Vec<String>,
+
+    /// Search hidden files and directories (names starting with `.`)
+    #[arg(long, short = '.')]
+    pub hidden: bool,
+
+    /// Don't respect ignore files (.gitignore, .ignore, .toposignore, and Git's global and
+    /// exclude files)
+    #[arg(long)]
+    pub no_ignore: bool,
+
+    /// Don't respect Git's ignore files (.gitignore, the global gitignore, .git/info/exclude)
+    #[arg(long)]
+    pub no_ignore_vcs: bool,
+
+    /// Don't respect ignore files in parent directories
+    #[arg(long)]
+    pub no_ignore_parent: bool,
+
+    /// Respect .gitignore files outside of Git repositories too
+    #[arg(long)]
+    pub no_require_git: bool,
+
+    /// Also ignore the paths in this file (gitignore syntax); can be repeated
+    #[arg(long, value_name = "PATH", value_hint = ValueHint::FilePath)]
+    pub ignore_file: Vec<PathBuf>,
+
+    /// Search more: -u is --no-ignore, -uu adds --hidden, -uuu adds --binary
+    #[arg(long, short = 'u', action = clap::ArgAction::Count)]
+    pub unrestricted: u8,
+
+    /// Search files that look binary as text (normally they are skipped)
+    #[arg(long)]
+    pub binary: bool,
+
+    /// Follow symbolic links
+    #[arg(long, short = 'L')]
+    pub follow: bool,
+
+    /// Descend at most this many directories below the paths given (0 searches only them)
+    #[arg(long, short = 'd', value_name = "NUM")]
+    pub max_depth: Option<usize>,
+
+    /// Skip files larger than this, like 500K, 10M, or 1G
+    #[arg(long, value_name = "SIZE", value_parser = parse_size)]
+    pub max_filesize: Option<u64>,
+
+    /// Don't cross into other file systems (like mounted drives)
+    #[arg(long)]
+    pub one_file_system: bool,
+
+    /// Print the files that would be searched, without searching them
+    #[arg(long)]
+    pub files: bool,
+
+    /// Print only the paths of files with references
+    #[arg(long, short = 'l', conflicts_with = "files_without_match")]
+    pub files_with_matches: bool,
+
+    /// Print only the paths of searched files without references
+    #[arg(long)]
+    pub files_without_match: bool,
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, ValueEnum)]
@@ -237,7 +311,74 @@ pub enum ColorChoice {
     Never,
 }
 
+/// `500`, `500K`, `10M`, or `1G` (powers of 1024)
+fn parse_size(text: &str) -> Result<u64, String> {
+    let text = text.trim();
+    let invalid = || format!("`{text}` isn't a size like 500K, 10M, or 1G");
+    let split = text
+        .find(|c: char| c.is_ascii_alphabetic())
+        .unwrap_or(text.len());
+    let (number, unit) = text.split_at(split);
+    let number: u64 = number.trim().parse().map_err(|_| invalid())?;
+    let scale: u64 = match unit.to_ascii_uppercase().as_str() {
+        "" | "B" => 1,
+        "K" | "KB" => 1 << 10,
+        "M" | "MB" => 1 << 20,
+        "G" | "GB" => 1 << 30,
+        _ => return Err(invalid()),
+    };
+    Ok(number.saturating_mul(scale))
+}
+
 impl Args {
+    /// How directories are walked, with -u applied
+    pub fn walk_options(&self) -> Result<WalkOptions, String> {
+        let u = self.unrestricted;
+        let mut overrides = None;
+        if !self.glob.is_empty() || !self.iglob.is_empty() {
+            let root = std::env::current_dir().map_err(|e| e.to_string())?;
+            let mut builder = ignore::overrides::OverrideBuilder::new(root);
+            for glob in &self.glob {
+                builder
+                    .add(glob)
+                    .map_err(|e| format!("--glob {glob}: {e}"))?;
+            }
+            builder.case_insensitive(true).map_err(|e| e.to_string())?;
+            for glob in &self.iglob {
+                builder
+                    .add(glob)
+                    .map_err(|e| format!("--iglob {glob}: {e}"))?;
+            }
+            overrides = Some(builder.build().map_err(|e| e.to_string())?);
+        }
+        let lower = |list: &[String]| -> Vec<String> {
+            list.iter()
+                .map(|ext| ext.trim().trim_start_matches('.').to_ascii_lowercase())
+                .filter(|ext| !ext.is_empty())
+                .collect()
+        };
+        Ok(WalkOptions {
+            hidden: self.hidden || u >= 2,
+            no_ignore: self.no_ignore || u >= 1,
+            no_ignore_vcs: self.no_ignore_vcs,
+            no_ignore_parent: self.no_ignore_parent,
+            no_require_git: self.no_require_git,
+            ignore_files: self.ignore_file.clone(),
+            follow: self.follow,
+            max_depth: self.max_depth,
+            max_filesize: self.max_filesize,
+            one_file_system: self.one_file_system,
+            overrides,
+            extensions: lower(&self.extensions),
+            exclude_extensions: lower(&self.exclude_ext),
+        })
+    }
+
+    /// Whether files that look binary are searched (`--binary` or `-uuu`)
+    pub fn search_binary(&self) -> bool {
+        self.binary || self.unrestricted >= 3
+    }
+
     /// Every option that changes which references are found before filtering (for the cache,
     /// which stores unfiltered results, so filters are left out)
     pub fn fingerprint(&self) -> String {
@@ -250,6 +391,8 @@ impl Args {
         let data = contents(self.data.as_slice());
         let merge = contents(&self.merge_data);
         let remove = contents(&self.remove_data);
+        // Binary files are cached as having no references unless they are searched
+        let binary = self.search_binary();
         format!(
             "{:?}",
             (
@@ -257,7 +400,8 @@ impl Args {
                 &self.context_heading,
                 data,
                 merge,
-                remove
+                remove,
+                binary
             )
         )
     }

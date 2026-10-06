@@ -618,3 +618,134 @@ fn merge_and_remove_data() {
     );
     let _ = std::fs::remove_dir_all(&home);
 }
+
+#[test]
+fn path_options() {
+    let dir = scratch("paths");
+    let write = |path: &str, text: &[u8]| {
+        let path = dir.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    };
+    write("a.md", b"John 3:16\n");
+    write("notes/b.txt", b"Romans 8:28\n");
+    write("notes/deep/c.md", b"Genesis 1:1\n");
+    write("ignored.md", b"Jude 5\n");
+    write("skip.md", b"Ruth 1:1\n");
+    write(".hidden.md", b"Psalm 23\n");
+    write("bin.dat", b"Mark 1:1\x00\n");
+    write(
+        "big.md",
+        format!("Acts 2:38\n{}", " ".repeat(4000)).as_bytes(),
+    );
+    write("none.md", b"no references here\n");
+    write(".gitignore", b"ignored.md\n");
+    write(".toposignore", b"skip.md\n");
+    // .gitignore only counts inside a Git repository, like ripgrep (see --no-require-git)
+    std::fs::create_dir_all(dir.join(".git")).unwrap();
+
+    let run = |args: &[&str]| -> (Vec<String>, Option<i32>) {
+        let output = Command::new(env!("CARGO_BIN_EXE_topos"))
+            .args(["--no-config", "--sort"])
+            .args(args)
+            .current_dir(&dir)
+            .stdin(Stdio::null())
+            .output()
+            .unwrap();
+        let mut lines: Vec<String> = String::from_utf8(output.stdout)
+            .unwrap()
+            .lines()
+            .map(|line| line.trim_start_matches("./").to_string())
+            .collect();
+        lines.sort();
+        (lines, output.status.code())
+    };
+    let files = |args: &[&str]| {
+        let mut all = vec!["--files", "."];
+        all.extend(args);
+        run(&all).0
+    };
+
+    // The defaults skip ignored, hidden, and binary files
+    let default = [
+        "a.md",
+        "big.md",
+        "bin.dat",
+        "none.md",
+        "notes/b.txt",
+        "notes/deep/c.md",
+    ];
+    assert_eq!(files(&[]), default);
+    assert_eq!(
+        run(&["-l", "."]).0,
+        ["a.md", "big.md", "notes/b.txt", "notes/deep/c.md"]
+    );
+    assert_eq!(run(&["--files-without-match", "."]).0, ["none.md"]);
+
+    assert!(files(&["--hidden"]).contains(&".hidden.md".to_string()));
+    assert!(files(&["-."]).contains(&".hidden.md".to_string()));
+    let no_ignore = files(&["--no-ignore"]);
+    assert!(
+        no_ignore.contains(&"ignored.md".to_string()) && no_ignore.contains(&"skip.md".to_string())
+    );
+    let no_vcs = files(&["--no-ignore-vcs"]);
+    assert!(no_vcs.contains(&"ignored.md".to_string()) && !no_vcs.contains(&"skip.md".to_string()));
+    write("extra-ignore", b"none.md\n");
+    assert!(!files(&["--ignore-file", "extra-ignore"]).contains(&"none.md".to_string()));
+
+    // -u stacks: no ignore files, then hidden files, then binary files
+    assert!(files(&["-u"]).contains(&"ignored.md".to_string()));
+    assert!(!files(&["-u"]).contains(&".hidden.md".to_string()));
+    assert!(files(&["-uu"]).contains(&".hidden.md".to_string()));
+    assert!(!run(&["-l", "-uu", "."]).0.contains(&"bin.dat".to_string()));
+    assert!(run(&["-l", "-uuu", "."]).0.contains(&"bin.dat".to_string()));
+    assert!(
+        run(&["-l", "--binary", "."])
+            .0
+            .contains(&"bin.dat".to_string())
+    );
+
+    // Like ripgrep, globs override the ignore rules: a matching file is searched even if it is
+    // hidden or ignored
+    assert_eq!(
+        files(&["--glob", "*.md", "--glob", "!big.md"]),
+        [
+            ".hidden.md",
+            "a.md",
+            "ignored.md",
+            "none.md",
+            "notes/deep/c.md",
+            "skip.md"
+        ]
+    );
+    assert_eq!(
+        files(&["--glob", "!*.md"]),
+        ["bin.dat", "extra-ignore", "notes/b.txt"]
+    );
+    assert_eq!(
+        files(&["--iglob", "*.MD", "--max-depth", "1", "--no-ignore"]),
+        [
+            ".hidden.md",
+            "a.md",
+            "big.md",
+            "ignored.md",
+            "none.md",
+            "skip.md"
+        ]
+    );
+    assert_eq!(
+        files(&["--exclude-ext", "md,dat"]),
+        ["extra-ignore", "notes/b.txt"]
+    );
+    assert_eq!(files(&["-d", "0"]), Vec::<String>::new());
+    assert!(!files(&["--max-filesize", "1K"]).contains(&"big.md".to_string()));
+    assert!(files(&["--max-filesize", "1M"]).contains(&"big.md".to_string()));
+
+    // Files named directly are always searched
+    assert_eq!(run(&["-l", "ignored.md"]).0, ["ignored.md"]);
+    // Exit codes: 1 when nothing is listed
+    assert_eq!(run(&["-l", "none.md"]).1, Some(1));
+    let bad = run(&["--max-filesize", "lots", "."]);
+    assert_eq!(bad.1, Some(2));
+    let _ = std::fs::remove_dir_all(&dir);
+}
