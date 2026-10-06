@@ -6,7 +6,7 @@ use crate::{
     data::{bible_data::BibleData, books::BookId},
     matcher::line_col::LineColLocation,
     segments::{
-        grammar::SegmentList,
+        grammar::{NumberKind, SegmentList},
         passage::{Passage, Segments},
         resolve::Resolver,
     },
@@ -74,6 +74,36 @@ pub struct FoundPassage {
     pub psg: Passage,
 }
 
+/// Text without whitespace this long is encoded data or code (like base64 in an SVG), not prose
+const LONG_TOKEN: usize = 64;
+
+/// Whether the word around `at` is at least [`LONG_TOKEN`] bytes without whitespace
+fn in_long_token(text: &str, at: usize) -> bool {
+    let is_space = |b: &u8| b.is_ascii_whitespace();
+    let before = text.as_bytes()[..at]
+        .iter()
+        .rev()
+        .take(LONG_TOKEN)
+        .take_while(|b| !is_space(b))
+        .count();
+    let after = text.as_bytes()[at..]
+        .iter()
+        .take(LONG_TOKEN)
+        .take_while(|b| !is_space(b))
+        .count();
+    before + after >= LONG_TOKEN
+}
+
+/// Book names are written in lowercase, Title Case, or CAPS, never like `mK` or `jE`
+fn book_case_is_plausible(name: &str) -> bool {
+    name.split_whitespace().all(|word| {
+        let letters: Vec<char> = word.chars().filter(|c| c.is_alphabetic()).collect();
+        !letters
+            .windows(2)
+            .any(|pair| pair[0].is_lowercase() && pair[1].is_uppercase())
+    })
+}
+
 impl FoundPassage {
     /**
     Parses the passage that starts with the book name `cur`
@@ -87,11 +117,21 @@ impl FoundPassage {
         next_start: Option<usize>,
     ) -> Option<Self> {
         let book = data.books().search(cur.as_str())?;
+        if in_long_token(text, cur.start()) || !book_case_is_plausible(cur.as_str()) {
+            return None;
+        }
         let window = &text[cur.end()..next_start.unwrap_or(text.len())];
         let list = SegmentList::parse(window);
         let (found, has_verse) = Self::resolve(data, book, cur.end(), &list)?;
         // Abbreviations that are also words (`is`) need an explicit verse (`Is 1:1`)
         if !has_verse && data.books().is_ambiguous(cur.as_str()) {
+            return None;
+        }
+        // A book glued to its chapter (`Jn3:16`) needs a verse, and never a Roman numeral, since
+        // codes and encoded data are full of things like `Gn5` and `GNi`
+        let first = list.nodes.first()?;
+        let glued = first.start.span.start == 0 && !cur.as_str().ends_with('.');
+        if glued && (!has_verse || first.start.kind == NumberKind::Roman) {
             return None;
         }
         Some(Self {

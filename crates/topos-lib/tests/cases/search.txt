@@ -85,3 +85,17 @@ John 3:16-\n18 => John 3:16-18
 
 # A blank line ends a reference
 Matthew 6, 24.\n\n143 => Matthew 6,24
+
+# Encoded data and code (base64 in SVGs, hashes, identifiers)
+data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mk8fJn3/+Gn5MKvI1k3 => 
+x/mk8f+Gn5+MKvI => 
+id GNi and EZx and 1SAx => 
+mK 3:16 and jE 2:1 => 
+
+# Compact references need a verse
+Jn3:16 => John 3:16
+Jn.3 => John 3
+Gn5 => 
+
+# Older abbreviations
+Psal. 10:3 => Psalms 10:3

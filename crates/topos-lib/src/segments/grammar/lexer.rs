@@ -124,7 +124,12 @@ fn lex_roman(s: &str, start: usize) -> Option<(Number, usize)> {
     if len == 0 || len > MAX_ROMAN || !at_boundary(&s[len..]) {
         return None;
     }
-    let value = roman::parse(&s[..len])?;
+    // One case throughout (`iv` or `IV`, not `vI`), as in real references
+    let numeral = &s[..len];
+    if numeral != numeral.to_ascii_lowercase() && numeral != numeral.to_ascii_uppercase() {
+        return None;
+    }
+    let value = roman::parse(numeral)?;
 
     let number = Number {
         value,
@@ -169,8 +174,10 @@ mod tests {
         assert_eq!(kinds("6,\n24"), ["6", ",", "24"]);
         // all Roman numeral letters, but not a canonical numeral
         assert_eq!(kinds("8, civil"), ["8", ","]);
-        // Roman numerals must be a whole word
+        // Roman numerals must be a whole word in one case
         assert_eq!(kinds("8, xylophone"), ["8", ","]);
+        assert_eq!(kinds("vI"), Vec::<String>::new());
+        assert_eq!(kinds("VI, vi"), ["6", ",", "6"]);
         // non-ASCII digits are not numbers
         assert_eq!(kinds("٣"), Vec::<String>::new());
     }
