@@ -55,7 +55,7 @@ topos "Church 07-27-25.md" -m table
 **Command**
 
 ```bash
-topos -t new -m table
+topos --nt -m table   # same as -t new
 ```
 
 **Output**
@@ -161,14 +161,15 @@ topos --exclude-testament new -m table
 
 - Including a testament, genre, or book excludes everything else in that category
 - Exclusions are applied after all inclusions, so a book can be excluded from an included genre
-- Several inclusions are joined with a logical OR (`-t new -b Psalms` is the New Testament and Psalms)
+- Several inclusions are joined with a logical OR (`--nt -b Psalms` is the New Testament and Psalms)
+- `-m count` prints matches per file; `--total-count` prints one total across all files
 - `--inside` and `--overlaps` passages are joined with a logical OR, then `--outside` removes matches
 - Unknown books or genres are errors
 
 ## Config
 
 Default options go in `~/.config/topos/config.toml` (or `$XDG_CONFIG_HOME/topos/config.toml`).
-Each key is a long option name; the command line overrides them, and `--no-config` ignores the file.
+Each key is a long option name; the command line overrides them. Use `--config PATH` to read another file instead, or `--no-config` to read none.
 
 ```toml
 mode = "grouped"
@@ -207,6 +208,12 @@ Options:
   -t, --testament <TESTAMENTS>
           Include books from a testament (old/new)
 
+      --nt
+          Include the New Testament (same as `-t new`)
+
+      --ot
+          Include the Old Testament (same as `-t old`)
+
       --exclude-testament <EXCLUDE_TESTAMENTS>
           Exclude books from a testament
 
@@ -240,19 +247,26 @@ Options:
       --data <DATA>
           A JSON file with custom books, genres, or chapter and verse counts
 
+      --config <PATH>
+          Read default options from this file instead of ~/.config/topos/config.toml
+
       --no-config
-          Do not read the default options from ~/.config/topos/config.toml
+          Do not read default options from a config file
+
+      --total-count
+          Print only the total number of matches across all files (same as `-m total-count`)
 
   -m, --mode <MODE>
           How to print results
 
           Possible values:
-          - auto:     Grouped by file on a terminal, otherwise `path:line:column: reference`
-          - grouped:  Grouped by file, with optional context lines
-          - quickfix: `path:line:column: reference` (for Vim's quickfix list)
-          - table:    A Markdown table
-          - json:     One JSON object per match
-          - count:    Matches per file
+          - auto:        Grouped by file on a terminal, otherwise `path:line:column: reference`
+          - grouped:     Grouped by file, with optional context lines
+          - quickfix:    `path:line:column: reference` (for Vim's quickfix list)
+          - table:       A Markdown table
+          - json:        One JSON object per match
+          - count:       Matches per file
+          - total-count: Matches across all files
           
           [default: auto]
 

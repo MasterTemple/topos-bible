@@ -1,4 +1,5 @@
-//! Default options from `~/.config/topos/config.toml`, added before the command line's.
+//! Default options from `~/.config/topos/config.toml` (or `--config PATH`), added before the
+//! command line's.
 //!
 //! Each key is a long option name and its value becomes that option's argument:
 //!
@@ -28,13 +29,33 @@ fn home() -> Option<PathBuf> {
     std::env::var_os("HOME").map(PathBuf::from)
 }
 
+/// The `--config PATH` (or `--config=PATH`) on the command line
+fn config_flag(args: &[OsString]) -> Option<PathBuf> {
+    args.iter().enumerate().find_map(|(idx, arg)| {
+        let arg = arg.to_str()?;
+        if arg == "--config" {
+            args.get(idx + 1).map(PathBuf::from)
+        } else {
+            arg.strip_prefix("--config=").map(PathBuf::from)
+        }
+    })
+}
+
 /// The command line with the config file's options inserted before the user's arguments
 pub fn with_defaults(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
     if args.iter().any(|arg| arg == "--no-config") {
         return Ok(args);
     }
-    let Some(path) = default_path().filter(|path| path.exists()) else {
-        return Ok(args);
+    let path = match config_flag(&args) {
+        // A config the user names must exist
+        Some(path) if !path.exists() => {
+            return Err(format!("{}: config file not found", path.display()));
+        }
+        Some(path) => path,
+        None => match default_path().filter(|path| path.exists()) {
+            Some(path) => path,
+            None => return Ok(args),
+        },
     };
     let text = fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     let defaults = parse(&text).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -57,7 +78,7 @@ fn parse(text: &str) -> Result<Vec<OsString>, String> {
         let known = command
             .get_arguments()
             .any(|arg| arg.get_long() == Some(name.as_str()));
-        if !known || name == "no-config" {
+        if !known || name == "no-config" || name == "config" {
             return Err(format!("unknown option `{key}`"));
         }
         let flag = OsString::from(format!("--{name}"));
@@ -119,6 +140,7 @@ mod tests {
             "unknown option `colour`"
         );
         assert!(parse("no-config = true").is_err());
+        assert!(parse("config = \"other.toml\"").is_err());
         assert!(parse("mode = [1.5]").is_err());
         assert!(parse("not toml").is_err());
     }

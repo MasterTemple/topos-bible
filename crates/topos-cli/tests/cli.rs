@@ -186,3 +186,40 @@ fn default_config_file() {
         "{stderr}"
     );
 }
+
+#[test]
+fn testament_shorthands_and_total_count() {
+    let text = "Gen 1:1, John 3:16, Rom 8:28";
+    let run = |args: &[&str]| {
+        let mut all = vec!["--text", text];
+        all.extend(args);
+        stdout(&topos(&all, None))
+    };
+    assert_eq!(run(&["--nt", "--total-count"]), "2\n");
+    assert_eq!(run(&["--ot", "-m", "total-count"]), "1\n");
+    assert_eq!(run(&["--ot", "--nt", "--total-count"]), "3\n");
+}
+
+#[test]
+fn explicit_config_file() {
+    let dir = scratch("explicit-config");
+    let config = dir.join("other.toml");
+    std::fs::write(&config, "format = \"osis\"\nmode = \"quickfix\"\n").unwrap();
+    let config = config.to_str().unwrap();
+
+    let output = topos(&["--config", config, "--text", "John 3:16"], None);
+    assert_eq!(stdout(&output), ":1:1: John.3.16\n");
+    let equals = format!("--config={config}");
+    assert_eq!(
+        stdout(&topos(&[&equals, "--text", "John 3:16"], None)),
+        ":1:1: John.3.16\n"
+    );
+
+    let missing = topos(
+        &["--config", "/nonexistent/topos.toml", "--text", "x"],
+        None,
+    );
+    assert_eq!(missing.status.code(), Some(2));
+    let both = topos(&["--config", config, "--no-config", "--text", "x"], None);
+    assert_eq!(both.status.code(), Some(2));
+}

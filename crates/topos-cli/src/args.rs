@@ -42,6 +42,14 @@ pub struct Args {
     #[arg(long = "testament", short = 't')]
     pub testaments: Vec<TestamentFilter>,
 
+    /// Include the New Testament (same as `-t new`)
+    #[arg(long)]
+    pub nt: bool,
+
+    /// Include the Old Testament (same as `-t old`)
+    #[arg(long)]
+    pub ot: bool,
+
     /// Exclude books from a testament
     #[arg(long = "exclude-testament")]
     pub exclude_testaments: Vec<TestamentFilter>,
@@ -87,9 +95,17 @@ pub struct Args {
     #[arg(long)]
     pub data: Option<PathBuf>,
 
-    /// Do not read the default options from ~/.config/topos/config.toml
+    /// Read default options from this file instead of ~/.config/topos/config.toml
+    #[arg(long, value_name = "PATH", conflicts_with = "no_config")]
+    pub config: Option<PathBuf>,
+
+    /// Do not read default options from a config file
     #[arg(long)]
     pub no_config: bool,
+
+    /// Print only the total number of matches across all files (same as `-m total-count`)
+    #[arg(long)]
+    pub total_count: bool,
 
     /// How to print results
     #[arg(long, short = 'm', value_enum, default_value_t)]
@@ -143,6 +159,8 @@ pub enum OutputMode {
     /// Matches per file
     #[value(alias = "c")]
     Count,
+    /// Matches across all files
+    TotalCount,
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, ValueEnum)]
@@ -175,7 +193,7 @@ impl Args {
         format!(
             "{:?}",
             (
-                (&self.testaments, &self.exclude_testaments),
+                (&self.testaments, self.nt, self.ot, &self.exclude_testaments),
                 (&self.genres, &self.exclude_genres),
                 (&self.books, &self.exclude_books),
                 (&self.inside, &self.overlaps, &self.outside),
@@ -218,6 +236,12 @@ impl Args {
         };
         let mut filter = BibleFilter::new(data);
         filter.include_many(self.testaments.iter().copied())?;
+        if self.nt {
+            filter.include(TestamentFilter::New)?;
+        }
+        if self.ot {
+            filter.include(TestamentFilter::Old)?;
+        }
         filter.include_many(self.genres.iter().map(GenreFilter::new))?;
         filter.include_many(self.books.iter().map(BookFilter::new))?;
         filter.exclude_many(self.exclude_testaments.iter().copied())?;

@@ -24,12 +24,14 @@ pub struct Printer {
     context: (usize, usize),
     rows: Vec<[String; 5]>,
     printed_group: bool,
+    total: usize,
 }
 
 impl Printer {
     pub fn new(args: &Args, data: BibleData) -> Self {
         let tty = io::stdout().is_terminal();
         let mode = match args.mode {
+            _ if args.total_count => OutputMode::TotalCount,
             OutputMode::Auto if tty => OutputMode::Grouped,
             OutputMode::Auto => OutputMode::Quickfix,
             mode => mode,
@@ -48,6 +50,7 @@ impl Printer {
             context: args.context_lines(),
             rows: vec![],
             printed_group: false,
+            total: 0,
         }
     }
 
@@ -123,11 +126,16 @@ impl Printer {
                 emit(format!("{path}:{}", file.hits.len()));
             }
             OutputMode::Count => emit(file.hits.len().to_string()),
+            OutputMode::TotalCount => self.total += file.hits.len(),
         }
     }
 
-    /// Prints anything that waits for every result (the table)
+    /// Prints anything that waits for every result (the total and the table)
     pub fn finish(self) {
+        if self.mode == OutputMode::TotalCount {
+            emit(self.total.to_string());
+            return;
+        }
         if self.mode != OutputMode::Table || self.rows.is_empty() {
             return;
         }
