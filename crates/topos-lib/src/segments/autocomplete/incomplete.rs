@@ -119,14 +119,14 @@ impl IncompleteSegment {
 
         Some(match self.clone() {
             // the first number of all segments is always and only a chapter
-            Self::ChapterOrVerse { start } => {
+            Self::ChapterOrVerse { start: _ } => {
                 if let Some(prev) = prev {
                     let next_verse = match prev.ending_verse() {
                         Some(cur) => cur + 1,
                         None => 1,
                     };
                     let current_chapter = prev.ending_chapter();
-                    let next_chapter = current_chapter + 1;
+                    let _next_chapter = current_chapter + 1;
                     let verses = (next_verse..=chapter_verses.get_last_verse(current_chapter)?)
                         .map(|v| Segment::chapter_verse(current_chapter, v))
                         .collect_vec();
@@ -138,7 +138,7 @@ impl IncompleteSegment {
                 }
             }
 
-            Self::ChapterOrVerseTo { start, end } => {
+            Self::ChapterOrVerseTo { start, end: _ } => {
                 // I can use context to determine if start is a chapter or a verse
                 if let Some(prev) = prev {
                     let is_chapter = prev.ending_verse().is_some();
@@ -169,7 +169,7 @@ impl IncompleteSegment {
 
             Self::ChapterVerse {
                 start_chapter,
-                start_verse,
+                start_verse: _,
             } => {
                 let verses = (1..=chapter_verses.get_last_verse(start_chapter)?)
                     .map(|v| Segment::chapter_verse(start_chapter, v))
@@ -180,7 +180,7 @@ impl IncompleteSegment {
             Self::ChapterVerseTo {
                 start_chapter,
                 start_verse,
-                end,
+                end: _,
             } => {
                 let verses = (start_verse + 1..=chapter_verses.get_last_verse(start_chapter)?)
                     .map(|v| Segment::chapter_verse_range(start_chapter, start_verse, v))
@@ -194,7 +194,7 @@ impl IncompleteSegment {
             Self::ChapterRangeTo {
                 start_chapter,
                 end_chapter,
-                end_verse,
+                end_verse: _,
             } => {
                 let verses = (1..=chapter_verses.get_last_verse(end_chapter)?)
                     .map(|v| Segment::chapter_range(start_chapter, 1, end_chapter, v))
@@ -206,7 +206,7 @@ impl IncompleteSegment {
                 start_chapter,
                 start_verse,
                 end_chapter,
-                end_verse,
+                end_verse: _,
             } => {
                 let verses = (1..=chapter_verses.get_last_verse(end_chapter)?)
                     .map(|v| Segment::chapter_range(start_chapter, start_verse, end_chapter, v))

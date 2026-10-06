@@ -1,7 +1,5 @@
-use std::marker::PhantomData;
 
-use line_col::LineColLookup;
-use regex::{Match, Regex};
+use regex::Regex;
 
 use crate::{
     data::data::BibleData,
@@ -9,7 +7,7 @@ use crate::{
     matcher::{
         instance::BibleMatch,
         location::{
-            epub::EPUBMatchError, html::HTMLMatchError, line_col::LineColLocation,
+            epub::EPUBMatchError, html::HTMLMatchError,
             srt::SRTMatchError,
         },
         matches::{ComplexFilter, FilteredBibleMatches},
@@ -47,7 +45,7 @@ impl BibleMatcher {
         self.complex_filter.as_filter()
     }
 
-    pub fn completer(&self) -> InputAutoCompleter {
+    pub fn completer(&self) -> InputAutoCompleter<'_> {
         InputAutoCompleter::new(self)
     }
 }

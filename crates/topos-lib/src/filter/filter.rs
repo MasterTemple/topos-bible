@@ -115,7 +115,7 @@ impl BibleFilter {
             .data
             .books()
             .iter_keys_and_ids()
-            .filter_map(|(key, id)| (self.ids.contains(&id).then_some(key)))
+            .filter_map(|(key, id)| self.ids.contains(&id).then_some(key) )
             .join("|");
 
         // let book_regex = Regex::new(format!(r"\b(((?:)(?i){books_pattern})[A-z]*)\.?").as_str())
@@ -160,10 +160,7 @@ impl Default for BibleFilter {
 
 #[cfg(test)]
 mod tests {
-    use crate::filter::{
-        filter::{BibleFilter, Operation},
-        filters::genre::GenreFilter,
-    };
+    use crate::filter::filter::BibleFilter;
 
     #[test]
     fn make_regex() {

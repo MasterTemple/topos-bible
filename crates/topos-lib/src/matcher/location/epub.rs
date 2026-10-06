@@ -181,8 +181,10 @@ pub fn search_epub(
 }
 
 #[test]
-fn epub_tdp() {
-    let path = "/home/dgmastertemple/Dropbox/Apps/remotely-save/Dropbox Library/Books/EPUB/The Dorean Principle - by Conley Owens.epub";
+#[ignore = "needs a local EPUB; set TOPOS_EPUB to its path"]
+fn epub_tdp() -> MatchResult<()> {
+    let path = std::env::var("TOPOS_EPUB").expect("TOPOS_EPUB is not set");
     let matcher = BibleMatcher::default();
-    dbg!(search_epub(path, &matcher));
+    dbg!(search_epub(&path, &matcher)?);
+    Ok(())
 }

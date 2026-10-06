@@ -1,11 +1,11 @@
 use std::{
     iter::Peekable,
-    str::{Chars, FromStr},
+    str::Chars,
 };
 
 use itertools::Itertools;
 
-use crate::segments::{segment::Segment, segments::Segments, units::chapter_verse::ChapterVerse};
+use crate::segments::{segment::Segment, segments::Segments};
 
 pub(crate) trait SegmentParseMethods: ParsableSegment {
     fn expect_done(chars: &mut Peekable<Chars<'_>>) -> Result<(), String> {

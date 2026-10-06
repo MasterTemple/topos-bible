@@ -7,17 +7,17 @@ use chumsky::{
 };
 
 use crate::matcher::{
-    location::{html::HTMLLocation, line_col::LineColLocation},
+    location::line_col::LineColLocation,
     matcher::Matcher,
 };
 
 // TODO: Make this more general
 #[derive(Clone, Copy, Debug)]
 pub struct SRTLocation {
-    id: u32,
+    pub id: u32,
     // TODO: Make this f32
-    start: SRTTimeStamp,
-    end: SRTTimeStamp,
+    pub start: SRTTimeStamp,
+    pub end: SRTTimeStamp,
 }
 
 #[derive(Clone, Debug)]
@@ -27,10 +27,10 @@ pub struct SRTDocument<'a> {
 
 #[derive(Clone, Debug)]
 pub struct SRTSegment<'a> {
-    id: u32,
-    start: SRTTimeStamp,
-    end: SRTTimeStamp,
-    text: &'a str,
+    pub id: u32,
+    pub start: SRTTimeStamp,
+    pub end: SRTTimeStamp,
+    pub text: &'a str,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -45,7 +45,7 @@ fn num<'a>() -> impl Parser<'a, &'a str, u32> {
     digits(10)
         .to_slice()
         .from_str()
-        .try_map(|v, span| v.map_err(|_| EmptyErr::default()))
+        .try_map(|v, _span| v.map_err(|_| EmptyErr::default()))
 }
 
 fn colon<'a>() -> impl Parser<'a, &'a str, char> {
@@ -158,7 +158,7 @@ impl Matcher for SRTLocation {
                 let segment = doc
                     .find_location(m.location.bytes.start)
                     .ok_or(SRTMatchError::FindSegment)?;
-                Ok(m.map_loc(|line_col| segment))
+                Ok(m.map_loc(|_line_col| segment))
             })
             .try_collect()
     }

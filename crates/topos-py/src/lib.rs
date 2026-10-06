@@ -1,12 +1,6 @@
 use pyo3::prelude::*;
 use topos_lib::matcher::{location::line_col::LineColLocation, matcher::BibleMatcher};
 
-/// Formats the sum of two numbers as string.
-#[pyfunction]
-fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
-    Ok((a + b).to_string())
-}
-
 #[pyfunction]
 fn search(input: &str) -> PyResult<String> {
     let m = BibleMatcher::default();
@@ -25,7 +19,6 @@ fn search(input: &str) -> PyResult<String> {
 /// A Python module implemented in Rust.
 #[pymodule]
 fn topos(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
     m.add_function(wrap_pyfunction!(search, m)?)?;
     Ok(())
 }

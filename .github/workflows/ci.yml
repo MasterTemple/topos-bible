@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      # Default members exclude topos-pdf (MuPDF); it gets its own job once it builds
+      - run: cargo fmt --check
+      - run: cargo test
+      - run: cargo test -p topos-lib --no-default-features
+      - run: cargo clippy --all-targets

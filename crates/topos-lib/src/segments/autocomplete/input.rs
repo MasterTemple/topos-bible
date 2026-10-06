@@ -60,7 +60,7 @@ impl<'a> InputAutoCompleter<'a> {
 
 #[cfg(test)]
 mod tests {
-    use regex::Regex;
+    
 
     use crate::{
         matcher::matcher::BibleMatcher, segments::autocomplete::input::InputAutoCompleter,
@@ -212,8 +212,8 @@ mod tests {
             let input = &format!("{bk}{v}");
             if let Some(result) = completer.suggest(input) {
                 println!("{input}");
-                let total = result.suggestions.len();
-                for (idx, sug) in result.suggestions.into_iter().enumerate() {
+                let _total = result.suggestions.len();
+                for (_idx, sug) in result.suggestions.into_iter().enumerate() {
                     let segs = result.segments.with_suggestion(sug);
                     println!("{}{}", " ".repeat(bk.len()), segs);
                     // if idx > 5 {

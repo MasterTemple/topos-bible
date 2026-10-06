@@ -1,13 +1,8 @@
-use clap::{Parser, ValueEnum};
-use std::{
-    fmt::Display,
-    io::{self, IsTerminal, Read},
-    path::PathBuf,
-};
+use clap::Parser;
+use std::path::PathBuf;
 use topos_lib::{
-    data::genres::Genres,
     filter::{
-        filter::{BibleFilter, IsFilter, Operation},
+        filter::BibleFilter,
         filters::{book::BookFilter, genre::GenreFilter, testament::TestamentFilter},
     },
     matcher::matcher::BibleMatcher,

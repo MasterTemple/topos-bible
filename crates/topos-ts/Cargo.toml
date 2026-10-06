@@ -17,10 +17,6 @@ serde_json = { workspace = true }
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 
-[profile.release]
-lto = true
-opt-level = 's'
-
 [dependencies.web-sys]
 version = "0.3"
 features = [

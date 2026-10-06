@@ -2,7 +2,6 @@ use std::io::{self, IsTerminal, Read};
 use std::path::PathBuf;
 
 use crossbeam_channel::{Receiver, unbounded};
-use ignore::types::Types;
 use ignore::{WalkBuilder, WalkState};
 use itertools::Either;
 use topos_lib::error::AnyResult;
@@ -85,7 +84,7 @@ fn run_multi_threaded_streaming<'scope>(
     let (sender, receiver) = unbounded();
     let walk = walk.build_parallel();
 
-    std::thread::scope(|s| {
+    std::thread::scope(|_s| {
         // let sender = sender.clone();
         // s.spawn(move || {
         walk.run(|| {

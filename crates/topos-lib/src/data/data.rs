@@ -1,8 +1,7 @@
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use regex::Regex;
 
-use crate::{data::chapter_verses::BookChapterVerses, segments::segments::Passage};
+use crate::data::chapter_verses::BookChapterVerses;
 
 use super::{books::Books, genres::Genres};
 
@@ -30,7 +29,7 @@ impl BibleData {
         let books_pattern: String = self
             .books()
             .iter_keys_and_ids()
-            .map(|(key, id)| (key))
+            .map(|(key, _id)| key )
             .join("|");
 
         let book_regex = Regex::new(format!(r"\b(((?:)(?i){books_pattern})\b\.?)").as_str())

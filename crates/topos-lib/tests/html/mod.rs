@@ -1,7 +1,7 @@
 use topos_lib::{
     error::AnyResult,
     matcher::{
-        location::{html::HTMLLocation, srt::SRTLocation},
+        location::html::HTMLLocation,
         matcher::BibleMatcher,
     },
 };

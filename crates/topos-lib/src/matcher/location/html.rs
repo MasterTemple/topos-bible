@@ -1,10 +1,10 @@
-use htmloc::{Document, FragmentEngine, GenerateOptions, Selection, TextFragment};
+use htmloc::{FragmentEngine, GenerateOptions, Selection, TextFragment};
 use itertools::Itertools;
 
 use crate::matcher::{
     instance::BibleMatch,
     location::line_col::{ByteIndex, LineColLocation, Position},
-    matcher::{BibleMatcher, MatchError, MatchResult, Matcher},
+    matcher::{BibleMatcher, MatchResult, Matcher},
 };
 
 impl From<Selection> for LineColLocation {

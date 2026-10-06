@@ -1,4 +1,3 @@
-use super::range_pair::RangePair;
 use crate::segments::{
     segment::{ChapterlessFormat, Segment},
     units::chapter_verse::ChapterVerse,
