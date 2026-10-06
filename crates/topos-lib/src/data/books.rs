@@ -178,6 +178,33 @@ impl Books {
         let mut book_id_to_osis = BTreeMap::new();
         let mut osis_to_book_id = BTreeMap::new();
 
+        // Each name means one book, and each book has one id
+        let mut owners: BTreeMap<String, (BookId, String)> = BTreeMap::new();
+        for book in &data.0 {
+            let names = std::iter::once(&book.book).chain(&book.abbreviations);
+            for name in names {
+                let key = Books::normalize_book_name(name);
+                match owners.get(&key) {
+                    Some((id, other)) if *id != book.id => {
+                        return Err(ToposError::InvalidData(format!(
+                            "`{name}` would mean both {other} and {}",
+                            book.book
+                        )));
+                    }
+                    _ => {
+                        owners.insert(key, (book.id, book.book.clone()));
+                    }
+                }
+            }
+        }
+        let mut ids = BTreeSet::new();
+        if let Some(book) = data.0.iter().find(|book| !ids.insert(book.id)) {
+            return Err(ToposError::InvalidData(format!(
+                "book id {} is used more than once (by {})",
+                book.id.0, book.book
+            )));
+        }
+
         for book in data.0 {
             if let Some(osis) = &book.osis {
                 book_id_to_osis.insert(book.id, osis.clone());
@@ -261,7 +288,7 @@ pub struct Book {
     /// - Matthew = 40
     #[serde(alias = "num")]
     #[serde(alias = "number")]
-    id: BookId,
+    pub(crate) id: BookId,
 
     /// - the display name
     /// - case is kept
@@ -269,7 +296,7 @@ pub struct Book {
     #[serde(alias = "name")]
     #[serde(alias = "book_name")]
     #[serde(alias = "display_name")]
-    book: String,
+    pub(crate) book: String,
 
     /// - the display abbreviation
     /// - case is kept
@@ -279,12 +306,12 @@ pub struct Book {
     #[serde(alias = "abbr")]
     #[serde(alias = "abbrv")]
     #[serde(alias = "abbrev")]
-    abbreviation: String,
+    pub(crate) abbreviation: String,
 
     /// - the OSIS book id, like `Gen`, `1Sam`, or `John`
     /// - used to read and write OSIS references
     #[serde(default)]
-    osis: Option<String>,
+    pub(crate) osis: Option<String>,
 
     /// - does not need to include book name or abbreviation
     /// - meant for matching/parsing references
@@ -292,12 +319,12 @@ pub struct Book {
     #[serde(alias = "abbrvs")]
     #[serde(alias = "abbrevs")]
     #[serde(default)]
-    abbreviations: Vec<String>,
+    pub(crate) abbreviations: Vec<String>,
 
     /// - abbreviations that are also common words, like `is` for Isaiah
     /// - in search, these only match with an explicit verse (`Is 1:1`, but not `is 1 of`)
     #[serde(default)]
-    ambiguous: Vec<String>,
+    pub(crate) ambiguous: Vec<String>,
 }
 
 // static DEFAULT_BOOKS_JSON: &'static str = include_str!(concat!(
@@ -309,7 +336,7 @@ static DEFAULT_BOOKS_JSON: &str = include_str!("./default_books.json");
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 // #[derive(Deref, DerefMut, IntoIterator)]
-pub struct BooksInput(Vec<Book>);
+pub struct BooksInput(pub(crate) Vec<Book>);
 
 impl Default for BooksInput {
     fn default() -> Self {

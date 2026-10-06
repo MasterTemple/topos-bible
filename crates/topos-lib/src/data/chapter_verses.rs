@@ -61,7 +61,7 @@ Example:
 ```
 */
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BookChapterVersesInput(BTreeMap<String, ChapterVerses>);
+pub struct BookChapterVersesInput(pub(crate) BTreeMap<String, ChapterVerses>);
 
 static DEFAULT_CHAPTER_VERSES_JSON: &str = include_str!("./default_chapter_verses.json");
 

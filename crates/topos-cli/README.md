@@ -190,7 +190,40 @@ color = "always"
 cache = true
 exclude-book = ["Song of Solomon"]
 data = "~/bible/custom.json"   # custom books, genres, or chapter and verse counts
+merge-data = ["~/bible/more-names.json"]
+remove-data = "~/bible/fewer-names.json"
 ```
+
+## Custom data
+
+`--data FILE` replaces the built-in books, genres, or chapter and verse counts (whichever parts
+the file has). To change only a few things, keep the defaults and use either of these, or both.
+They can be repeated and set in `config.toml`:
+
+- `--merge-data FILE` adds names and values. A book is found by its `id`, or else by any of its
+  names. A book that isn't found is added, so it needs an `id`. Renaming a book keeps its old
+  name as an abbreviation, and chapter counts replace the book's.
+- `--remove-data FILE` removes values. A book or genre listed with nothing else is removed
+  entirely, otherwise just the values listed are removed.
+
+The files use the `--data` format with every field optional. Values already there aren't added
+twice, and every name must still mean exactly one book (`"gen"` for John is an error).
+
+```jsonc
+// more-names.json
+{
+  "books": [
+    { "book": "John", "abbreviations": ["jhn"] },
+    { "id": 67, "book": "Tobit", "abbreviation": "Tob", "abbreviations": ["tb"] }
+  ],
+  "genres": [{ "title": "Apocrypha", "books": ["Tobit"] }],
+  "chapter_verses": { "Tobit": [22, 14, 17, 21, 22, 18, 16, 21, 6, 13, 18, 22, 18, 15] }
+}
+// fewer-names.json: "song" no longer matches; Jude isn't a book
+{ "books": [{ "book": "Song of Solomon", "abbreviations": ["song"] }, { "book": "Jude" }] }
+```
+
+The order is `--data` (or the defaults), then each `--merge-data`, then each `--remove-data`.
 
 ## Named queries
 
@@ -336,6 +369,12 @@ Options:
 
       --data <DATA>
           A JSON file with custom books, genres, or chapter and verse counts
+
+      --merge-data <PATH>
+          A JSON file (like --data, every field optional) whose names and values are added to the data, keeping the defaults: new abbreviations, books, genres, or chapter counts
+
+      --remove-data <PATH>
+          A JSON file (like --data, every field optional) whose values are removed from the data: a book or genre listed alone is removed entirely, otherwise just the values listed
 
   -q, --query <NAME>
           Use a named query from ~/.config/topos/queries.toml (its options go where this is)

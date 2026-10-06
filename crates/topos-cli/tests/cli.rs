@@ -563,3 +563,58 @@ fn complete_and_list_books() {
         [r#"{"text":"Romans 8","label":"Romans 8","kind":"chapter"}"#]
     );
 }
+
+#[test]
+fn merge_and_remove_data() {
+    let home = scratch("merge-data");
+    std::fs::create_dir_all(home.join("topos")).unwrap();
+    std::fs::write(
+        home.join("merge.json"),
+        r#"{ "books": [{ "book": "John", "abbreviations": ["jhn"] }, { "id": 67, "book": "Tobit", "abbreviation": "Tob" }] }"#,
+    )
+    .unwrap();
+    std::fs::write(
+        home.join("remove.json"),
+        r#"{ "books": [{ "book": "Jude" }, { "book": "Romans", "abbreviations": ["rom"] }] }"#,
+    )
+    .unwrap();
+    // Both can be set in config.toml (a list or one path)
+    let config = format!(
+        "merge-data = [{:?}]\nremove-data = {:?}\nmode = \"quickfix\"\n",
+        home.join("merge.json"),
+        home.join("remove.json")
+    );
+    std::fs::write(home.join("topos/config.toml"), config).unwrap();
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_topos"))
+            .args(args)
+            .env("XDG_CONFIG_HOME", &home)
+            .env("XDG_CACHE_HOME", home.join("cache"))
+            .stdin(Stdio::null())
+            .output()
+            .unwrap()
+    };
+    let text = "Jhn 3:16, Tobit 1:1, Jude 5, Rom 8:28, Romans 8:28, Gen 1:1";
+    let found = stdout(&run(&["--text", text]));
+    assert_eq!(
+        found, ":1:1: John 3:16\n:1:11: Tobit 1:1\n:1:40: Romans 8:28\n:1:53: Genesis 1:1\n",
+        "{found}"
+    );
+    assert_eq!(stdout(&run(&["--list-books"])).lines().count(), 66);
+
+    // A name for two books is an error that says which file and name
+    std::fs::write(
+        home.join("bad.json"),
+        r#"{ "books": [{ "book": "John", "abbreviations": ["gen"] }] }"#,
+    )
+    .unwrap();
+    let bad_path = home.join("bad.json");
+    let bad = run(&["--text", "x", "--merge-data", bad_path.to_str().unwrap()]);
+    assert_eq!(bad.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&bad.stderr);
+    assert!(
+        stderr.contains("bad.json") && stderr.contains("`gen` would mean both"),
+        "{stderr}"
+    );
+    let _ = std::fs::remove_dir_all(&home);
+}
