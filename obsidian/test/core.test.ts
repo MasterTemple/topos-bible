@@ -34,6 +34,11 @@ test("each site's links open the first verse or chapter", () => {
   assert.equal(link(hub, "Ps 23"), "https://biblehub.com/psalms/23.htm");
   assert.equal(link(hub, "Song 2:1"), "https://biblehub.com/songs/2-1.htm");
 
+  const letsBible = site("letsbible");
+  assert.equal(link(letsBible, "John 13:34-35"), "https://lets.bible/bible/john/13?v=34");
+  assert.equal(link(letsBible, "1 Cor 13"), "https://lets.bible/bible/1-corinthians/13");
+  assert.equal(link(letsBible, "Song 2:1"), "https://lets.bible/bible/song-of-solomon/2?v=1");
+
   const gateway = site("biblegateway");
   assert.equal(
     link(gateway, "jn 3:16-18; 4"),

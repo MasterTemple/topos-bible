@@ -183,11 +183,20 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
     mkdirSync(dirname(join(vaultPath, path)), { recursive: true });
     writeFileSync(join(vaultPath, path), text);
   }
+  // An open note, which records being redrawn
+  const redrawn: string[] = [];
+  const openNote = {
+    view: Object.assign(new obsidian.MarkdownView(), {
+      editor: { cm: { dispatch: () => redrawn.push("editor") } },
+      previewMode: { rerender: () => redrawn.push("reading view") },
+    }),
+  };
   const app = {
     workspace: Object.assign(new Events(), {
       onLayoutReady: (callback: () => void) => callback(),
       updateOptions() {},
       getActiveFile: () => null,
+      getLeavesOfType: (type: string) => (type === "markdown" ? [openNote] : []),
     }),
     vault: Object.assign(new Events(), {
       getFiles: () => Object.keys(files).map((path) => new TFile(path)),
@@ -282,7 +291,13 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
 
   // Links: a site, a template of your own, or none
   assert.equal(setting("Open references in").controls[0].value, "literalword");
+  // Earlier changes save in the background; let them finish before counting redraws
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  redrawn.length = 0;
   setting("Open references in").controls[0].change("biblehub");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  // Open notes are redrawn, so their links go to the new site
+  assert.deepEqual(redrawn, ["editor", "reading view"]);
   assert.equal(
     setting("Link template").desc,
     "Preview: https://biblehub.com/john/3-16.htm   https://biblehub.com/psalms/23.htm",

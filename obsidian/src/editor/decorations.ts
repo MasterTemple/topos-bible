@@ -1,4 +1,4 @@
-import { RangeSetBuilder } from "@codemirror/state";
+import { RangeSetBuilder, StateEffect } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -9,6 +9,9 @@ import {
 } from "@codemirror/view";
 import { OffsetUnit } from "topos-bible";
 import type ToposPlugin from "../main.ts";
+
+/** Rebuilds the references in an editor, after the settings change what they link to */
+export const refreshReferences = StateEffect.define<null>();
 
 /**
  * Underlines references in the visible part of the editor, and opens their links on
@@ -23,7 +26,8 @@ export function referenceDecorations(plugin: ToposPlugin) {
     }
 
     update(update: ViewUpdate): void {
-      if (update.docChanged || update.viewportChanged) this.decorations = this.build(update.view);
+      const refresh = update.transactions.some((tr) => tr.effects.some((e) => e.is(refreshReferences)));
+      if (refresh || update.docChanged || update.viewportChanged) this.decorations = this.build(update.view);
     }
 
     build(view: EditorView): DecorationSet {

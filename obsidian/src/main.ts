@@ -10,6 +10,7 @@ import {
   type TAbstractFile,
 } from "obsidian";
 import type { Passage, Topos } from "topos-bible";
+import type { EditorView } from "@codemirror/view";
 import { OutdatedCliError } from "./core/cli.ts";
 import { DEFAULT_FORMAT } from "./core/format.ts";
 import { migrateQuery, parseQuery, type SavedQuery } from "./core/query.ts";
@@ -17,7 +18,7 @@ import { NO_FILTERS } from "./core/filters.ts";
 import { linkUrl, siteName, templateFromTranslation, type LinkBook } from "./core/links.ts";
 import { applyReplacements, normalizeReferences, referenceAt } from "./core/references.ts";
 import { ReferenceIndex, searchText, type Hit } from "./core/search.ts";
-import { referenceDecorations } from "./editor/decorations.ts";
+import { referenceDecorations, refreshReferences } from "./editor/decorations.ts";
 import { ReferenceSuggest } from "./editor/suggest.ts";
 import { engineWasm, loadTopos } from "./engine.ts";
 import { BackgroundSearcher } from "./indexers/background.ts";
@@ -160,8 +161,24 @@ export default class ToposPlugin extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
-    // Re-render editor decorations and reading view with the new settings
+    this.refreshLinks();
+  }
+
+  /**
+   * Redraws references everywhere they are shown, after a setting changes how they look or
+   * where they link: open editors, reading views, and the sidebar
+   */
+  refreshLinks(): void {
     this.app.workspace.updateOptions();
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      if (!(leaf.view instanceof MarkdownView)) continue;
+      // Editors keep their decorations until the text or viewport changes, so ask for new ones
+      const editor = (leaf.view.editor as { cm?: EditorView } | undefined)?.cm;
+      editor?.dispatch({ effects: refreshReferences.of(null) });
+      // Reading view keeps the HTML it rendered (and linked) until told to render again
+      leaf.view.previewMode?.rerender(true);
+    }
+    this.search.set({});
   }
 
   // Index

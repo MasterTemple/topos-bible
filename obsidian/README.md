@@ -1,7 +1,7 @@
 # Topos Bible for Obsidian
 
 Find, search, filter, and autocomplete Bible references in your vault, and open them in
-[Literal Word](https://app.literalword.com), BibleHub, BibleGateway, YouVersion, or any site with
+[Literal Word](https://app.literalword.com), BibleHub, lets.bible, BibleGateway, YouVersion, or any site with
 a link template. Built on [topos-bible](../README.md) (Rust compiled
 to WebAssembly, embedded in the plugin, so it works offline and on mobile). The design is in
 [doc/obsidian-plugin.md](../doc/obsidian-plugin.md).
@@ -91,13 +91,14 @@ skips files ignored by a `.gitignore`.
 
 ## Links
 
-References open in Literal Word by default. The settings offer BibleHub, BibleGateway, and
-YouVersion, no links at all, or a link template of your own, with a preview as you type:
+References open in Literal Word by default. The settings offer BibleHub, lets.bible,
+BibleGateway, and YouVersion, no links at all, or a link template of your own, with a preview as you type:
 
 | Site | Template |
 |---|---|
 | Literal Word | `https://app.literalword.com/{book.id}/{chapter}[/{verse}]` |
 | BibleHub | `https://biblehub.com/{book.biblehub}/{chapter}[-{verse}].htm` |
+| lets.bible | `https://lets.bible/bible/{book\|lower\|kebab}/{chapter}[?v={verse}]` |
 | BibleGateway | `https://www.biblegateway.com/passage/?search={reference}` |
 | YouVersion | `https://www.bible.com/bible/59/{book.usfm}.{chapter}[.{verse}][-{end_verse}]` |
 
@@ -127,7 +128,8 @@ A part in `[ ]` is left out when a placeholder in it has no value, so `{chapter}
 `3/16` for John 3:16 and `3` for John 3. A placeholder with no value outside `[ ]` means no link
 (`{book.usfm}` for a book outside the 66, from custom data). Most sites open one verse or
 chapter, so a reference like `John 3:16; 4:1` opens at its first verse; `{reference}` and
-`{osis}` carry all of it.
+`{osis}` carry all of it. Changing the site updates open notes, reading view, and the sidebar
+right away.
 
 ## Build and install
 

@@ -22,6 +22,7 @@ export interface LinkSite {
 export const SITES: LinkSite[] = [
   { id: "literalword", name: "Literal Word", template: "https://app.literalword.com/{book.id}/{chapter}[/{verse}]" },
   { id: "biblehub", name: "BibleHub", template: "https://biblehub.com/{book.biblehub}/{chapter}[-{verse}].htm" },
+  { id: "letsbible", name: "lets.bible", template: "https://lets.bible/bible/{book|lower|kebab}/{chapter}[?v={verse}]" },
   { id: "biblegateway", name: "BibleGateway", template: "https://www.biblegateway.com/passage/?search={reference}" },
   {
     id: "youversion",

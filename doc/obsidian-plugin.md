@@ -62,7 +62,7 @@ name, abbreviation, OSIS id, number, USFM code, and BibleHub name, the first cha
 (and the end of the first range), and the whole reference written out or as OSIS; filters
 (`{book|lower|kebab}`) change them, and a `[ ]` part is left out when a placeholder in it has no
 value. Literal Word ([deep links](https://app.literalword.com/deep-links)), BibleHub,
-BibleGateway, and YouVersion are built in; links can also be turned off. Most sites open one verse
+lets.bible, BibleGateway, and YouVersion are built in; links can also be turned off. Most sites open one verse
 or chapter, so a reference opens at its first verse. The plugin README lists the placeholders.
 Settings from before templates (a Literal Word translation) become the matching template.
 
