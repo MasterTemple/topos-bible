@@ -55,7 +55,7 @@ test("editor links follow the settings after a refresh", async () => {
     settings,
     referenceUrl: (passage: any) => linkUrl(settings.linkTemplate, passage),
     linkSite: () => "the site",
-    clickOpens: (event: MouseEvent) => event.ctrlKey,
+    clickOpens: (event: MouseEvent) => event.button === 1 || event.ctrlKey,
   };
   const view = new EditorView({
     doc: "Read Jn 3:16 today",
@@ -104,7 +104,12 @@ test("editor links follow the settings after a refresh", async () => {
   const rom = editorEl.querySelectorAll(".topos-rendered")[1]!;
   rom.dispatchEvent(new (window as any).MouseEvent("click", { bubbles: true }));
   rom.dispatchEvent(new (window as any).MouseEvent("click", { bubbles: true, ctrlKey: true }));
-  assert.deepEqual(opened, ["https://app.literalword.com/45/8/28"]);
+  // A middle click (auxclick) opens it too, and its mousedown doesn't paste
+  rom.dispatchEvent(new (window as any).MouseEvent("auxclick", { bubbles: true, button: 1 }));
+  const down = new (window as any).MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 1 });
+  rom.dispatchEvent(down);
+  assert.equal(down.defaultPrevented, true);
+  assert.deepEqual(opened, ["https://app.literalword.com/45/8/28", "https://app.literalword.com/45/8/28"]);
   assert.equal(editorEl.querySelector("a.topos-reference"), null);
   settings.linkTemplate = "";
   relinkEditor(plugin, editorEl);

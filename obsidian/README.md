@@ -46,8 +46,8 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
   range ends after a dash, and book names (`1 Co` → `1 Corinthians`). Book names only complete
   for capitalized words by default, so ordinary prose isn't interrupted
 - References glow faintly with a dashed underline in your accent color (or one you pick), and
-  highlight on hover; Ctrl/Cmd-click opens their links (a setting allows plain clicks). With links
-  turned off, they aren't marked
+  highlight on hover; Ctrl/Cmd-click or a middle click opens their links (a setting allows plain
+  clicks). With links turned off, they aren't marked
 - Right-click a reference: open its link, find references to those verses, copy as OSIS
 - In reading view, callouts, tables, and embedded notes, references are marked the same way, not
   as ordinary links: Ctrl/Cmd-click opens them on desktop, and a tap on mobile

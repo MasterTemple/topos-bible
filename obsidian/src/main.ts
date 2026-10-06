@@ -396,11 +396,13 @@ export default class ToposPlugin extends Plugin {
   }
 
   /**
-   * Whether a click on a reference opens it: on desktop, a Ctrl/Cmd-click (or any click, if the
-   * setting allows it); on mobile, which has no Ctrl, a tap outside the editor, or in it if
-   * plain clicks are allowed
+   * Whether a click on a reference opens it: a middle click always; on desktop, a Ctrl/Cmd-click
+   * (or any click, if the setting allows it); on mobile, which has no Ctrl, a tap outside the
+   * editor, or in it if plain clicks are allowed. Right clicks never do (they open menus)
    */
   clickOpens(event: MouseEvent, inEditor: boolean): boolean {
+    if (event.button === 1) return true;
+    if (event.button !== 0) return false;
     if (!Platform.isDesktop) return !inEditor || !this.settings.clickNeedsModifier;
     return !this.settings.clickNeedsModifier || event.ctrlKey || event.metaKey;
   }

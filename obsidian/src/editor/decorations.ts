@@ -58,16 +58,26 @@ export function referenceDecorations(plugin: ToposPlugin) {
     }
   }
 
+  const reference = (event: MouseEvent) =>
+    (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-topos-url]") ?? null;
+  const open = (event: MouseEvent) => {
+    const target = reference(event);
+    if (!target || !plugin.settings.linkInEditor || !plugin.clickOpens(event, true)) return false;
+    event.preventDefault();
+    window.open(target.dataset.toposUrl, "_blank");
+    return true;
+  };
+
   return [
     ViewPlugin.fromClass(References, { decorations: (value) => value.decorations }),
     EditorView.domEventHandlers({
-      click(event: MouseEvent) {
-        const target = (event.target as HTMLElement | null)?.closest<HTMLElement>(
-          "[data-topos-url]",
-        );
-        if (!target || !plugin.settings.linkInEditor || !plugin.clickOpens(event, true)) return false;
+      click: open,
+      // A middle click arrives as auxclick, not click
+      auxclick: open,
+      mousedown(event: MouseEvent) {
+        // Middle-clicking a reference opens it, so it doesn't paste (Linux) or start autoscrolling
+        if (event.button !== 1 || !plugin.settings.linkInEditor || !reference(event)) return false;
         event.preventDefault();
-        window.open(target.dataset.toposUrl, "_blank");
         return true;
       },
     }),

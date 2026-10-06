@@ -56,12 +56,18 @@ export function linkElement(plugin: ToposPlugin, el: HTMLElement): void {
       reference.textContent = text.slice(m.start, m.end);
       reference.dataset.toposUrl = url;
       reference.title = `${m.passage.reference}, opens in ${plugin.linkSite()}`;
-      reference.addEventListener("click", (event) => {
+      const open = (event: MouseEvent) => {
         if (!plugin.clickOpens(event, false)) return;
         // In live preview, a click in a callout would otherwise start editing it
         event.preventDefault();
         event.stopPropagation();
         doc.defaultView?.open(reference.dataset.toposUrl, "_blank");
+      };
+      reference.addEventListener("click", open);
+      // A middle click arrives as auxclick; its mousedown would paste (Linux) or autoscroll
+      reference.addEventListener("auxclick", open);
+      reference.addEventListener("mousedown", (event) => {
+        if (event.button === 1) event.preventDefault();
       });
       fragment.append(reference);
       last = m.end;
