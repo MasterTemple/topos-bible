@@ -180,7 +180,7 @@ impl Segment {
     }
 
     pub fn as_segments(self) -> Segments {
-        Segments(vec![self])
+        Segments(smallvec::smallvec![self])
     }
 
     pub fn is_range(&self) -> bool {

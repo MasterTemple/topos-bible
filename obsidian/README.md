@@ -89,29 +89,41 @@ one into the next) and turns the references' positions into CFIs. Then:
   verses, copy it as OSIS, or **Save as highlight** / **Save with comment**, which turn it into an
   EPUB++ highlight in the book's annotation file.
 
-Books are searched once; their references are cached in the plugin's folder (`epub-index.json`)
-until the file changes. With the CLI engine (below), the `topos` command searches the books, which
-is much faster for a library (EPUB++ extracts one book at a time on Obsidian's thread); books it
-can't read still go through EPUB++.
+Books are searched once, on any device (see below). With the CLI engine, the `topos` command
+searches them, which is much faster for a library (EPUB++ extracts one book at a time on
+Obsidian's thread); books it can't read still go through EPUB++. A phone or tablet doesn't search
+books at all unless **Search new EPUBs on this device** is on: it uses what a computer indexed.
+
+### The reference index
+
+Every file's references are kept in an index in the plugin's folder (`index/`), which syncs with
+the rest of your settings. So each file is searched once, on whichever device sees it first, and
+Obsidian starts without searching anything that hasn't changed. Another device (like your phone)
+uses those results too: files synced to it have new modification times, so a note is matched by
+its contents and a book by its size. Each device writes its own files (`index/packs/<device>-*.bin`),
+so syncing never conflicts; EPUBs' CFIs and the text around each reference are kept per book
+(`index/details/`) and read only when shown.
+
+The index is compact (about 15 bytes a reference; a million references take 16 MB), and the
+sidebar's filtering, sorting, and counting run in the engine, a page at a time. **Rebuild** in the
+settings searches every file again.
 
 ### Large vaults
 
-The vault is indexed in a background thread (a Web Worker), so Obsidian stays responsive while it
-runs; results appear in the sidebar as batches finish. On desktop, **Search engine → topos CLI**
-runs the native [`topos`](../crates/topos-cli) command over the vault folder instead, which is
-faster for very large vaults and can cache results between runs (`--cache`):
+New and changed files are searched in a background thread (a Web Worker), so Obsidian stays
+responsive; results appear in the sidebar as batches finish. On desktop, **Search engine → topos
+CLI** runs the native [`topos`](../crates/topos-cli) command on them instead, which is much faster
+for many files and EPUBs and can cache results between runs (`--cache`):
 
 ```sh
 cargo install topos-bible-cli
 ```
 
 The plugin looks for `~/.cargo/bin/topos`, then `topos` on your PATH; set the path in the settings
-otherwise (the **Test** button checks it). It runs `topos --ext` with the plugin's file
-extensions, so PDFs and other files in the vault aren't searched (EPUBs are searched separately,
-when that's on). It needs a `topos` new
-enough to have `--ext` and to report UTF-16 positions in its JSON output; with an older one, or if it fails, the plugin says so and uses the
-built-in engine. Notes you edit are always indexed by the built-in engine. Like ripgrep, the CLI
-skips files ignored by a `.gitignore`.
+otherwise (the **Test** button checks it). It runs `topos -m index` on the files that need
+searching, named one by one (so a `.gitignore` can't skip them). It needs a `topos` new enough to
+have `-m index`; with an older one, or if it fails, the plugin says so and uses the built-in
+engine. Notes you edit are always searched by the built-in engine.
 
 ## Links
 
@@ -183,5 +195,6 @@ includes these bindings, the dependency can point at the npm version instead.
 - `npm run typecheck`
 
 `src/indexers/` has the Web Worker (`worker.ts`, bundled separately and embedded in `main.js` by
-`esbuild.config.mjs`) and the CLI runner. `src/core/` has no Obsidian imports (filters, search index, sorting, completions, link
+`esbuild.config.mjs`), the CLI runner, and `vault.ts`, which keeps the index on disk and up to
+date. `src/core/` has no Obsidian imports (filters, the index's wrapper, sorting, completions, link
 templates, settings data), so it is tested directly; the rest connects it to Obsidian.

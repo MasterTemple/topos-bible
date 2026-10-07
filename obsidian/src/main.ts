@@ -9,20 +9,22 @@ import {
   type Menu,
   type TAbstractFile,
 } from "obsidian";
-import type { Passage, Topos } from "topos-bible";
+import { OffsetUnit, type Passage, type Topos } from "topos-bible";
 import type { EditorView } from "@codemirror/view";
-import { OutdatedCliError } from "./core/cli.ts";
 import { DEFAULT_FORMAT } from "./core/format.ts";
 import { migrateQuery, parseQuery, type SavedQuery } from "./core/query.ts";
 import { NO_FILTERS } from "./core/filters.ts";
 import { linkUrl, siteName, templateFromTranslation, type LinkBook } from "./core/links.ts";
 import { applyReplacements, normalizeReferences, referenceAt } from "./core/references.ts";
-import { ReferenceIndex, searchText, type Hit } from "./core/search.ts";
+import { ReferenceIndex } from "./core/index.ts";
+import { searchText, type Hit } from "./core/search.ts";
 import { referenceDecorations, refreshReferences } from "./editor/decorations.ts";
 import { ReferenceSuggest } from "./editor/suggest.ts";
 import { engineWasm, loadTopos } from "./engine.ts";
 import { BackgroundSearcher } from "./indexers/background.ts";
-import { defaultCliPath, runCli, type CliRun } from "./indexers/cli.ts";
+import { defaultCliPath } from "./indexers/cli.ts";
+import { VaultIndexer } from "./indexers/vault.ts";
+import type { IndexRequest } from "./indexers/worker.ts";
 import { EpubSupport } from "./epub/support.ts";
 import workerSource from "topos-worker-source";
 import { GoToReferenceModal, InsertReferenceModal, SavedQueryModal } from "./modals.ts";
@@ -44,16 +46,16 @@ export default class ToposPlugin extends Plugin {
   private readonly indexListeners = new Set<() => void>();
   /** The background indexer; null if workers are unavailable (then searches run on this thread) */
   private worker: BackgroundSearcher | null | undefined;
-  /** Bumped by each reindex, so a superseded run stops */
-  generation = 0;
-  private cliRun: CliRun | null = null;
-  /** Files indexed from an edit during the current reindex, which it must not overwrite */
-  private readonly edited = new Set<string>();
+  /** Keeps the index on disk and up to date */
+  indexer = new VaultIndexer(this);
+  /** Names this device's index packs */
+  device = "";
 
   async onload(): Promise<void> {
     await this.loadSettings();
     this.topos = await loadTopos();
-    this.index = new ReferenceIndex(this.topos);
+    this.device = this.deviceId();
+    this.index = new ReferenceIndex(this.topos, this.device, this.manifest?.version ?? "");
     const { sort, groupBy, context } = this.settings;
     this.search.set({ sort, groupBy, context });
     // Remember the sidebar's order, grouping, and context lines
@@ -78,34 +80,28 @@ export default class ToposPlugin extends Plugin {
     this.addCommands();
 
     this.app.workspace.onLayoutReady(() => {
-      void this.reindex();
+      void this.indexer.start();
       this.epubs.start();
       const vault = this.app.vault;
-      this.registerEvent(vault.on("modify", (file) => void this.indexFile(file)));
-      this.registerEvent(vault.on("create", (file) => void this.indexFile(file)));
-      this.registerEvent(
-        vault.on("delete", (file) => {
-          this.index.remove(file.path);
-          this.epubs.remove(file.path);
-          this.notifyIndex();
-        }),
-      );
-      this.registerEvent(
-        vault.on("rename", (file, oldPath) => {
-          this.index.remove(oldPath);
-          this.epubs.rename(oldPath, file.path);
-          void this.indexFile(file);
-        }),
-      );
+      this.registerEvent(vault.on("modify", (file) => file instanceof TFile && void this.indexer.update(file)));
+      this.registerEvent(vault.on("create", (file) => file instanceof TFile && void this.indexer.update(file)));
+      this.registerEvent(vault.on("delete", (file) => this.indexer.remove(file.path)));
+      this.registerEvent(vault.on("rename", (file, oldPath) => file instanceof TFile && this.indexer.rename(file, oldPath)));
+      // Other devices' packs sync in while Obsidian is in the background
+      if (typeof document !== "undefined") {
+        this.registerDomEvent(document, "visibilitychange", () => {
+          if (document.visibilityState === "visible") void this.indexer.refreshFromSync();
+        });
+        this.registerInterval(window.setInterval(() => void this.indexer.refreshFromSync(), 5 * 60 * 1000));
+      }
     });
   }
 
   onunload(): void {
     for (const doc of this.documents()) doc.body.style.removeProperty("--topos-reference-color");
-    this.generation++;
+    this.indexer.stop();
     this.epubs.stop();
     clearTimeout(this.notifyTimer);
-    this.cliRun?.stop();
     this.worker?.terminate();
     this.topos?.dispose();
   }
@@ -203,7 +199,7 @@ export default class ToposPlugin extends Plugin {
     return () => this.indexListeners.delete(listener);
   };
 
-  private notifyIndex(): void {
+  notifyIndex(): void {
     clearTimeout(this.notifyTimer);
     this.notifyTimer = undefined;
     this.lastNotify = performance.now();
@@ -243,17 +239,6 @@ export default class ToposPlugin extends Plugin {
     return this.extensions().includes(file.extension) && !this.isExcluded(file.path);
   }
 
-  private async indexFile(file: TAbstractFile): Promise<void> {
-    if (file instanceof TFile && this.epubs.isEpub(file)) return this.epubs.indexFile(file);
-    if (!this.isSearchable(file)) return;
-    if (this.indexing) this.edited.add(file.path);
-    const text = await this.app.vault.cachedRead(file);
-    const [result] = await this.searchFiles([{ path: file.path, text }]);
-    if (!result) return;
-    this.index.set(result.path, result.hits);
-    this.notifyIndex();
-  }
-
   /** The background indexer, started on first use */
   private background(): BackgroundSearcher | null {
     if (this.worker === undefined) {
@@ -265,6 +250,40 @@ export default class ToposPlugin extends Plugin {
       }
     }
     return this.worker;
+  }
+
+  /** Searches files into index entries in the background, or on this thread if the worker fails */
+  async indexFiles(files: IndexRequest[]): Promise<{ path: string; bytes: Uint8Array }[]> {
+    const worker = this.background();
+    if (worker) {
+      try {
+        return await worker.index(files);
+      } catch (error) {
+        if (this.worker !== worker) return []; // stopped
+        console.warn("topos: the background indexer failed, indexing on the main thread", error);
+        worker.terminate();
+        this.worker = null;
+      }
+    }
+    const entries = [];
+    const written = Date.now();
+    for (const file of files) {
+      const bytes = this.topos.indexEntry(file.path, file.size, file.mtime, file.text, written, OffsetUnit.Utf16);
+      entries.push({ path: file.path, bytes });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    return entries;
+  }
+
+  /** A random name for this device's index packs, kept in this device's storage for the vault */
+  private deviceId(): string {
+    const key = "topos-bible-device";
+    const app = this.app as { loadLocalStorage?: (key: string) => unknown; saveLocalStorage?: (key: string, value: unknown) => void };
+    const saved = app.loadLocalStorage?.(key);
+    if (typeof saved === "string" && /^[a-z0-9]+$/.test(saved)) return saved;
+    const id = Math.random().toString(36).slice(2, 10) || "device";
+    app.saveLocalStorage?.(key, id);
+    return id;
   }
 
   /** Searches files in the background, or on this thread if the worker fails */
@@ -288,78 +307,21 @@ export default class ToposPlugin extends Plugin {
     return results;
   }
 
-  /** Searches every file again, without blocking Obsidian */
-  async reindex(): Promise<void> {
-    const generation = ++this.generation;
-    this.cliRun?.stop();
-    this.cliRun = null;
-    this.indexing = true;
-    this.edited.clear();
-    this.index = new ReferenceIndex(this.topos);
-    this.notifyIndex();
-    const start = performance.now();
-    let engine = "built in";
-    if (this.settings.engine === "cli" && Platform.isDesktopApp) {
-      try {
-        await this.reindexWithCli(generation);
-        engine = "CLI";
-      } catch (error) {
-        if (generation !== this.generation) return;
-        const reason = error instanceof OutdatedCliError ? error.message : `topos failed: ${String(error)}`;
-        new Notice(`Verse search: ${reason}. Using the built-in engine.`);
-        this.index = new ReferenceIndex(this.topos);
-        await this.reindexBuiltin(generation);
-      }
-    } else {
-      await this.reindexBuiltin(generation);
-    }
-    if (generation !== this.generation) return;
-    await this.epubs.indexAll(generation);
-    if (generation !== this.generation) return;
-    console.debug(`topos: indexed ${this.index.fileCount} files with references (${engine}) in ${Math.round(performance.now() - start)} ms`);
-    this.indexing = false;
-    this.edited.clear();
-    this.notifyIndex();
+  /**
+   * Brings the index up to date with the vault (after settings change what's searched); with
+   * `force`, searches every file again
+   */
+  async reindex(force = false): Promise<void> {
+    this.indexer.resetCli();
+    await this.indexer.reconcile(force);
   }
 
-  /** Reads and searches files in batches, so memory stays bounded and results appear as they come */
-  private async reindexBuiltin(generation: number): Promise<void> {
-    const files = this.app.vault.getFiles().filter((file) => this.isSearchable(file));
-    const maxFiles = 200;
-    const maxChars = 4_000_000;
-    for (let i = 0; i < files.length; ) {
-      const batch: { path: string; text: string }[] = [];
-      let chars = 0;
-      while (i < files.length && batch.length < maxFiles && chars < maxChars) {
-        const file = files[i++];
-        const text = await this.app.vault.cachedRead(file);
-        batch.push({ path: file.path, text });
-        chars += text.length;
-      }
-      const results = await this.searchFiles(batch);
-      if (generation !== this.generation) return;
-      for (const { path, hits } of results) if (!this.edited.has(path)) this.index.set(path, hits);
-      this.notifyIndexSoon();
-    }
-  }
+  private reindexTimer: ReturnType<typeof setTimeout> | undefined;
 
-  /** Runs the topos CLI over the vault folder, streaming its results into the index */
-  private async reindexWithCli(generation: number): Promise<void> {
-    const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof FileSystemAdapter)) throw new Error("the vault is not a folder on disk");
-    const run = runCli(this.cliPath(), adapter.getBasePath(), { cache: this.settings.cliCache, extensions: this.extensions() }, (path, hits) => {
-      if (generation !== this.generation || this.edited.has(path)) return;
-      const file = this.app.vault.getAbstractFileByPath(path);
-      if (!file || !this.isSearchable(file)) return;
-      this.index.set(path, hits);
-      this.notifyIndexSoon();
-    });
-    this.cliRun = run;
-    try {
-      await run.done;
-    } finally {
-      if (this.cliRun === run) this.cliRun = null;
-    }
+  /** Reindexes once typing in a setting pauses */
+  reindexSoon(): void {
+    clearTimeout(this.reindexTimer);
+    this.reindexTimer = setTimeout(() => void this.reindex(), 1000);
   }
 
   /** The vault's folder when searching with the topos CLI (the CLI engine, on desktop), else null */

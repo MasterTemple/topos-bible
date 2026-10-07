@@ -87,9 +87,9 @@ impl Printer {
         }
     }
 
-    /// JSON output includes each match's text
+    /// JSON output includes each match's text, and index entries the text's hash
     pub fn needs_text(&self) -> bool {
-        self.mode == OutputMode::Json
+        matches!(self.mode, OutputMode::Json | OutputMode::Index)
     }
 
     /// Prints a file's results; returns whether it counts as found (for the exit code)
@@ -104,6 +104,11 @@ impl Printer {
             Some(PathsOnly::Files) => true,
             Some(PathsOnly::WithMatches) => !file.hits.is_empty(),
             Some(PathsOnly::WithoutMatch) => file.hits.is_empty(),
+            // Every searched file, so a file without references is known to have none
+            None if self.mode == OutputMode::Index => {
+                emit(index_line(file));
+                return !file.hits.is_empty();
+            }
             None => {
                 if file.hits.is_empty() {
                     return false;
@@ -253,6 +258,7 @@ impl Printer {
             }
             OutputMode::Count => emit(file.hits.len().to_string()),
             OutputMode::TotalCount => self.total += file.hits.len(),
+            OutputMode::Index => emit(index_line(file)),
         }
     }
 
@@ -374,6 +380,106 @@ impl Printer {
             ));
         }
     }
+}
+
+/// A file's `-m index` line: its path, and its entry for topos-bible-index (base64)
+fn index_line(file: &FileHits) -> String {
+    use base64::Engine;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use topos_bible_index::{
+        EntryMessage, EpubEntryBuilder, EpubRef, FileEntry, Reference, Stamp, Unit, detail_name,
+        text_hash,
+    };
+
+    let path = file
+        .path
+        .as_ref()
+        .map(|p| p.display().to_string())
+        .unwrap_or_default();
+    let millis = |time: SystemTime| {
+        time.duration_since(UNIX_EPOCH)
+            .map_or(0, |d| d.as_millis() as u64)
+    };
+    let metadata = file.path.as_ref().and_then(|p| std::fs::metadata(p).ok());
+    let size = metadata
+        .as_ref()
+        .map(|m| m.len())
+        .or(file.text.as_ref().map(|t| t.len() as u64))
+        .unwrap_or_default();
+    let mtime = metadata.and_then(|m| m.modified().ok()).map_or(0, millis);
+    let written = millis(SystemTime::now());
+    let is_book = file.path.as_deref().is_some_and(is_epub);
+    let (entry, detail) = if is_book {
+        let mut builder = EpubEntryBuilder::default();
+        for hit in &file.hits {
+            let Some(epub) = &hit.epub else {
+                continue;
+            };
+            builder.push(EpubRef {
+                passage: hit.passage.clone(),
+                start: epub.text_utf16.start as u32,
+                end: epub.text_utf16.end as u32,
+                line: epub.line as u32,
+                column: epub.utf16_column as u32,
+                spine: epub.spine_index as u32,
+                chapter: epub.chapter.as_deref(),
+                cfi: hit.label.clone().unwrap_or_default(),
+                line_text: &epub.line_text,
+            });
+        }
+        let stamp = Stamp {
+            size,
+            mtime,
+            hash: None,
+        };
+        let (entry, detail) = builder.finish(stamp, written, detail_name(&path, &stamp));
+        // A book without references needs no details
+        if entry.refs.is_empty() {
+            (
+                FileEntry {
+                    detail: None,
+                    ..entry
+                },
+                None,
+            )
+        } else {
+            (entry, Some(detail))
+        }
+    } else {
+        let text = file.text.as_deref();
+        let mut utf16 = Utf16Offsets::default();
+        let refs = file
+            .hits
+            .iter()
+            .filter_map(|hit| {
+                let (text, bytes, (start, _)) = (text?, hit.bytes.as_ref()?, hit.position?);
+                let from = utf16.at(text, bytes.start) as u32;
+                let to = utf16.at(text, bytes.end) as u32;
+                Some(Reference {
+                    passage: hit.passage.clone(),
+                    start: from,
+                    len: to - from,
+                    line: start.line as u32,
+                    column: start.utf16_column as u32,
+                    section: None,
+                })
+            })
+            .collect();
+        let stamp = Stamp {
+            size,
+            mtime,
+            hash: text.map(text_hash),
+        };
+        (FileEntry::new(stamp, written, refs), None)
+    };
+    let message = EntryMessage {
+        path: path.clone(),
+        unit: Unit::Utf16,
+        entry,
+        detail,
+    };
+    let encoded = base64::engine::general_purpose::STANDARD.encode(message.encode());
+    json!({ "path": path, "entry": encoded }).to_string()
 }
 
 /// Converts increasing byte offsets in one text to UTF-16 offsets, counting each byte once

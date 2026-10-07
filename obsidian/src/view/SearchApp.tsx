@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import { compileFilters, isEmpty, keep, NO_FILTERS, type Filters, type Testament } from "../core/filters.ts";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { compileFilters, isEmpty, NO_FILTERS, type Filters, type Testament } from "../core/filters.ts";
 import { formatQuery, parseQuery } from "../core/query.ts";
 import { written } from "../core/format.ts";
 import type { Hit } from "../core/search.ts";
-import { groupHits, sortHits, type SortOrder } from "../core/sort.ts";
+import { groupHits, type SortOrder } from "../core/sort.ts";
 import type ToposPlugin from "../main.ts";
 import { bookStyle, type StyleName } from "../core/settings.ts";
 import { Chips, NameInput, ReferenceInput } from "./inputs.tsx";
@@ -26,6 +26,8 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
   const [activePath, setActivePath] = useState(plugin.app.workspace.getActiveFile()?.path ?? "");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [shown, setShown] = useState(PAGE);
+  /** Bumped when EPUB details the page needs are read */
+  const [detailsVersion, setDetailsVersion] = useState(0);
   const [filtersOpen, setFiltersOpen] = useState(!isEmpty(state.filters));
   /** The name being typed to save the current search, or null */
   const [saving, setSaving] = useState<string | null>(null);
@@ -39,36 +41,54 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
   }, [plugin]);
 
   const filter = useMemo(() => compileFilters(topos, state.filters), [topos, state.filters]);
-  const hits = useMemo(() => {
+  // The engine filters, sorts, and counts every reference; only the page shown becomes objects
+  const results = useMemo(() => {
     const folder = state.folder.replace(/\/+$/, "");
-    const inScope =
+    const scope =
       state.scope === "file"
-        ? plugin.index.get(activePath)
-        : plugin.index
-            .all()
-            .filter((hit) => state.scope === "vault" || !folder || hit.path.startsWith(`${folder}/`));
-    return sortHits(
-      inScope.filter((hit) => keep(topos, filter, hit.passage)),
-      state.sort,
-    );
+        ? { kind: "file" as const, path: activePath }
+        : state.scope === "folder" && folder
+          ? { kind: "folder" as const, path: folder }
+          : { kind: "vault" as const };
+    return plugin.index.query(state.filters, scope, state.sort);
     // indexVersion: recompute when files change
-  }, [topos, plugin, filter, state.scope, state.folder, state.sort, activePath, indexVersion]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plugin, state.filters, state.scope, state.folder, state.sort, activePath, indexVersion]);
+  const hits = useMemo(
+    () => results.page(0, shown),
+    // detailsVersion: read again once EPUB details are loaded
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [results, shown, detailsVersion],
+  );
+  // EPUB results show their CFI and context once the books' details are read
+  useEffect(() => {
+    const names = results.missingDetails(0, shown);
+    if (names.length === 0) return;
+    let cancelled = false;
+    void plugin.indexer.loadDetails(names).then(() => {
+      if (!cancelled) setDetailsVersion((v) => v + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [plugin, results, shown]);
 
   const books = useMemo(() => topos.books(), [topos]);
   const genres = useMemo(() => topos.genres(), [topos]);
   const bookName = (id: number) => books.find((b) => b.id === id)?.name ?? `Book ${id}`;
   const groups = useMemo(
-    () => groupHits(hits.slice(0, shown), state.groupBy, bookName),
+    () => groupHits(hits, state.groupBy, bookName),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [hits, shown, state.groupBy, books],
   );
-  const fileCount = useMemo(() => new Set(hits.map((h) => h.path)).size, [hits]);
+  const total = results.total;
+  const fileCount = results.files;
   const shownPaths = useMemo(
     () => [...new Set(groups.flatMap((g) => g.hits.map((h) => h.path)))],
     [groups],
   );
-  // EPUBs have no lines to read (their hits carry their paragraph)
-  const fileLines = useFileLines(plugin, state.context > 0 ? shownPaths.filter((p) => !isEpub(p)) : [], indexVersion);
+  // Notes' lines are read for the page shown (EPUB hits carry the text around them)
+  const fileLines = useFileLines(plugin, shownPaths.filter((p) => !isEpub(p)), indexVersion);
 
   const setFilters = (update: Partial<Filters>) => {
     plugin.search.set({ filters: { ...state.filters, ...update } });
@@ -314,9 +334,7 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
       {filter.conflict && <div className="topos-conflict">⚠ {filter.conflict}</div>}
 
       <div className="topos-summary">
-        {plugin.indexing
-          ? "Indexing…"
-          : `${hits.length} reference${hits.length === 1 ? "" : "s"} in ${fileCount} note${fileCount === 1 ? "" : "s"}`}
+        {`${plugin.indexing ? "Indexing… " : ""}${total.toLocaleString()} reference${total === 1 ? "" : "s"} in ${fileCount.toLocaleString()} note${fileCount === 1 ? "" : "s"}`}
       </div>
 
       <div className="topos-results">
@@ -352,9 +370,9 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
             </div>
           );
         })}
-        {hits.length > shown && (
+        {total > shown && (
           <button className="topos-more" onClick={() => setShown(shown + PAGE)}>
-            Show more ({hits.length - shown} left)
+            Show more ({(total - shown).toLocaleString()} left)
           </button>
         )}
       </div>
@@ -422,18 +440,22 @@ function TestamentToggle({
  */
 function useFileLines(plugin: ToposPlugin, paths: string[], indexVersion: number): Map<string, string[]> {
   const [lines, setLines] = useState(() => new Map<string, string[]>());
+  // Notes already read (until the index changes), so changing filters reads only new ones
+  const read = useRef({ version: indexVersion, lines: new Map<string, string[]>() });
   const key = paths.join("\n");
   useEffect(() => {
-    if (paths.length === 0) return;
+    if (read.current.version !== indexVersion) read.current = { version: indexVersion, lines: new Map() };
+    const known = read.current.lines;
+    const missing = paths.filter((path) => !known.has(path));
+    if (missing.length === 0) return;
     let cancelled = false;
     void (async () => {
-      const next = new Map<string, string[]>();
-      for (const path of paths) {
+      for (const path of missing) {
         const file = plugin.app.vault.getFileByPath?.(path);
         if (!file) continue;
-        next.set(path, (await plugin.app.vault.cachedRead(file)).split(/\r?\n/));
+        known.set(path, (await plugin.app.vault.cachedRead(file)).split(/\r?\n/));
       }
-      if (!cancelled) setLines(next);
+      if (!cancelled) setLines(new Map(known));
     })();
     return () => {
       cancelled = true;
@@ -459,8 +481,10 @@ function HitRow({
   context: number;
   lines: string[] | undefined;
 }) {
+  // A note's line comes from the note (the index keeps only where references are)
+  const lineText = hit.lineText || lines?.[hit.line - 1] || "";
   const from = hit.column - 1;
-  const to = Math.min(hit.lineText.length, from + (hit.end - hit.start));
+  const to = Math.min(lineText.length, from + (hit.end - hit.start));
   const url = plugin.referenceUrl(hit.passage);
   return (
     <div className={`topos-hit${context > 0 ? " has-context" : ""}`} onClick={() => void plugin.openHit(hit)}>
@@ -484,13 +508,13 @@ function HitRow({
           </button>
         )}
       </div>
-      {context > 0 && lines && <ContextLines lines={lines} from={hit.line - 1 - context} to={hit.line - 2} />}
+      {context > 0 && lines && !hit.epub && <ContextLines lines={lines} from={hit.line - 1 - context} to={hit.line - 2} />}
       <div className="topos-hit-context">
-        {context > 0 ? hit.lineText.slice(0, from) : hit.lineText.slice(0, from).trimStart()}
-        <mark>{hit.lineText.slice(from, to)}</mark>
-        {hit.lineText.slice(to)}
+        {context > 0 ? lineText.slice(0, from) : lineText.slice(0, from).trimStart()}
+        <mark>{lineText.slice(from, to)}</mark>
+        {lineText.slice(to)}
       </div>
-      {context > 0 && lines && <ContextLines lines={lines} from={hit.line} to={hit.line - 1 + context} />}
+      {context > 0 && lines && !hit.epub && <ContextLines lines={lines} from={hit.line} to={hit.line - 1 + context} />}
     </div>
   );
 }

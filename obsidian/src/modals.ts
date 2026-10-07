@@ -2,10 +2,9 @@ import { App, Editor, SuggestModal } from "obsidian";
 import { CompletionKind, type Completion } from "topos-bible";
 import { applyCompletion, completionsBefore } from "./core/completions.ts";
 import { written } from "./core/format.ts";
-import { compileFilters, keep, NO_FILTERS } from "./core/filters.ts";
+import { NO_FILTERS } from "./core/filters.ts";
 import type { SavedQuery } from "./core/query.ts";
 import type { Hit } from "./core/search.ts";
-import { sortHits } from "./core/sort.ts";
 import type ToposPlugin from "./main.ts";
 import { bookStyle } from "./settings.ts";
 
@@ -84,11 +83,7 @@ export class GoToReferenceModal extends SuggestModal<Hit> {
   getSuggestions(query: string): Hit[] {
     const { topos, index } = this.plugin;
     if (!query.trim() || !topos.parse(query, 0)) return [];
-    const filter = compileFilters(topos, { ...NO_FILTERS, anyOverlap: [query] });
-    return sortHits(
-      index.all().filter((hit) => keep(topos, filter, hit.passage)),
-      "bible",
-    );
+    return index.query({ ...NO_FILTERS, anyOverlap: [query] }, { kind: "vault" }, "bible").page(0, this.limit);
   }
 
   renderSuggestion(hit: Hit, el: HTMLElement): void {
@@ -97,7 +92,10 @@ export class GoToReferenceModal extends SuggestModal<Hit> {
     const reference = written(this.plugin.topos, hit.passage, style, this.plugin.settings.format);
     el.createDiv({ cls: "topos-hit-reference", text: reference });
     el.createDiv({ cls: "topos-hit-location", text: hit.epub ? `${hit.path}: ${hit.epub.chapter ?? `section ${hit.epub.spineIndex + 1}`}` : `${hit.path}:${hit.line}` });
-    el.createDiv({ cls: "topos-hit-context", text: hit.lineText.trim() });
+    const context = el.createDiv({ cls: "topos-hit-context", text: hit.lineText.trim() });
+    // A note's line comes from the note
+    const file = hit.lineText || hit.epub ? null : this.app.vault.getFileByPath(hit.path);
+    if (file) void this.app.vault.cachedRead(file).then((text) => context.setText(text.split(/\r?\n/)[hit.line - 1]?.trim() ?? ""));
   }
 
   onChooseSuggestion(hit: Hit): void {

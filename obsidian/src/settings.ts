@@ -131,7 +131,7 @@ export class ToposSettingTab extends PluginSettingTab {
       .addText((t) =>
         t.setValue(settings.extensions).onChange((value) => {
           settings.extensions = value;
-          void save().then(() => this.plugin.reindex());
+          void save().then(() => this.plugin.reindexSoon());
         }),
       );
     new Setting(containerEl)
@@ -145,11 +145,24 @@ export class ToposSettingTab extends PluginSettingTab {
           void save().then(() => this.plugin.epubs.toggled());
         }),
       );
+    if (!Platform.isDesktopApp && settings.searchEpubs) {
+      new Setting(containerEl)
+        .setName("Search new EPUBs on this device")
+        .setDesc(
+          "Books a computer has indexed are never searched here: their references sync with the vault. Turn this on to also search books no other device has indexed yet (slow for a big library).",
+        )
+        .addToggle((t) =>
+          t.setValue(settings.searchEpubsOnMobile).onChange((value) => {
+            settings.searchEpubsOnMobile = value;
+            void save().then(() => this.plugin.reindex());
+          }),
+        );
+    }
     if (Platform.isDesktopApp) {
       new Setting(containerEl)
         .setName("Search engine")
         .setDesc(
-          "Built in: indexes in a background thread, everywhere. topos CLI: runs the native command-line tool, which is faster for very large vaults (install it with cargo install topos-bible-cli). Edits are always indexed by the built-in engine.",
+          "Built in: searches in a background thread, everywhere. topos CLI: runs the native command-line tool, which is much faster for many files and EPUBs (install it with cargo install topos-bible-cli). Either way, only new and changed files are searched; edits are always searched by the built-in engine.",
         )
         .addDropdown((d) =>
           d
@@ -159,7 +172,7 @@ export class ToposSettingTab extends PluginSettingTab {
               settings.engine = value as "builtin" | "cli";
               void save().then(() => {
                 this.display();
-                void this.plugin.reindex();
+                this.plugin.indexer.resetCli();
               });
             }),
         );
@@ -199,7 +212,18 @@ export class ToposSettingTab extends PluginSettingTab {
       .addTextArea((t) =>
         t.setValue(settings.excludeFolders).onChange((value) => {
           settings.excludeFolders = value;
-          void save().then(() => this.plugin.reindex());
+          void save().then(() => this.plugin.reindexSoon());
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName("Reference index")
+      .setDesc(
+        `${this.plugin.index.referenceCount.toLocaleString()} references in ${this.plugin.index.fileCount.toLocaleString()} files. The index is kept in the plugin's folder and syncs with your settings, so each file is searched once (on any device). Rebuilding searches every file again.`,
+      )
+      .addButton((b) =>
+        b.setButtonText("Rebuild").onClick(() => {
+          void this.plugin.reindex(true).then(() => this.display());
         }),
       );
 

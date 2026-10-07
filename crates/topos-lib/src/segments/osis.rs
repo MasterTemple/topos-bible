@@ -106,7 +106,7 @@ impl Books {
         let book = book.ok_or_else(invalid)?;
         Ok(Passage {
             book,
-            segments: crate::segments::passage::Segments(segments),
+            segments: crate::segments::passage::Segments(segments.into()),
         })
     }
 

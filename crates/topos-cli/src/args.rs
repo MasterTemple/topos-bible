@@ -367,6 +367,10 @@ pub enum OutputMode {
     Count,
     /// Matches across all files
     TotalCount,
+    /// One line per searched file, for apps that keep an index (the Obsidian plugin):
+    /// `{"path": ..., "entry": ...}`, with the file's references as a topos-bible-index entry
+    /// (base64; UTF-16 offsets)
+    Index,
 }
 
 /// How `--epub-links` writes links

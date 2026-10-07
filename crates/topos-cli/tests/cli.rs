@@ -468,7 +468,8 @@ fn shell_completions() {
             "table",
             "json",
             "count",
-            "total-count"
+            "total-count",
+            "index"
         ]
     );
     assert_eq!(c(&["topos", "-b", "1 co"]), ["1 Corinthians"]);
@@ -1050,5 +1051,73 @@ fn epub_links() {
     // Text isn't searched for links
     let output = topos(&["--no-config", "--epub-links", "wiki"], Some("John 3:16"));
     assert_eq!(output.status.code(), Some(2));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn index_entries() {
+    use base64::Engine;
+    use topos_bible_index::{EntryMessage, Unit, text_hash};
+
+    let dir = scratch("index-entries");
+    std::fs::create_dir_all(dir.join("Books")).unwrap();
+    write_epub(&dir.join("Books/My Book.epub"));
+    std::fs::write(dir.join("a.md"), "é Jn 3:16\nRom 8:28").unwrap();
+    std::fs::write(dir.join("empty.md"), "nothing").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_topos"))
+        .args(["--no-config", "--sort", "-m", "index", "."])
+        .current_dir(&dir)
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    let lines: Vec<(String, EntryMessage)> = String::from_utf8(output.stdout)
+        .unwrap()
+        .lines()
+        .map(|line| {
+            let value: serde_json::Value = serde_json::from_str(line).unwrap();
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(value["entry"].as_str().unwrap())
+                .unwrap();
+            let path = value["path"].as_str().unwrap().to_string();
+            (path, EntryMessage::decode(&bytes).unwrap())
+        })
+        .collect();
+    // Every searched file, with or without references
+    let paths: Vec<&str> = lines.iter().map(|(p, _)| p.as_str()).collect();
+    assert_eq!(paths, ["./Books/My Book.epub", "./a.md", "./empty.md"]);
+
+    let (_, note) = &lines[1];
+    assert_eq!(note.unit, Unit::Utf16);
+    assert_eq!(note.entry.stamp.size, 19);
+    assert_eq!(
+        note.entry.stamp.hash,
+        Some(text_hash("é Jn 3:16\nRom 8:28"))
+    );
+    let refs: Vec<_> = note
+        .entry
+        .refs
+        .iter()
+        .map(|r| (r.start, r.len, r.line, r.column))
+        .collect();
+    assert_eq!(refs, [(2, 7, 1, 3), (10, 8, 2, 1)]);
+    assert!(lines[2].1.entry.refs.is_empty());
+
+    // An EPUB's details: its CFIs and the text around each reference
+    let (_, book) = &lines[0];
+    assert_eq!(book.entry.stamp.hash, None);
+    assert_eq!(book.entry.refs.len(), 2);
+    let detail = book.detail.as_ref().unwrap();
+    assert_eq!(detail.refs[1].cfi, "epubcfi(/6/4!/4/2,/1:4,/1:15)");
+    assert_eq!(
+        (detail.refs[1].context.as_str(), detail.refs[1].at),
+        ("And Romans 8:28", 4)
+    );
+    assert_eq!(
+        book.entry.detail,
+        Some(topos_bible_index::detail_name(
+            "./Books/My Book.epub",
+            &book.entry.stamp
+        ))
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }

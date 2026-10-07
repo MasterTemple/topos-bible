@@ -72,29 +72,30 @@ Settings from before templates (a Literal Word translation) become the matching 
 Reference style; where references open (a site, a link template, or nowhere); whether editor clicks need Ctrl/Cmd; whether a tap opens references in the editor on mobile; highlight
 references in the editor and reading view; autocomplete on/off, book-name completion
 (off, capitalized, always), and how many suggestions; files and folders to exclude from search;
-whether to search EPUBs.
+whether to search EPUBs (and on mobile, whether to search books no other device has indexed);
+the reference index (its size, and **Rebuild**).
 
 ### EPUBs (with EPUB++)
 
 EPUB++ (a separate plugin) opens EPUBs in Obsidian and has an API for annotation providers. With
-**Search EPUB files** on, books not in the cache are searched in one of two ways:
+**Search EPUB files** on, books the index doesn't have are searched in one of two ways:
 
-- With the CLI engine (desktop), `topos -m json -- <book>...` searches them, named on the command
+- With the CLI engine (desktop), `topos -m index -- <book>...` searches them, named on the command
   line (in batches that fit on one) so ignore files can't skip them, and in parallel off
-  Obsidian's thread. Its JSON has the CFI, spine index, chapter, and offsets through the book's
-  text (`topos-bible-formats` extracts text and writes CFIs exactly as EPUB++ does, checked on 98
-  books), so the hits are the same as the other way's. A named book the CLI doesn't report as
-  unreadable has been searched, even with no references. Books it can't read, a CLI that fails,
-  or one too old to report EPUB positions fall back to EPUB++.
+  Obsidian's thread. Each entry has the CFIs, spine indexes, chapters, and offsets through the
+  book's text (`topos-bible-formats` extracts text and writes CFIs exactly as EPUB++ does, checked
+  on 98 books), so the references are the same as the other way's. Books it can't read, a CLI
+  that fails, or one too old for `-m index` fall back to EPUB++.
 - Otherwise topos asks EPUB++ for each book's text (`extractText`, one string per spine item,
   paragraphs separated by `\n\n`, parsed on Obsidian's main thread one book at a time, which is
-  slow for a library), searches the sections like notes, and asks for each hit's range CFI.
+  slow for a library), searches the sections like notes, and asks for each hit's range CFI. On
+  mobile this only happens with **Search new EPUBs on this device**; otherwise books wait for a
+  computer to index them. A book EPUB++ can't read is kept with no references until it changes.
 
-The hits join the index (offsets continue through the book, so position order is book
-order; `Hit.epub` holds the spine index, CFI, and chapter) and are cached in `epub-index.json` by
-size and mtime. topos registers a "Bible references" provider: EPUB++ draws them (topos picks
-the style: dashed underline and glow), lists them in a sidebar tab, and offers *Save as highlight*
-next to topos's menu items. Results in the sidebar open with EPUB++'s `open(file, cfi)`.
+Offsets continue through the book, so position order is book order. topos registers a "Bible
+references" provider: EPUB++ draws them (topos picks the style: dashed underline and glow), lists
+them in a sidebar tab, and offers *Save as highlight* next to topos's menu items. Results in the
+sidebar open with EPUB++'s `open(file, cfi)`.
 
 Either way the CFIs match the reader's exactly.
 
@@ -112,13 +113,26 @@ Either way the CFIs match the reader's exactly.
   is sent to it at startup rather than embedded twice), in batches of up to 200 files or 4M
   characters. If workers are unavailable it falls back to the main thread, yielding between
   files. The sidebar re-renders at most twice a second while results arrive.
+- **The index** (`topos-bible-index`, through the bindings' `ToposIndex`; `src/core/index.ts`
+  wraps it, `src/indexers/vault.ts` keeps it on disk): each file's references in a compact binary
+  form (about 15 bytes each), with its size, modification time, and for text files a content
+  hash. At startup the packs are read and each file checked: unchanged files aren't searched, and
+  files synced from another device (new times, same size) are matched by hash (notes) or size
+  (EPUBs) and confirmed in this device's own packs. Each device writes only its own packs (32 per
+  device, by path hash, written a few seconds after a change), so syncing never conflicts; other
+  devices' packs are read again when Obsidian comes back to the front. EPUB details (CFIs and
+  about 200 characters around each reference) are per book and read when a page or book needs
+  them. The JSON cache from before (`epub-index.json`) is deleted.
+- **Queries run in the engine**: the sidebar and *Go to a reference* send the filters as a
+  `ToposQuery` (the CLI's rules), and the engine filters, sorts, and counts, keeping every
+  reference's order until the index changes; only the page shown becomes objects. Notes' lines
+  are read from the notes for the page shown.
 - **EPUBs** (`src/epub/`) are searched by the CLI when it's the engine, else through EPUB++: the
   text comes from its API, searching uses the same worker, and `src/core/epub.ts` maps section
-  hits to the book. Either way they're cached in `epub-index.json`.
-- **Optional CLI engine (desktop)**: runs `topos . --no-config -m json [--cache]` in the vault
-  folder and streams the results into the index. The CLI's JSON includes UTF-16 offsets, the
-  book id, segments, and the line text, so its hits are identical to the built-in engine's
-  (tested). Edits during a reindex win over the reindex's older results.
+  hits to the book.
+- **Optional CLI engine (desktop)**: runs `topos -m index --no-config [--cache] -- <files>` on the
+  files that need searching, and streams each file's entry into the index. Its entries are
+  identical to the built-in engine's (tested). Edits during a pass win over its older results.
 
 ## Library additions
 

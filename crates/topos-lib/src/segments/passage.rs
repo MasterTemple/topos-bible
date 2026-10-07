@@ -1,5 +1,6 @@
 use derive_more::{Deref, DerefMut, IntoIterator};
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 
 use crate::{
     data::books::BookId,
@@ -52,7 +53,7 @@ impl Passage {
             .collect();
         (!segments.is_empty()).then_some(Passage {
             book: self.book,
-            segments: Segments(segments),
+            segments: Segments(segments.into()),
         })
     }
 }
@@ -60,7 +61,7 @@ impl Passage {
 /// TODO: I need Segments and PartialSegments/Incomplete segments to be unified under a large
 /// Segment type that I can use for auto-completions
 #[derive(Clone, Debug, PartialEq, Eq, Deref, DerefMut, Serialize, Deserialize, IntoIterator)]
-pub struct Segments(pub Vec<Segment>);
+pub struct Segments(pub SmallVec<[Segment; 2]>);
 
 impl Default for Segments {
     fn default() -> Self {
@@ -70,7 +71,7 @@ impl Default for Segments {
 
 impl Segments {
     pub fn new() -> Self {
-        Self(vec![])
+        Self(SmallVec::new())
     }
 
     // pub fn overlaps_segment(&self, other: impl Into<Segment>) -> bool {
@@ -149,7 +150,7 @@ mod tests {
     use super::*;
 
     fn parse(input: &str) -> Vec<Segment> {
-        Segments::parse(input).unwrap().0
+        Segments::parse(input).unwrap().0.to_vec()
     }
 
     #[test]

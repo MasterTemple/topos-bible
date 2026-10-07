@@ -1,15 +1,12 @@
 import type { Hit } from "../core/search.ts";
-import type { WorkerRequest, WorkerResponse } from "./worker.ts";
+import type { IndexRequest, WorkerRequest, WorkerResponse } from "./worker.ts";
 
 /** Searches files in a Web Worker, so indexing never blocks Obsidian */
 export class BackgroundSearcher {
   private readonly worker: Worker;
   private readonly ready: Promise<void>;
   private nextId = 0;
-  private readonly pending = new Map<
-    number,
-    { resolve: (results: { path: string; hits: Hit[] }[]) => void; reject: (error: Error) => void }
-  >();
+  private readonly pending = new Map<number, { resolve: (value: never) => void; reject: (error: Error) => void }>();
 
   /** `source` is the worker's bundled code; `wasm` is the engine, copied into the worker */
   constructor(source: string, wasm: Uint8Array) {
@@ -20,8 +17,9 @@ export class BackgroundSearcher {
       this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
         const message = event.data;
         if (message.type === "ready") resolve();
-        else if (message.type === "results") {
-          this.pending.get(message.id)?.resolve(message.results);
+        else if (message.type === "results" || message.type === "entries") {
+          const value = message.type === "results" ? message.results : message.entries;
+          this.pending.get(message.id)?.resolve(value as never);
           this.pending.delete(message.id);
         } else if (message.type === "error") {
           const error = new Error(message.message);
@@ -45,8 +43,18 @@ export class BackgroundSearcher {
     await this.ready;
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      this.pending.set(id, { resolve: resolve as (value: never) => void, reject });
       this.post({ type: "search", id, files });
+    });
+  }
+
+  /** Searches files into index entries (for `ToposIndex.insert`) */
+  async index(files: IndexRequest[]): Promise<{ path: string; bytes: Uint8Array }[]> {
+    await this.ready;
+    const id = this.nextId++;
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve: resolve as (value: never) => void, reject });
+      this.post({ type: "index", id, files });
     });
   }
 

@@ -33,6 +33,11 @@ export interface ToposSettings {
   extensions: string;
   /** Also search EPUBs (needs the EPUB++ plugin, which opens them and shows their references) */
   searchEpubs: boolean;
+  /**
+   * On a phone or tablet, search EPUBs that no other device has indexed yet (slow for a big
+   * library; off, they wait for a computer to index them and sync)
+   */
+  searchEpubsOnMobile: boolean;
   /** Folders to leave out of search, one per line */
   excludeFolders: string;
   /** The sidebar's order and grouping, remembered between sessions */
@@ -66,6 +71,7 @@ export const DEFAULT_SETTINGS: ToposSettings = {
   format: DEFAULT_FORMAT,
   extensions: "md, txt",
   searchEpubs: false,
+  searchEpubsOnMobile: false,
   excludeFolders: "",
   sort: "file",
   groupBy: "file",

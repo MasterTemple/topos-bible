@@ -17,7 +17,7 @@ test("the sidebar renders filtered, grouped results", async () => {
      import { Topos } from "topos-bible";
      import { SearchApp } from ${src("view/SearchApp.tsx")};
      import { SearchStore } from ${src("view/store.ts")};
-     import { ReferenceIndex } from ${src("core/search.ts")};
+     import { ReferenceIndex } from ${src("core/index.ts")};
      import { DEFAULT_SETTINGS } from ${src("core/settings.ts")};
      import { linkUrl, siteName } from ${src("core/links.ts")};
      import { NO_FILTERS } from ${src("core/filters.ts")};
@@ -29,6 +29,7 @@ test("the sidebar renders filtered, grouped results", async () => {
        index.update("b.md", "Psalm 23, then John 1:1");
        const plugin = {
          topos, index, indexVersion: 1, indexing: false,
+         indexer: { loadDetails: async () => {} },
          settings: { ...DEFAULT_SETTINGS, queries },
          referenceUrl: (passage) => linkUrl(DEFAULT_SETTINGS.linkTemplate, passage),
          linkSite: () => siteName(DEFAULT_SETTINGS.linkTemplate),

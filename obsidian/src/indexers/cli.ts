@@ -1,5 +1,4 @@
-import { CliOutputParser } from "../core/cli.ts";
-import type { Hit } from "../core/search.ts";
+import { CliOutputParser, OutdatedCliError } from "../core/cli.ts";
 
 /** A running `topos` search that can be stopped */
 export interface CliRun {
@@ -21,28 +20,28 @@ export function defaultCliPath(): string {
 }
 
 /**
- * Runs `topos -m json` over the vault folder, or the vault `paths` given (desktop only), and
- * reports each file's hits as they stream in. Exit code 1 only means nothing was found.
+ * Runs `topos -m index` on the vault `paths` given (named, so ignore files can't skip them;
+ * desktop only), and reports each file's index entry as it streams in. Exit code 1 only means
+ * nothing was found.
  */
 export function runCli(
   cliPath: string,
   vaultPath: string,
-  { cache, extensions, paths = ["."] }: { cache: boolean; extensions: string[]; paths?: string[] },
-  onFile: (path: string, hits: Hit[]) => void,
+  { cache, extensions = [], paths }: { cache: boolean; extensions?: string[]; paths: string[] },
+  onEntry: (path: string, bytes: Uint8Array) => void,
 ): CliRun {
   const { spawn } = require("node:child_process") as typeof import("node:child_process");
-  // --ext keeps the CLI from searching (and printing) what the plugin would throw away, like EPUBs
   const args = [
     "--no-config",
     "-m",
-    "json",
+    "index",
     ...(cache ? ["--cache"] : []),
     ...(extensions.length > 0 ? ["--ext", extensions.join(",")] : []),
     "--",
     ...paths,
   ];
   const child = spawn(cliPath, args, { cwd: vaultPath, stdio: ["ignore", "pipe", "pipe"] });
-  const parser = new CliOutputParser(onFile);
+  const parser = new CliOutputParser(onEntry);
   let stderr = "";
   const errors: string[] = [];
   let partial = "";
@@ -75,6 +74,7 @@ export function runCli(
       // arguments were rejected (an older topos without --ext)
       const badArguments = code === 2 && /^error:/m.test(stderr);
       if (code === 0 || code === 1 || (code === 2 && !badArguments)) resolve();
+      else if (/invalid value 'index'/.test(stderr)) reject(new OutdatedCliError());
       else reject(new Error(stderr.trim() || `topos exited with code ${code}`));
     });
   });

@@ -4,6 +4,10 @@
 //! differently: bytes (Rust, C), Unicode scalars (Python), or UTF-16 code units (JavaScript,
 //! Kotlin, Swift's `utf16` view).
 
+mod index;
+
+pub use index::*;
+
 use boltffi::*;
 use topos_lib::{
     data::{
@@ -153,6 +157,8 @@ pub enum ToposError {
     InvalidConfig { message: String },
     /// A query names a book, genre, or passage that doesn't exist
     InvalidQuery { message: String },
+    /// An index file couldn't be read (damaged, or from another version)
+    InvalidIndex { message: String },
 }
 
 /// A testament, for [`ToposQuery`]
@@ -197,6 +203,13 @@ pub struct ToposQuery {
     pub exact_overlap: Vec<String>,
     /// Drop references that share any verse with one of these (`--exclude-overlap`)
     pub exclude_overlap: Vec<String>,
+}
+
+impl ToposQuery {
+    /// Whether it keeps every reference
+    fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
 }
 
 fn with<T>(mut list: Vec<T>, value: T) -> Vec<T> {

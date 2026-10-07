@@ -11,6 +11,9 @@ categories = ["text-processing", "parser-implementations"]
 
 [dependencies]
 derive_more = { version = "2.0.1", features = ["deref", "deref_mut", "from", "into_iterator"] }
+# A passage's segments are kept inline (nearly every passage has one or two), so indexes of
+# millions of references don't make an allocation for each
+smallvec = { version = "1.15", features = ["serde", "union", "const_generics"] }
 
 # workspace dependencies
 once_cell = { workspace = true }

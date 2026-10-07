@@ -1,7 +1,7 @@
 // Loads the built main.js with a stand-in for Obsidian's API (Obsidian itself can't run here)
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import Module, { createRequire } from "node:module";
@@ -44,6 +44,8 @@ class Plugin {
     this.postProcessors.push(p);
   }
   registerEvent() {}
+  registerDomEvent() {}
+  registerInterval() {}
   addCommand(command: any) {
     this.commands.push(command);
   }
@@ -102,6 +104,7 @@ class EditorSuggest {
   }
   setInstructions() {}
 }
+/** The vault on disk, for the CLI engine and the index's files */
 class FileSystemAdapter {
   base: string;
   constructor(base: string) {
@@ -110,7 +113,36 @@ class FileSystemAdapter {
   getBasePath() {
     return this.base;
   }
+  private full(path: string) {
+    return join(this.base, path);
+  }
+  async exists(path: string) {
+    return existsSync(this.full(path));
+  }
+  async mkdir(path: string) {
+    mkdirSync(this.full(path), { recursive: true });
+  }
+  async list(path: string) {
+    const names = readdirSync(this.full(path), { withFileTypes: true });
+    const files = names.filter((n) => n.isFile()).map((n) => `${path}/${n.name}`);
+    return { files, folders: names.filter((n) => n.isDirectory()).map((n) => `${path}/${n.name}`) };
+  }
+  async stat(path: string) {
+    const stat = statSync(this.full(path));
+    return { mtime: stat.mtimeMs, size: stat.size, ctime: stat.ctimeMs, type: "file" };
+  }
+  async readBinary(path: string) {
+    const bytes = readFileSync(this.full(path));
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  }
+  async writeBinary(path: string, data: ArrayBuffer) {
+    writeFileSync(this.full(path), new Uint8Array(data));
+  }
+  async remove(path: string) {
+    rmSync(this.full(path));
+  }
 }
+
 const obsidian = {
   Platform: { isDesktopApp: true },
   FileSystemAdapter,
@@ -234,10 +266,26 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
       adapter: new FileSystemAdapter(vaultPath),
     }),
     plugins: { plugins: { "epub-plus-plus": { api: epub.api } } },
+    storage: new Map<string, unknown>(),
+    loadLocalStorage(key: string) {
+      return this.storage.get(key) ?? null;
+    },
+    saveLocalStorage(key: string, value: unknown) {
+      this.storage.set(key, value);
+    },
   };
-  const plugin = new ToposPlugin(app, {});
+  const manifest = { dir: ".obsidian/plugins/topos-bible", version: "0.4.0" };
+  mkdirSync(join(vaultPath, manifest.dir), { recursive: true });
+  // The JSON cache from before the index is removed
+  writeFileSync(join(vaultPath, manifest.dir, "epub-index.json"), "{}");
+  const idle = async (p: any) => {
+    await new Promise((r) => setTimeout(r, 5));
+    while (p.indexing) await new Promise((r) => setTimeout(r, 5));
+  };
+  const plugin = new ToposPlugin(app, manifest);
   await plugin.onload();
-  while (plugin.indexing) await new Promise((r) => setTimeout(r, 5));
+  await idle(plugin);
+  assert.equal(existsSync(join(vaultPath, manifest.dir, "epub-index.json")), false);
 
   assert.deepEqual(plugin.views, ["topos-bible-search"]);
   assert.deepEqual(
@@ -259,6 +307,48 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   assert.equal(plugin.clickOpens(tap, true, true), false);
   plugin.settings.tapOpensInEditor = false;
 
+  // The index is saved, and a restart searches nothing again
+  await plugin.indexer.save();
+  const packs = readdirSync(join(vaultPath, manifest.dir, "index/packs"));
+  assert.ok(packs.length > 0 && packs.every((name) => name.startsWith(`${plugin.device}-`)), packs.join());
+  const searched: string[] = [];
+  const counting = (p: any) => {
+    const indexFiles = p.indexFiles.bind(p);
+    p.indexFiles = async (batch: any[]) => (searched.push(...batch.map((f) => f.path)), indexFiles(batch));
+    return p;
+  };
+  const restarted = counting(new ToposPlugin(app, manifest));
+  await restarted.onload();
+  await idle(restarted);
+  assert.equal(restarted.device, plugin.device);
+  assert.deepEqual(searched, []);
+  assert.deepEqual(restarted.index.all().map((h: any) => h.passage.reference), plugin.index.all().map((h: any) => h.passage.reference));
+  restarted.onunload();
+
+  // Another device (its files have other times after syncing) confirms the notes by their text
+  const phoneApp = Object.create(app, { storage: { value: new Map() } });
+  const realFiles = app.vault.getFiles;
+  app.vault.getFiles = () => realFiles().map((f: any) => Object.assign(f, { stat: { mtime: 99, size: f.stat.size } }));
+  const phone = counting(new ToposPlugin(phoneApp, manifest));
+  await phone.onload();
+  await idle(phone);
+  assert.notEqual(phone.device, plugin.device);
+  assert.deepEqual(searched, []);
+  assert.equal(phone.index.all().length, 4);
+  // An edit there is searched, and saved in the phone's own packs
+  files["Sermons/b.md"] = "Psalm 23 and Psalm 24";
+  app.vault.getFiles = () => realFiles().map((f: any) => (f.path === "Sermons/b.md" ? Object.assign(f, { stat: { mtime: 100, size: 21 } }) : f));
+  await phone.indexer.update(app.vault.getFileByPath("Sermons/b.md"));
+  assert.equal(phone.index.get("Sermons/b.md").length, 2);
+  await phone.indexer.save();
+  assert.ok(readdirSync(join(vaultPath, manifest.dir, "index/packs")).some((name) => name.startsWith(`${phone.device}-`)));
+  phone.onunload();
+  files["Sermons/b.md"] = "Psalm 23 and is 2.5%";
+  app.vault.getFiles = realFiles;
+  // The other instances replaced this one's EPUB++ annotation provider
+  plugin.epubs.api = null;
+  plugin.epubs.start();
+
   // Excluding a folder reindexes without it
   plugin.settings.excludeFolders = "Archive";
   await plugin.reindex();
@@ -271,12 +361,12 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
     plugin.settings.engine = "cli";
     plugin.settings.cliPath = cli;
     plugin.settings.cliCache = false;
-    await plugin.reindex();
+    await plugin.reindex(true);
     assert.deepEqual(plugin.index.all(), builtin);
 
     // A missing CLI falls back to the built-in engine with a notice
     plugin.settings.cliPath = join(vaultPath, "no-such-topos");
-    await plugin.reindex();
+    await plugin.reindex(true);
     assert.deepEqual(plugin.index.all(), builtin);
     assert.match(obsidian.Notice.messages.at(-1)!, /Using the built-in engine/);
     plugin.settings.engine = "builtin";
@@ -414,7 +504,7 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   const at = epubText.indexOf("Rom");
   assert.deepEqual(hit.epub, { spineIndex: 1, cfi: `epubcfi(/6/4!/4,/1:${at},/1:${at + "Rom 8:28".length})`, chapter: "Chapter 1" });
   assert.equal(hit.start, "Title".length + 2 + at);
-  assert.deepEqual(epub.refreshed.at(-1), ["Books/b.epub"]);
+  assert.ok(epub.refreshed.some((paths) => paths?.[0] === "Books/b.epub"));
   const annotations = await epub.provider.annotations(new TFile("Books/b.epub"));
   assert.deepEqual(
     annotations.map((a: any) => [a.label, a.locator]),
@@ -424,9 +514,14 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   // Results open in the book
   await plugin.openHit(hit);
   assert.deepEqual(epub.opened, [`Books/b.epub#${hit.epub.cfi}`]);
-  // A reindex keeps them (from the cache); turning the setting off removes them
+  // A reindex keeps them (from the index); turning the setting off removes them
+  const extractText = epub.api.extractText;
+  epub.api.extractText = async () => {
+    throw new Error("searched again");
+  };
   await plugin.reindex();
   assert.equal(plugin.index.get("Books/b.epub").length, 1);
+  epub.api.extractText = extractText;
   plugin.settings.searchEpubs = false;
   await plugin.epubs.toggled();
   assert.equal(plugin.index.get("Books/b.epub").length, 0);

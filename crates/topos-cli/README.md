@@ -401,7 +401,15 @@ Without links, `-m json` describes each reference in an EPUB with an `epub` obje
 fills `line`, `utf16_column`, `start_utf16`, `end_utf16`, and `line_text` from the book's text:
 each content document's text (block elements a blank line apart, as EPUB++ extracts it), one after
 another with a blank line between. So positions are in book order, and `line_text` is the
-paragraph. The Obsidian plugin's CLI engine uses these to search EPUBs.
+paragraph.
+
+### Index entries
+
+`-m index` prints one line for every file searched (with or without references) for apps that
+keep an index of many files, like the Obsidian plugin: `{"path": ..., "entry": ...}`, where
+`entry` is the file's [`topos-bible-index`](../topos-index) entry in base64 (its references with
+UTF-16 offsets, its size, modification time, and a hash of a text file's contents, and for EPUBs
+their CFIs and the text around each reference).
 
 ## Usage
 
@@ -504,6 +512,7 @@ Options:
           - json:        One JSON object per match
           - count:       Matches per file
           - total-count: Matches across all files
+          - index:       One line per searched file, for apps that keep an index (the Obsidian plugin): `{"path": ..., "entry": ...}`, with the file's references as a topos-bible-index entry (base64; UTF-16 offsets)
           
           [default: auto]
 

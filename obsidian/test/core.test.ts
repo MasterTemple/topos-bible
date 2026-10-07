@@ -9,7 +9,8 @@ import {
   referenceAt,
   written,
 } from "../src/core/references.ts";
-import { ReferenceIndex, searchText } from "../src/core/search.ts";
+import { ReferenceIndex } from "../src/core/index.ts";
+import { searchText, type Hit } from "../src/core/search.ts";
 import { groupHits, sortHits } from "../src/core/sort.ts";
 
 const topos = Topos.new();
@@ -180,6 +181,49 @@ test("the index follows file changes", () => {
   );
   index.remove("a.md");
   assert.equal(index.all().length, 1);
+});
+
+test("the index's queries keep and order what the JS filters and sort did", () => {
+  const notes: Record<string, string> = {
+    "Sermons/a.md": "John 3:16-18; 5 and Gen 1:1. Then Rom 8:28-39, Ps 23, and John 1-2:3",
+    "Sermons/b.md": "Jude 5, Rev 22:21, Matt 5-7, 1 Cor 13:4-7, 13, Is. 53:5",
+    "c.md": "Exodus 20; Deut 6:4-5; Mark 12:29-31 and John 3",
+  };
+  const index = new ReferenceIndex(topos);
+  for (const [path, text] of Object.entries(notes)) index.update(path, text);
+  const all = Object.entries(notes)
+    .sort(([a], [b]) => a.toLowerCase().localeCompare(b.toLowerCase()))
+    .flatMap(([path, text]) => searchText(topos, path, text));
+  const cases: Partial<Filters>[] = [
+    {},
+    { testaments: ["new"] },
+    { testaments: ["old"], excludeBooks: ["Genesis"] },
+    { genres: ["Gospels"], excludeTestaments: ["old"] },
+    { books: ["John", "Psalm"] },
+    { inside: ["John 3"] },
+    { anyOverlap: ["John 3:17"] },
+    { explicitOverlap: ["John 3"] },
+    { exactOverlap: ["John 3:16-18; 5"] },
+    { excludeOverlap: ["John 1-3"], testaments: ["new"] },
+    { anyOverlap: ["Romans 8", "Psalm 23"], excludeGenres: ["Wisdom"] },
+  ];
+  const show = (h: Hit) => `${h.path}@${h.start} ${h.passage.reference}`;
+  for (const partial of cases) {
+    const filters = { ...NO_FILTERS, ...partial };
+    const filter = compileFilters(topos, filters);
+    const kept = all.filter((h) => keep(topos, filter, h.passage));
+    for (const order of ["file", "bible"] as const) {
+      const results = index.query(filters, { kind: "vault" }, order);
+      assert.deepEqual(results.page(0, 1000).map(show), sortHits(kept, order).map(show), `${JSON.stringify(partial)} ${order}`);
+      assert.equal(results.files, new Set(kept.map((h) => h.path)).size);
+    }
+  }
+  const folder = index.query(NO_FILTERS, { kind: "folder", path: "Sermons" }).page(0, 100);
+  assert.ok(folder.length > 0 && folder.every((h) => h.path.startsWith("Sermons/")));
+  assert.deepEqual(index.query(NO_FILTERS, { kind: "file", path: "c.md" }).page(0, 100).map(show), index.get("c.md").map(show));
+  // Pages
+  const results = index.query(NO_FILTERS);
+  assert.deepEqual(results.page(2, 3).map(show), results.page(0, 5).slice(2).map(show));
 });
 
 test("sorting and grouping", () => {

@@ -21,7 +21,7 @@ async function loadApp() {
      import { SearchApp } from ${src("view/SearchApp.tsx")};
      import { ErrorBoundary } from ${src("view/ErrorBoundary.tsx")};
      import { SearchStore } from ${src("view/store.ts")};
-     import { ReferenceIndex } from ${src("core/search.ts")};
+     import { ReferenceIndex } from ${src("core/index.ts")};
      import { DEFAULT_SETTINGS } from ${src("core/settings.ts")};
      import { linkUrl, siteName } from ${src("core/links.ts")};
      export { act };
@@ -31,6 +31,7 @@ async function loadApp() {
        for (const [path, text] of Object.entries(notes)) index.update(path, text);
        const plugin = {
          topos, index, indexVersion: 1, indexing: false,
+         indexer: { loadDetails: async () => {} },
          settings: DEFAULT_SETTINGS,
          referenceUrl: (passage) => linkUrl(DEFAULT_SETTINGS.linkTemplate, passage),
          linkSite: () => siteName(DEFAULT_SETTINGS.linkTemplate),
@@ -90,7 +91,10 @@ test("the sidebar's inputs and context lines work in a DOM", async () => {
       "b.md": "Rom 8:28",
     };
     const { plugin } = mount(container, notes);
+    // The notes' lines are read after the first render
+    await act(async () => new Promise((r) => setTimeout(r, 10)));
     const text = () => container.textContent!.replace(/\s+/g, " ");
+    assert.match(text(), /Read Jn 3:16 here/);
     assert.match(text(), /2 references in 2 notes/);
 
     // Open the filters and focus the "Names" input (explicit overlap): every book is listed, and arrows move
