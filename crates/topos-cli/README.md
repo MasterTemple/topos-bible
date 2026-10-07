@@ -372,9 +372,36 @@ files with references, and `--files-without-match` lists the ones without.
 
 ## File types
 
-- `.pdf` (with the `pdf` feature) reports the page, and `.epub` reports a CFI
+- `.pdf` (with the `pdf` feature) reports the page, and `.epub` reports a range CFI like
+  `epubcfi(/6/14!/4/2/4,/1:0,/1:16)`, the same one the [EPUB++](https://github.com/MasterTemple/epub-plus-plus)
+  reader makes for that text (`--cfi-assertions` adds `[id]` assertions)
 - `.srt`, `.vtt`, and `.sbv` also report the cue's start time
 - Everything else is searched as text; binary files are skipped (see `--binary`)
+
+## EPUB++ links
+
+`--epub-links wiki` (or `markdown`) searches only EPUBs and prints a link to each reference that
+the EPUB++ Obsidian plugin opens at the reference, labeled with it (as `-f` and `--psg-fmt` write
+it). Paths are relative to the directory searched, so run it from the vault (or name the folder):
+
+```sh
+$ topos --epub-links wiki Books
+[[Moby Dick.epub#epubcfi(/6/14!/4/2/4,/1:0,/1:16)|John 3:16]]
+$ topos --epub-links markdown -f abbrev .
+[Jn 3:16](Books/Moby%20Dick.epub#epubcfi%28/6/14!/4/2/4,/1%3A0,/1%3A16%29)
+```
+
+Markdown destinations encode spaces, `(`, `)`, and `:`, as EPUB++ does. With `-m json`, each object
+gets a `link` field instead; `-m count`, `-m total-count`, `-l`, and `--files` work as usual. CFIs
+leave out `[id]` assertions unless `--cfi-assertions` is given, because `[` and `]` break
+wikilinks.
+
+Without links, `-m json` describes each reference in an EPUB with an `epub` object
+(`spine_index`, `cfi`, and `chapter`, the table of contents' name for its content document), and
+fills `line`, `utf16_column`, `start_utf16`, `end_utf16`, and `line_text` from the book's text:
+each content document's text (block elements a blank line apart, as EPUB++ extracts it), one after
+another with a blank line between. So positions are in book order, and `line_text` is the
+paragraph. The Obsidian plugin's CLI engine uses these to search EPUBs.
 
 ## Usage
 
@@ -520,6 +547,16 @@ Options:
           Write the chapter in single-chapter books: Jude 1:5 instead of Jude 5 [default: true]
           
           [possible values: true, false]
+
+      --epub-links <STYLE>
+          Print an EPUB++ link to each reference instead (`[[Book.epub#epubcfi(...)|John 3:16]]`, or with markdown, `[John 3:16](Book.epub#epubcfi%28...%29)`), labeled with the reference as written by -f and --psg-fmt. Only EPUBs are searched, and the path in each link is relative to the directory searched (or just the file's name, for a file named on the command line). With -m json, each object gets a "link" field instead; -m count, -m total-count, -l, and --files work as usual
+
+          Possible values:
+          - wiki:     `[[Book.epub#epubcfi(...)|John 3:16]]`
+          - markdown: `[John 3:16](Book.epub#epubcfi%28...%29)`
+
+      --cfi-assertions
+          Write EPUB CFIs with `[id]` assertions, like /6/14[chapter-1]!/4/2[p3]/1:0: more robust if the book changes, but `[` and `]` break wikilinks (EPUB++ leaves them out by default)
 
   -A, --after-context <AFTER_CONTEXT>
           Lines of context to show after each match

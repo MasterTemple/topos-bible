@@ -5,6 +5,8 @@ import type { Hit } from "../core/search.ts";
 export interface CliRun {
   done: Promise<void>;
   stop(): void;
+  /** The lines it printed to stderr (like `topos: <path>: <error>` for files it couldn't read) */
+  errors: string[];
 }
 
 /** Where `topos` usually is when it was installed with cargo (GUI apps often lack ~/.cargo/bin in PATH) */
@@ -19,28 +21,31 @@ export function defaultCliPath(): string {
 }
 
 /**
- * Runs `topos -m json` over the vault folder (desktop only) and reports each file's hits as
- * they stream in. Exit code 1 only means nothing was found.
+ * Runs `topos -m json` over the vault folder, or the vault `paths` given (desktop only), and
+ * reports each file's hits as they stream in. Exit code 1 only means nothing was found.
  */
 export function runCli(
   cliPath: string,
   vaultPath: string,
-  { cache, extensions }: { cache: boolean; extensions: string[] },
+  { cache, extensions, paths = ["."] }: { cache: boolean; extensions: string[]; paths?: string[] },
   onFile: (path: string, hits: Hit[]) => void,
 ): CliRun {
   const { spawn } = require("node:child_process") as typeof import("node:child_process");
   // --ext keeps the CLI from searching (and printing) what the plugin would throw away, like EPUBs
   const args = [
-    ".",
     "--no-config",
     "-m",
     "json",
     ...(cache ? ["--cache"] : []),
     ...(extensions.length > 0 ? ["--ext", extensions.join(",")] : []),
+    "--",
+    ...paths,
   ];
   const child = spawn(cliPath, args, { cwd: vaultPath, stdio: ["ignore", "pipe", "pipe"] });
   const parser = new CliOutputParser(onFile);
   let stderr = "";
+  const errors: string[] = [];
+  let partial = "";
   const done = new Promise<void>((resolve, reject) => {
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
@@ -52,10 +57,15 @@ export function runCli(
       }
     });
     child.stderr.on("data", (chunk: Buffer) => {
-      if (stderr.length < 10_000) stderr += chunk.toString();
+      const text = chunk.toString();
+      if (stderr.length < 10_000) stderr += text;
+      const lines = (partial + text).split("\n");
+      partial = lines.pop() ?? "";
+      errors.push(...lines.filter(Boolean));
     });
     child.on("error", reject);
     child.on("close", (code) => {
+      if (partial) errors.push(partial);
       try {
         parser.finish();
       } catch (error) {
@@ -68,5 +78,5 @@ export function runCli(
       else reject(new Error(stderr.trim() || `topos exited with code ${code}`));
     });
   });
-  return { done, stop: () => child.kill() };
+  return { done, stop: () => child.kill(), errors };
 }

@@ -953,3 +953,102 @@ fn single_chapter_books_in_filters() {
     assert_eq!(run(&["-o", "Jude 5"]), ":1:1: Jude 1:5\n");
     assert_eq!(run(&["--exact-overlap", "Jude 6"]), ":1:9: Jude 1:6\n");
 }
+
+/// A two-chapter EPUB whose spine starts at /6/2
+fn write_epub(path: &std::path::Path) {
+    let file = std::fs::File::create(path).unwrap();
+    let mut zip = zip::ZipWriter::new(file);
+    let options =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    let page = |body: &str| {
+        format!(
+            "<?xml version=\"1.0\"?><html xmlns=\"http://www.w3.org/1999/xhtml\"><head><title>t</title></head><body><p id=\"p\">{body}</p></body></html>"
+        )
+    };
+    let files = [
+        ("mimetype", "application/epub+zip".to_string()),
+        (
+            "META-INF/container.xml",
+            r#"<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>"#.to_string(),
+        ),
+        (
+            "content.opf",
+            r#"<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata/><manifest><item id="a" href="a.xhtml" media-type="application/xhtml+xml"/><item id="b" href="b.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="a"/><itemref idref="b"/></spine></package>"#.to_string(),
+        ),
+        ("a.xhtml", page("See Jn 3:16.")),
+        ("b.xhtml", page("And Romans 8:28")),
+    ];
+    for (name, text) in files {
+        zip.start_file(name, options).unwrap();
+        zip.write_all(text.as_bytes()).unwrap();
+    }
+    zip.finish().unwrap();
+}
+
+#[test]
+fn epub_links() {
+    let dir = scratch("epub-links");
+    std::fs::create_dir_all(dir.join("Books")).unwrap();
+    write_epub(&dir.join("Books/My Book.epub"));
+    std::fs::write(dir.join("notes.md"), "John 1:1\n").unwrap();
+    let run = |args: &[&str]| {
+        let output = Command::new(env!("CARGO_BIN_EXE_topos"))
+            .args(["--no-config", "--sort"])
+            .args(args)
+            .current_dir(&dir)
+            .stdin(Stdio::null())
+            .output()
+            .unwrap();
+        String::from_utf8(output.stdout).unwrap()
+    };
+    // Only EPUBs, with paths relative to the directory searched
+    assert_eq!(
+        run(&["--epub-links", "wiki", "."]),
+        "[[Books/My Book.epub#epubcfi(/6/2!/4/2,/1:4,/1:11)|John 3:16]]\n\
+         [[Books/My Book.epub#epubcfi(/6/4!/4/2,/1:4,/1:15)|Romans 8:28]]\n"
+    );
+    assert_eq!(
+        run(&["--epub-links", "markdown", "-f", "abbrev", "Books"]),
+        "[Jn 3:16](My%20Book.epub#epubcfi%28/6/2!/4/2,/1%3A4,/1%3A11%29)\n\
+         [Rom 8:28](My%20Book.epub#epubcfi%28/6/4!/4/2,/1%3A4,/1%3A15%29)\n"
+    );
+    // Assertions, and the CFI as the label in other modes
+    let quickfix = run(&["--cfi-assertions", "-m", "quickfix", "Books/My Book.epub"]);
+    assert_eq!(
+        quickfix.lines().next(),
+        Some("Books/My Book.epub: John 3:16 (epubcfi(/6/2[a]!/4/2[p],/1:4,/1:11))")
+    );
+    // JSON gets a link field; counts are unchanged
+    let json = run(&["--epub-links", "wiki", "-m", "json", "."]);
+    let first: serde_json::Value = serde_json::from_str(json.lines().next().unwrap()).unwrap();
+    assert_eq!(
+        first["link"],
+        "[[Books/My Book.epub#epubcfi(/6/2!/4/2,/1:4,/1:11)|John 3:16]]"
+    );
+    // Positions in an EPUB are in the book's text: its documents' text, a blank line apart
+    let second: serde_json::Value = serde_json::from_str(json.lines().nth(1).unwrap()).unwrap();
+    let place = |key: &str| second[key].to_string();
+    assert_eq!(
+        [
+            "start_utf16",
+            "end_utf16",
+            "line",
+            "utf16_column",
+            "line_text"
+        ]
+        .map(place),
+        ["18", "29", "3", "5", "\"And Romans 8:28\""]
+    );
+    assert_eq!(
+        second["epub"],
+        serde_json::json!({ "spine_index": 1, "cfi": "epubcfi(/6/4!/4/2,/1:4,/1:15)", "chapter": null })
+    );
+    assert_eq!(
+        run(&["--epub-links", "wiki", "-m", "total-count", "."]),
+        "2\n"
+    );
+    // Text isn't searched for links
+    let output = topos(&["--no-config", "--epub-links", "wiki"], Some("John 3:16"));
+    assert_eq!(output.status.code(), Some(2));
+    let _ = std::fs::remove_dir_all(&dir);
+}

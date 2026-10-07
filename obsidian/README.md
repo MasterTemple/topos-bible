@@ -47,7 +47,7 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
   for capitalized words by default, so ordinary prose isn't interrupted
 - References glow faintly with a dashed underline in your accent color (or one you pick), and
   highlight on hover; Ctrl/Cmd-click or a middle click opens their links (a setting allows plain
-  clicks). With links turned off, they aren't marked
+  clicks, and another lets a tap open them on mobile when you aren't typing). With links turned off, they aren't marked
 - Right-click a reference: open its link, find references to those verses, copy as OSIS
 - In reading view, callouts, tables, and embedded notes, references are marked the same way, not
   as ordinary links: Ctrl/Cmd-click opens them on desktop, and a tap on mobile
@@ -68,11 +68,31 @@ to WebAssembly, embedded in the plugin, so it works offline and on mobile). The 
 
 **Settings**: reference style (`John 3:16`, `Jn 3:16`, or `John.3.16`), where references open
 (see [Links](#links)), the references' color, editor and reading-view links, whether editor clicks
-need Ctrl/Cmd, autocomplete and book-name completion, number of suggestions, the reference format
+need Ctrl/Cmd, whether a tap opens references in the editor on mobile (when the keyboard isn't open), autocomplete and book-name completion, number of suggestions, the reference format
 (the CLI's `--psg-fmt` fields: separators, joining adjacent verses, the chapter in single-chapter
 books, with a preview; used by completions, the sidebar, the dialogs, and normalizing), file
 extensions to
-search, excluded folders, and the search engine (below).
+search, whether to search EPUBs (below), excluded folders, and the search engine.
+
+### EPUBs
+
+With **Search EPUB files** on (off by default) and the [EPUB++](https://github.com/MasterTemple/epub-plus-plus)
+plugin enabled, EPUBs in the vault are searched too. EPUB++ opens EPUBs in Obsidian; it extracts
+each book's text for topos (paragraphs separated by a blank line, so a reference never runs from
+one into the next) and turns the references' positions into CFIs. Then:
+
+- The sidebar lists EPUB results with their chapter, and clicking one opens the book there.
+- In the book, references get the same dashed underline and glow as in notes (in the reference
+  color). Hovering shows the reference; Ctrl/Cmd-click (or middle-click) opens its link.
+- EPUB++'s **Bible references** sidebar tab lists the book's references by chapter, with a filter.
+- Right-click a reference (tap or hold it on mobile) to open it, find references to the same
+  verses, copy it as OSIS, or **Save as highlight** / **Save with comment**, which turn it into an
+  EPUB++ highlight in the book's annotation file.
+
+Books are searched once; their references are cached in the plugin's folder (`epub-index.json`)
+until the file changes. With the CLI engine (below), the `topos` command searches the books, which
+is much faster for a library (EPUB++ extracts one book at a time on Obsidian's thread); books it
+can't read still go through EPUB++.
 
 ### Large vaults
 
@@ -87,7 +107,8 @@ cargo install topos-bible-cli
 
 The plugin looks for `~/.cargo/bin/topos`, then `topos` on your PATH; set the path in the settings
 otherwise (the **Test** button checks it). It runs `topos --ext` with the plugin's file
-extensions, so EPUBs, PDFs, and other files in the vault aren't searched. It needs a `topos` new
+extensions, so PDFs and other files in the vault aren't searched (EPUBs are searched separately,
+when that's on). It needs a `topos` new
 enough to have `--ext` and to report UTF-16 positions in its JSON output; with an older one, or if it fails, the plugin says so and uses the
 built-in engine. Notes you edit are always indexed by the built-in engine. Like ripgrep, the CLI
 skips files ignored by a `.gitignore`.

@@ -1,4 +1,7 @@
-use std::io::{self, IsTerminal, Write};
+use std::{
+    io::{self, IsTerminal, Write},
+    path::{Component, Path, PathBuf},
+};
 
 use serde_json::json;
 use topos_bible::segments::formatter::BookStyle;
@@ -6,10 +9,11 @@ use topos_bible::{
     data::bible_data::BibleData,
     segments::{Passage, Segment, verse_bounds::VerseBounds},
 };
+use topos_bible_formats::epub::{LinkStyle, epub_link};
 
 use crate::{
     args::{Args, ColorChoice, OutputMode},
-    search::{FileHits, Hit},
+    search::{FileHits, Hit, is_epub},
 };
 
 const PATH: &str = "\x1b[35m";
@@ -29,6 +33,10 @@ pub struct Printer {
     printed_group: bool,
     total: usize,
     paths: Option<PathsOnly>,
+    /// `--epub-links`
+    links: Option<LinkStyle>,
+    /// The paths searched, which links are relative to
+    roots: Vec<PathBuf>,
 }
 
 /// Printing paths instead of references
@@ -43,7 +51,7 @@ enum PathsOnly {
 }
 
 impl Printer {
-    pub fn new(args: &Args, data: BibleData) -> Self {
+    pub fn new(args: &Args, data: BibleData, roots: Vec<PathBuf>) -> Self {
         let tty = io::stdout().is_terminal();
         let mode = match args.mode {
             _ if args.total_count => OutputMode::TotalCount,
@@ -74,6 +82,8 @@ impl Printer {
             } else {
                 None
             },
+            links: args.epub_links.map(LinkStyle::from),
+            roots,
         }
     }
 
@@ -108,9 +118,33 @@ impl Printer {
         list
     }
 
+    /// The EPUB++ link to a hit, with `--epub-links` (for EPUBs, which have CFIs)
+    fn link(&self, file: &FileHits, hit: &Hit) -> Option<String> {
+        let style = self.links?;
+        let path = file.path.as_deref().filter(|p| is_epub(p))?;
+        let cfi = hit.label.as_deref()?;
+        let path = link_path(path, &self.roots);
+        Some(epub_link(&path, cfi, &self.reference(&hit.passage), style))
+    }
+
     fn hits(&mut self, path: &str, file: &FileHits) {
         let path = path.to_string();
-        match self.mode {
+        let mode = self.mode;
+        // Links replace the modes that print each reference, except JSON
+        if self.links.is_some()
+            && !matches!(
+                mode,
+                OutputMode::Json | OutputMode::Count | OutputMode::TotalCount
+            )
+        {
+            for hit in &file.hits {
+                if let Some(link) = self.link(file, hit) {
+                    emit(link);
+                }
+            }
+            return;
+        }
+        match mode {
             OutputMode::Auto | OutputMode::Grouped => self.grouped(&path, file),
             OutputMode::Quickfix => {
                 for hit in &file.hits {
@@ -150,24 +184,40 @@ impl Printer {
                         (Some(text), Some(bytes)) => Some(&text[bytes.clone()]),
                         _ => None,
                     };
-                    let (start_utf16, end_utf16, line_text) = match (&file.text, &hit.bytes) {
-                        (Some(text), Some(bytes)) => (
-                            Some(utf16.at(text, bytes.start)),
-                            Some(utf16.at(text, bytes.end)),
-                            Some(line_at(text, bytes.start)),
-                        ),
-                        _ => (None, None, None),
-                    };
-                    let value = json!({
+                    let (start_utf16, end_utf16, line_text) =
+                        match (&file.text, &hit.bytes, &hit.epub) {
+                            (Some(text), Some(bytes), _) => (
+                                Some(utf16.at(text, bytes.start)),
+                                Some(utf16.at(text, bytes.end)),
+                                Some(line_at(text, bytes.start)),
+                            ),
+                            // EPUBs: in the book's text (each content document's, a blank line
+                            // apart), so positions are in book order
+                            (_, _, Some(epub)) => (
+                                Some(epub.text_utf16.start),
+                                Some(epub.text_utf16.end),
+                                Some(epub.line_text.as_str()),
+                            ),
+                            _ => (None, None, None),
+                        };
+                    let line = hit
+                        .position
+                        .map(|(s, _)| s.line)
+                        .or(hit.epub.as_ref().map(|e| e.line));
+                    let utf16_column = hit
+                        .position
+                        .map(|(s, _)| s.utf16_column)
+                        .or(hit.epub.as_ref().map(|e| e.utf16_column));
+                    let mut value = json!({
                         "path": file.path,
                         "reference": self.reference(&hit.passage),
                         "osis": hit.passage.to_osis(self.data.books()),
                         "book_id": hit.passage.book.0,
                         "book": self.data.books().get_name(hit.passage.book),
                         "segments": segments_json(&hit.passage),
-                        "line": hit.position.map(|(s, _)| s.line),
+                        "line": line,
                         "column": hit.position.map(|(s, _)| s.column),
-                        "utf16_column": hit.position.map(|(s, _)| s.utf16_column),
+                        "utf16_column": utf16_column,
                         "end_line": hit.position.map(|(_, e)| e.line),
                         "end_column": hit.position.map(|(_, e)| e.column),
                         "start_byte": hit.bytes.as_ref().map(|b| b.start),
@@ -178,6 +228,23 @@ impl Printer {
                         "label": hit.label,
                         "text": text,
                     });
+                    if let (Some(epub), serde_json::Value::Object(map)) = (&hit.epub, &mut value) {
+                        map.insert(
+                            "epub".into(),
+                            json!({
+                                "spine_index": epub.spine_index,
+                                "cfi": hit.label,
+                                "chapter": epub.chapter,
+                            }),
+                        );
+                    }
+                    let value = match (value, self.link(file, hit)) {
+                        (serde_json::Value::Object(mut map), Some(link)) => {
+                            map.insert("link".into(), link.into());
+                            serde_json::Value::Object(map)
+                        }
+                        (value, _) => value,
+                    };
                     emit(value.to_string());
                 }
             }
@@ -327,6 +394,31 @@ impl Utf16Offsets {
     }
 }
 
+/// A file's path relative to the searched path it was found under, with forward slashes (a file
+/// named on the command line is just its name)
+fn link_path(path: &Path, roots: &[PathBuf]) -> String {
+    let relative = roots
+        .iter()
+        .find_map(|root| {
+            if path == root {
+                path.file_name().map(Path::new)
+            } else {
+                path.strip_prefix(root)
+                    .ok()
+                    .filter(|p| !p.as_os_str().is_empty())
+            }
+        })
+        .unwrap_or(path);
+    let parts: Vec<_> = relative
+        .components()
+        .filter(|c| !matches!(c, Component::CurDir | Component::RootDir))
+        .map(|c| c.as_os_str().to_string_lossy())
+        .collect();
+    // An absolute path (outside every root) keeps its leading slash
+    let root = if relative.has_root() { "/" } else { "" };
+    format!("{root}{}", parts.join("/"))
+}
+
 /// The line that contains a byte offset, without its line break
 fn line_at(text: &str, byte: usize) -> &str {
     let start = text[..byte].rfind('\n').map_or(0, |i| i + 1);
@@ -373,5 +465,26 @@ pub fn emit(line: String) {
     let mut out = io::stdout().lock();
     if writeln!(out, "{line}").is_err() {
         std::process::exit(0);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn link_paths_are_relative_to_the_root() {
+        let roots = [
+            PathBuf::from("."),
+            PathBuf::from("vault"),
+            PathBuf::from("one.epub"),
+        ];
+        let path = |p: &str| link_path(Path::new(p), &roots);
+        assert_eq!(path("./Books/Moby Dick.epub"), "Books/Moby Dick.epub");
+        assert_eq!(path("vault/Books/a.epub"), "Books/a.epub");
+        assert_eq!(path("one.epub"), "one.epub");
+        let roots = [PathBuf::from("dir/two.epub")];
+        assert_eq!(link_path(Path::new("dir/two.epub"), &roots), "two.epub");
+        assert_eq!(link_path(Path::new("/b/c.epub"), &roots), "/b/c.epub");
     }
 }

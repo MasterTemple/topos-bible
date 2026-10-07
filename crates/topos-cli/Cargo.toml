@@ -25,6 +25,10 @@ shlex = "1"
 clap_complete = { version = "4.6.11", features = ["unstable-dynamic"] }
 postcard = { version = "1", features = ["use-std"] }
 
+[dev-dependencies]
+# Builds a small EPUB for the tests
+zip = { version = "3.0.0", default-features = false }
+
 [features]
 # Search PDFs (builds MuPDF)
 pdf = ["topos-bible-formats/pdf", "dep:mupdf"]

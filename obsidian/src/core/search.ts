@@ -12,6 +12,15 @@ export interface Hit {
   /** The line the reference starts on, for context */
   lineText: string;
   passage: Passage;
+  /** For EPUBs (whose offsets run through the book's text, section after section): where it is */
+  epub?: EpubLocation;
+}
+
+/** Where a reference in an EPUB is: its spine item, its CFI, and the chapter's name */
+export interface EpubLocation {
+  spineIndex: number;
+  cfi: string;
+  chapter: string | null;
 }
 
 export function searchText(topos: Topos, path: string, text: string): Hit[] {

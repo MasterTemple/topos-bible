@@ -23,6 +23,7 @@ import { ReferenceSuggest } from "./editor/suggest.ts";
 import { engineWasm, loadTopos } from "./engine.ts";
 import { BackgroundSearcher } from "./indexers/background.ts";
 import { defaultCliPath, runCli, type CliRun } from "./indexers/cli.ts";
+import { EpubSupport } from "./epub/support.ts";
 import workerSource from "topos-worker-source";
 import { GoToReferenceModal, InsertReferenceModal, SavedQueryModal } from "./modals.ts";
 import { linkReferences, relinkEditor } from "./reading.ts";
@@ -35,6 +36,8 @@ export default class ToposPlugin extends Plugin {
   topos!: Topos;
   index!: ReferenceIndex;
   search = new SearchStore();
+  /** References in EPUBs, through the EPUB++ plugin */
+  epubs = new EpubSupport(this);
   /** Bumped whenever the index changes, so the sidebar re-renders */
   indexVersion = 0;
   indexing = false;
@@ -42,7 +45,7 @@ export default class ToposPlugin extends Plugin {
   /** The background indexer; null if workers are unavailable (then searches run on this thread) */
   private worker: BackgroundSearcher | null | undefined;
   /** Bumped by each reindex, so a superseded run stops */
-  private generation = 0;
+  generation = 0;
   private cliRun: CliRun | null = null;
   /** Files indexed from an edit during the current reindex, which it must not overwrite */
   private readonly edited = new Set<string>();
@@ -76,18 +79,21 @@ export default class ToposPlugin extends Plugin {
 
     this.app.workspace.onLayoutReady(() => {
       void this.reindex();
+      this.epubs.start();
       const vault = this.app.vault;
       this.registerEvent(vault.on("modify", (file) => void this.indexFile(file)));
       this.registerEvent(vault.on("create", (file) => void this.indexFile(file)));
       this.registerEvent(
         vault.on("delete", (file) => {
           this.index.remove(file.path);
+          this.epubs.remove(file.path);
           this.notifyIndex();
         }),
       );
       this.registerEvent(
         vault.on("rename", (file, oldPath) => {
           this.index.remove(oldPath);
+          this.epubs.rename(oldPath, file.path);
           void this.indexFile(file);
         }),
       );
@@ -97,6 +103,7 @@ export default class ToposPlugin extends Plugin {
   onunload(): void {
     for (const doc of this.documents()) doc.body.style.removeProperty("--topos-reference-color");
     this.generation++;
+    this.epubs.stop();
     clearTimeout(this.notifyTimer);
     this.cliRun?.stop();
     this.worker?.terminate();
@@ -185,6 +192,7 @@ export default class ToposPlugin extends Plugin {
       // Reading view keeps the HTML it rendered (and linked) until told to render again
       leaf.view.previewMode?.rerender(true);
     }
+    this.epubs.refresh();
     this.search.set({});
   }
 
@@ -207,7 +215,7 @@ export default class ToposPlugin extends Plugin {
   private lastNotify = 0;
 
   /** Notifies at most twice a second, since the sidebar re-sorts every hit (for indexing in batches) */
-  private notifyIndexSoon(): void {
+  notifyIndexSoon(): void {
     if (this.notifyTimer !== undefined) return;
     const wait = Math.max(0, 500 - (performance.now() - this.lastNotify));
     this.notifyTimer = setTimeout(() => this.notifyIndex(), wait);
@@ -221,20 +229,22 @@ export default class ToposPlugin extends Plugin {
       .filter(Boolean);
   }
 
-  isSearchable(file: TAbstractFile): file is TFile {
-    if (!(file instanceof TFile)) return false;
-    const extensions = this.extensions();
-    const excluded = this.settings.excludeFolders
+  /** Whether a path is in one of the folders left out of search */
+  isExcluded(path: string): boolean {
+    return this.settings.excludeFolders
       .split("\n")
       .map((f) => f.trim().replace(/\/+$/, ""))
-      .filter(Boolean);
-    return (
-      extensions.includes(file.extension) &&
-      !excluded.some((folder) => file.path === folder || file.path.startsWith(`${folder}/`))
-    );
+      .filter(Boolean)
+      .some((folder) => path === folder || path.startsWith(`${folder}/`));
+  }
+
+  isSearchable(file: TAbstractFile): file is TFile {
+    if (!(file instanceof TFile)) return false;
+    return this.extensions().includes(file.extension) && !this.isExcluded(file.path);
   }
 
   private async indexFile(file: TAbstractFile): Promise<void> {
+    if (file instanceof TFile && this.epubs.isEpub(file)) return this.epubs.indexFile(file);
     if (!this.isSearchable(file)) return;
     if (this.indexing) this.edited.add(file.path);
     const text = await this.app.vault.cachedRead(file);
@@ -258,7 +268,7 @@ export default class ToposPlugin extends Plugin {
   }
 
   /** Searches files in the background, or on this thread if the worker fails */
-  private async searchFiles(files: { path: string; text: string }[]): Promise<{ path: string; hits: Hit[] }[]> {
+  async searchFiles(files: { path: string; text: string }[]): Promise<{ path: string; hits: Hit[] }[]> {
     const worker = this.background();
     if (worker) {
       try {
@@ -303,6 +313,8 @@ export default class ToposPlugin extends Plugin {
     } else {
       await this.reindexBuiltin(generation);
     }
+    if (generation !== this.generation) return;
+    await this.epubs.indexAll(generation);
     if (generation !== this.generation) return;
     console.debug(`topos: indexed ${this.index.fileCount} files with references (${engine}) in ${Math.round(performance.now() - start)} ms`);
     this.indexing = false;
@@ -350,6 +362,13 @@ export default class ToposPlugin extends Plugin {
     }
   }
 
+  /** The vault's folder when searching with the topos CLI (the CLI engine, on desktop), else null */
+  cliVault(): string | null {
+    const adapter = this.app.vault.adapter;
+    if (this.settings.engine !== "cli" || !Platform.isDesktopApp || !(adapter instanceof FileSystemAdapter)) return null;
+    return adapter.getBasePath();
+  }
+
   /** The topos command to run */
   cliPath(): string {
     return this.settings.cliPath || defaultCliPath();
@@ -381,6 +400,7 @@ export default class ToposPlugin extends Plugin {
 
   /** Opens the note and selects the reference */
   async openHit(hit: Hit): Promise<void> {
+    if (hit.epub && (await this.epubs.open(hit))) return;
     const file = this.app.vault.getFileByPath(hit.path);
     if (!file) return;
     const leaf = this.app.workspace.getLeaf(false);
@@ -398,12 +418,14 @@ export default class ToposPlugin extends Plugin {
   /**
    * Whether a click on a reference opens it: a middle click always; on desktop, a Ctrl/Cmd-click
    * (or any click, if the setting allows it); on mobile, which has no Ctrl, a tap outside the
-   * editor, or in it if plain clicks are allowed. Right clicks never do (they open menus)
+   * editor, or, if that setting is on, a tap in an editor that wasn't focused (the tap that would
+   * place the cursor and open the keyboard; once it's open, taps move the cursor). Right clicks
+   * never do (they open menus)
    */
-  clickOpens(event: MouseEvent, inEditor: boolean): boolean {
+  clickOpens(event: MouseEvent, inEditor: boolean, editorFocused = false): boolean {
     if (event.button === 1) return true;
     if (event.button !== 0) return false;
-    if (!Platform.isDesktop) return !inEditor || !this.settings.clickNeedsModifier;
+    if (!Platform.isDesktop) return !inEditor || (this.settings.tapOpensInEditor && !editorFocused);
     return !this.settings.clickNeedsModifier || event.ctrlKey || event.metaKey;
   }
 
@@ -555,7 +577,7 @@ export default class ToposPlugin extends Plugin {
     );
   }
 
-  private async copy(text: string): Promise<void> {
+  async copy(text: string): Promise<void> {
     await navigator.clipboard.writeText(text);
     new Notice(`Copied ${text}`);
   }

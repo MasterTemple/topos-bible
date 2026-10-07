@@ -51,6 +51,7 @@ class Plugin {
 class TFile {
   path: string;
   extension: string;
+  stat = { mtime: 1, size: 1 };
   constructor(path: string) {
     this.path = path;
     this.extension = path.split(".").pop()!;
@@ -137,6 +138,31 @@ const files: Record<string, string> = {
   "Sermons/b.md": "Psalm 23 and is 2.5%",
   "Archive/old.md": "Gen 1:1",
   "image.png": "Jn 3:16",
+  "Books/b.epub": "(an EPUB; its text comes from the stand-in EPUB++ API)",
+};
+
+/** A stand-in for EPUB++'s API: one book of two sections, with made-up CFIs from section offsets */
+const epubText = "See John\n\n3 more, and Rom 8:28.";
+const epub = {
+  provider: null as any,
+  opened: [] as string[],
+  refreshed: [] as (string[] | undefined)[],
+  api: {
+    version: 1,
+    extractText: async () => ({
+      sections: [
+        { spineIndex: 0, href: "title.xhtml", text: "Title", title: null },
+        { spineIndex: 1, href: "ch1.xhtml", text: epubText, title: "Chapter 1" },
+      ],
+      cfi: (spine: number, start: number, end: number) => `epubcfi(/6/${(spine + 1) * 2}!/4,/1:${start},/1:${end})`,
+    }),
+    registerAnnotationProvider(provider: any) {
+      epub.provider = provider;
+      return () => (epub.provider = null);
+    },
+    refreshAnnotations: (_id: string, paths?: string[]) => void epub.refreshed.push(paths),
+    open: async (file: TFile, locator: string) => void epub.opened.push(`${file.path}#${locator}`),
+  },
 };
 
 /** A minimal Editor over one line of text */
@@ -204,8 +230,10 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
       getFiles: () => Object.keys(files).map((path) => new TFile(path)),
       cachedRead: async (file: TFile) => files[file.path],
       getAbstractFileByPath: (path: string) => (path in files ? new TFile(path) : null),
+      getFileByPath: (path: string) => (path in files ? new TFile(path) : null),
       adapter: new FileSystemAdapter(vaultPath),
     }),
+    plugins: { plugins: { "epub-plus-plus": { api: epub.api } } },
   };
   const plugin = new ToposPlugin(app, {});
   await plugin.onload();
@@ -220,6 +248,16 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   for (const id of ["open-search", "insert-reference", "go-to-reference", "open-literal-word", "normalize-references"]) {
     assert.ok(ids.includes(id), id);
   }
+
+  // On mobile (the stand-in's Platform isn't desktop), a tap opens references outside the editor;
+  // in it, only with the setting on, and only when the tap would focus the editor
+  const tap = { button: 0, ctrlKey: false, metaKey: false } as MouseEvent;
+  assert.equal(plugin.clickOpens(tap, false), true);
+  assert.equal(plugin.clickOpens(tap, true, false), false);
+  plugin.settings.tapOpensInEditor = true;
+  assert.equal(plugin.clickOpens(tap, true, false), true);
+  assert.equal(plugin.clickOpens(tap, true, true), false);
+  plugin.settings.tapOpensInEditor = false;
 
   // Excluding a folder reindexes without it
   plugin.settings.excludeFolders = "Archive";
@@ -363,4 +401,36 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   suggest.selectSuggestion(suggestions[15]);
   assert.equal(typing.value, "Read John 3:16");
   assert.equal(suggest.onTrigger({ line: 0, ch: 9 }, fakeEditor("The quick")), null);
+
+  // EPUBs: off by default; on, their references come from EPUB++'s text and go back as annotations
+  assert.ok(epub.provider, "registered as an annotation provider");
+  assert.equal(plugin.index.get("Books/b.epub").length, 0);
+  plugin.settings.searchEpubs = true;
+  await plugin.epubs.toggled();
+  const [hit, ...rest] = plugin.index.get("Books/b.epub");
+  // "See John" / "3 more" are separate paragraphs, so only Romans 8:28 is a reference
+  assert.equal(rest.length, 0);
+  assert.equal(hit.passage.reference, "Romans 8:28");
+  const at = epubText.indexOf("Rom");
+  assert.deepEqual(hit.epub, { spineIndex: 1, cfi: `epubcfi(/6/4!/4,/1:${at},/1:${at + "Rom 8:28".length})`, chapter: "Chapter 1" });
+  assert.equal(hit.start, "Title".length + 2 + at);
+  assert.deepEqual(epub.refreshed.at(-1), ["Books/b.epub"]);
+  const annotations = await epub.provider.annotations(new TFile("Books/b.epub"));
+  assert.deepEqual(
+    annotations.map((a: any) => [a.label, a.locator]),
+    [["Romans 8:28", hit.epub.cfi]],
+  );
+  assert.match(epub.provider.style("red"), /dashed/);
+  // Results open in the book
+  await plugin.openHit(hit);
+  assert.deepEqual(epub.opened, [`Books/b.epub#${hit.epub.cfi}`]);
+  // A reindex keeps them (from the cache); turning the setting off removes them
+  await plugin.reindex();
+  assert.equal(plugin.index.get("Books/b.epub").length, 1);
+  plugin.settings.searchEpubs = false;
+  await plugin.epubs.toggled();
+  assert.equal(plugin.index.get("Books/b.epub").length, 0);
+  assert.deepEqual(await epub.provider.annotations(new TFile("Books/b.epub")), []);
+  plugin.onunload();
+  assert.equal(epub.provider, null);
 });

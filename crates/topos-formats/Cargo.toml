@@ -24,6 +24,10 @@ roxmltree = { version = "0.21.1", optional = true }
 mupdf = { version = "0.8.0", optional = true }
 serde_json = { workspace = true, optional = true }
 
+[dev-dependencies]
+# Builds a small EPUB in memory (already a dependency of `epub`)
+zip = { version = "3.0.0", default-features = false }
+
 [features]
 default = ["html", "srt", "epub", "json", "xml"]
 html = ["dep:line-col", "dep:regex", "dep:urlencoding"]

@@ -96,7 +96,7 @@ export class GoToReferenceModal extends SuggestModal<Hit> {
     el.addClass("topos-hit-suggestion");
     const reference = written(this.plugin.topos, hit.passage, style, this.plugin.settings.format);
     el.createDiv({ cls: "topos-hit-reference", text: reference });
-    el.createDiv({ cls: "topos-hit-location", text: `${hit.path}:${hit.line}` });
+    el.createDiv({ cls: "topos-hit-location", text: hit.epub ? `${hit.path}: ${hit.epub.chapter ?? `section ${hit.epub.spineIndex + 1}`}` : `${hit.path}:${hit.line}` });
     el.createDiv({ cls: "topos-hit-context", text: hit.lineText.trim() });
   }
 

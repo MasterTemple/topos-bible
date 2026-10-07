@@ -58,11 +58,22 @@ export class ToposSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Require Ctrl/Cmd to open references")
       .setDesc(
-        "On desktop, plain clicks place the cursor (or do nothing in reading view); Ctrl/Cmd-click opens the reference. On mobile, a tap opens references outside the editor.",
+        "On desktop, plain clicks place the cursor (or do nothing in reading view); Ctrl/Cmd-click opens the reference.",
       )
       .addToggle((t) =>
         t.setValue(settings.clickNeedsModifier).onChange((value) => {
           settings.clickNeedsModifier = value;
+          void save();
+        }),
+      );
+    new Setting(containerEl)
+      .setName("Tap to open references in the editor")
+      .setDesc(
+        "On mobile, the tap that would place the cursor and open the keyboard opens the reference's link instead. Once you're typing, taps move the cursor as usual. Taps outside the editor always open references.",
+      )
+      .addToggle((t) =>
+        t.setValue(settings.tapOpensInEditor).onChange((value) => {
+          settings.tapOpensInEditor = value;
           void save();
         }),
       );
@@ -121,6 +132,17 @@ export class ToposSettingTab extends PluginSettingTab {
         t.setValue(settings.extensions).onChange((value) => {
           settings.extensions = value;
           void save().then(() => this.plugin.reindex());
+        }),
+      );
+    new Setting(containerEl)
+      .setName("Search EPUB files")
+      .setDesc(
+        `Find references in EPUBs too. Needs the EPUB++ plugin, which opens EPUBs in Obsidian: it shows their references in the book, with a sidebar tab to step through them and save one as a highlight. Results open in the book.${this.plugin.epubs.api ? "" : " (EPUB++ isn't enabled.)"}`,
+      )
+      .addToggle((t) =>
+        t.setValue(settings.searchEpubs).onChange((value) => {
+          settings.searchEpubs = value;
+          void save().then(() => this.plugin.epubs.toggled());
         }),
       );
     if (Platform.isDesktopApp) {

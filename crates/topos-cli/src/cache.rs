@@ -23,7 +23,7 @@ use topos_bible::data::books::BookId;
 use crate::search::Hit;
 
 /// Bumped when entries change shape, so old ones are never misread
-const FORMAT: u32 = 2;
+const FORMAT: u32 = 3;
 /// Prune entries for deleted files at most this often
 const PRUNE_EVERY: Duration = Duration::from_secs(24 * 60 * 60);
 /// Caches for other options (an old version, a data file no longer used) are removed after this
@@ -49,7 +49,7 @@ pub enum Cached {
 }
 
 pub struct Cache {
-    /// `~/.cache/topos/v2/<options>/`
+    /// `~/.cache/topos/v3/<options>/`
     dir: PathBuf,
 }
 
@@ -207,7 +207,8 @@ fn write_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
     })
 }
 
-/// The first cache was one JSON file per set of options, directly in the cache folder
+/// Removes older caches: the first was one JSON file per set of options, directly in the cache
+/// folder, and later ones are folders for older entry formats (`v2`)
 fn remove_legacy(root: &Path) {
     for entry in fs::read_dir(root).into_iter().flatten().flatten() {
         let path = entry.path();
@@ -217,6 +218,12 @@ fn remove_legacy(root: &Path) {
             .unwrap_or_default();
         if path.is_file() && (name.ends_with(".json") || name.ends_with(".json.tmp")) {
             let _ = fs::remove_file(path);
+        } else if path.is_dir()
+            && let Some(version) = name.strip_prefix('v').and_then(|v| v.parse::<u32>().ok())
+            && version < FORMAT
+        {
+            // Entries in an older format
+            let _ = fs::remove_dir_all(path);
         }
     }
 }

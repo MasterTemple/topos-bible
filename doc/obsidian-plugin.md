@@ -36,7 +36,7 @@ verse) or grouped by book, which the CLI can't do.
 - **Clickable references**: references in the editor (live preview and source) and in reading
   view (callouts, tables, and embeds too) are marked with a soft glow and a dashed underline in
   the accent color (or a chosen one), not as ordinary links. Ctrl/Cmd-click on desktop (a tap on
-  mobile outside the editor) opens its link (Literal Word by default; see Links).
+  mobile outside the editor, or in it if a setting allows and the editor isn't focused) opens its link (Literal Word by default; see Links).
 - **Context menu** on a reference: open its link, copy as OSIS, find it in the vault.
 
 ### Commands
@@ -69,9 +69,34 @@ Settings from before templates (a Literal Word translation) become the matching 
 
 ### Settings
 
-Reference style; where references open (a site, a link template, or nowhere); whether editor clicks need Ctrl/Cmd; highlight
+Reference style; where references open (a site, a link template, or nowhere); whether editor clicks need Ctrl/Cmd; whether a tap opens references in the editor on mobile; highlight
 references in the editor and reading view; autocomplete on/off, book-name completion
-(off, capitalized, always), and how many suggestions; files and folders to exclude from search.
+(off, capitalized, always), and how many suggestions; files and folders to exclude from search;
+whether to search EPUBs.
+
+### EPUBs (with EPUB++)
+
+EPUB++ (a separate plugin) opens EPUBs in Obsidian and has an API for annotation providers. With
+**Search EPUB files** on, books not in the cache are searched in one of two ways:
+
+- With the CLI engine (desktop), `topos -m json -- <book>...` searches them, named on the command
+  line (in batches that fit on one) so ignore files can't skip them, and in parallel off
+  Obsidian's thread. Its JSON has the CFI, spine index, chapter, and offsets through the book's
+  text (`topos-bible-formats` extracts text and writes CFIs exactly as EPUB++ does, checked on 98
+  books), so the hits are the same as the other way's. A named book the CLI doesn't report as
+  unreadable has been searched, even with no references. Books it can't read, a CLI that fails,
+  or one too old to report EPUB positions fall back to EPUB++.
+- Otherwise topos asks EPUB++ for each book's text (`extractText`, one string per spine item,
+  paragraphs separated by `\n\n`, parsed on Obsidian's main thread one book at a time, which is
+  slow for a library), searches the sections like notes, and asks for each hit's range CFI.
+
+The hits join the index (offsets continue through the book, so position order is book
+order; `Hit.epub` holds the spine index, CFI, and chapter) and are cached in `epub-index.json` by
+size and mtime. topos registers a "Bible references" provider: EPUB++ draws them (topos picks
+the style: dashed underline and glow), lists them in a sidebar tab, and offers *Save as highlight*
+next to topos's menu items. Results in the sidebar open with EPUB++'s `open(file, cfi)`.
+
+Either way the CFIs match the reader's exactly.
 
 ## Design
 
@@ -87,6 +112,9 @@ references in the editor and reading view; autocomplete on/off, book-name comple
   is sent to it at startup rather than embedded twice), in batches of up to 200 files or 4M
   characters. If workers are unavailable it falls back to the main thread, yielding between
   files. The sidebar re-renders at most twice a second while results arrive.
+- **EPUBs** (`src/epub/`) are searched by the CLI when it's the engine, else through EPUB++: the
+  text comes from its API, searching uses the same worker, and `src/core/epub.ts` maps section
+  hits to the book. Either way they're cached in `epub-index.json`.
 - **Optional CLI engine (desktop)**: runs `topos . --no-config -m json [--cache]` in the vault
   folder and streams the results into the index. The CLI's JSON includes UTF-16 offsets, the
   book id, segments, and the line text, so its hits are identical to the built-in engine's
@@ -101,6 +129,6 @@ The bindings gained what the filters need: `books()`, `genres()`, `find_book()`,
 
 ## Not in the first version
 
-- PDF and EPUB search inside the vault (needs the native formats crate)
+- PDF search inside the vault (needs the native formats crate)
 - Book context for notes about one book (`--context-book`)
 - Diagnostics for references that don't exist (needs `problems` in the bindings)

@@ -17,6 +17,7 @@ use topos_bible::{
     matcher::{BibleMatcher, context::BookContext},
     segments::formatter::{BookStyle, FormatOptions},
 };
+use topos_bible_formats::epub::{CfiOptions, LinkStyle};
 
 /**
 Find Bible references in files, directories, text, or stdin.
@@ -203,6 +204,20 @@ pub struct Args {
     #[arg(long, value_name = "BOOL", num_args = 0..=1, default_missing_value = "true")]
     pub fmt_chapter_in_single_chapter_books: Option<bool>,
 
+    /// Print an EPUB++ link to each reference instead (`[[Book.epub#epubcfi(...)|John 3:16]]`, or
+    /// with markdown, `[John 3:16](Book.epub#epubcfi%28...%29)`), labeled with the reference as
+    /// written by -f and --psg-fmt. Only EPUBs are searched, and the path in each link is relative
+    /// to the directory searched (or just the file's name, for a file named on the command line).
+    /// With -m json, each object gets a "link" field instead; -m count, -m total-count, -l, and
+    /// --files work as usual
+    #[arg(long, value_enum, value_name = "STYLE", conflicts_with = "text")]
+    pub epub_links: Option<EpubLinks>,
+
+    /// Write EPUB CFIs with `[id]` assertions, like /6/14[chapter-1]!/4/2[p3]/1:0: more robust
+    /// if the book changes, but `[` and `]` break wikilinks (EPUB++ leaves them out by default)
+    #[arg(long)]
+    pub cfi_assertions: bool,
+
     /// Lines of context to show after each match
     #[arg(long, short = 'A', default_value_t = 0)]
     pub after_context: usize,
@@ -354,6 +369,25 @@ pub enum OutputMode {
     TotalCount,
 }
 
+/// How `--epub-links` writes links
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+pub enum EpubLinks {
+    /// `[[Book.epub#epubcfi(...)|John 3:16]]`
+    Wiki,
+    /// `[John 3:16](Book.epub#epubcfi%28...%29)`
+    #[value(alias = "md")]
+    Markdown,
+}
+
+impl From<EpubLinks> for LinkStyle {
+    fn from(links: EpubLinks) -> Self {
+        match links {
+            EpubLinks::Wiki => LinkStyle::Wiki,
+            EpubLinks::Markdown => LinkStyle::Markdown,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, ValueEnum)]
 pub enum ReferenceFormat {
     /// `Genesis 1:1`
@@ -439,7 +473,15 @@ impl Args {
             overrides,
             extensions: lower(&self.extensions),
             exclude_extensions: lower(&self.exclude_ext),
+            only_epub: self.epub_links.is_some(),
         })
+    }
+
+    /// How EPUB CFIs are written
+    pub fn cfi_options(&self) -> CfiOptions {
+        CfiOptions {
+            assertions: self.cfi_assertions,
+        }
     }
 
     /// Whether files that look binary are searched (`--binary` or `-uuu`)
@@ -461,6 +503,8 @@ impl Args {
         let remove = contents(&self.remove_data);
         // Binary files are cached as having no references unless they are searched
         let binary = self.search_binary();
+        // EPUB results are stored with their CFIs
+        let cfi = self.cfi_assertions;
         format!(
             "{:?}",
             (
@@ -469,7 +513,8 @@ impl Args {
                 data,
                 merge,
                 remove,
-                binary
+                binary,
+                cfi
             )
         )
     }

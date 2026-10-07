@@ -60,11 +60,16 @@ export function referenceDecorations(plugin: ToposPlugin) {
 
   const reference = (event: MouseEvent) =>
     (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-topos-url]") ?? null;
-  const open = (event: MouseEvent) => {
+  // Whether the editor had focus when the pointer went down, before a tap focuses it: on mobile,
+  // a tap in an unfocused editor opens the reference, and one in a focused editor moves the cursor
+  let focusedAtPress = false;
+  const open = (event: MouseEvent, view: EditorView) => {
     const target = reference(event);
-    if (!target || !plugin.settings.linkInEditor || !plugin.clickOpens(event, true)) return false;
+    if (!target || !plugin.settings.linkInEditor || !plugin.clickOpens(event, true, focusedAtPress)) return false;
     event.preventDefault();
     window.open(target.dataset.toposUrl, "_blank");
+    // The tap focused the editor; don't leave the keyboard opening behind the link
+    if (!focusedAtPress) view.contentDOM.blur();
     return true;
   };
 
@@ -74,6 +79,10 @@ export function referenceDecorations(plugin: ToposPlugin) {
       click: open,
       // A middle click arrives as auxclick, not click
       auxclick: open,
+      pointerdown(_event: PointerEvent, view: EditorView) {
+        focusedAtPress = view.hasFocus;
+        return false;
+      },
       mousedown(event: MouseEvent) {
         // Middle-clicking a reference opens it, so it doesn't paste (Linux) or start autoscrolling
         if (event.button !== 1 || !plugin.settings.linkInEditor || !reference(event)) return false;

@@ -14,6 +14,8 @@ interface CliMatch {
   start_utf16: number;
   end_utf16: number;
   line_text: string;
+  /** For EPUBs (whose positions run through the book's text) */
+  epub?: { spine_index: number; cfi: string; chapter: string | null };
 }
 
 export class OutdatedCliError extends Error {
@@ -42,7 +44,16 @@ export function parseCliLine(line: string): Hit | null {
     column: m.utf16_column,
     lineText: m.line_text,
     passage,
+    ...(m.epub && { epub: { spineIndex: m.epub.spine_index, cfi: m.epub.cfi, chapter: m.epub.chapter } }),
   };
+}
+
+/** Whether the CLI reported that it couldn't search a file (`topos: <path>: <error>` on stderr) */
+export function cliFailed(errors: string[], path: string): boolean {
+  return errors.some((line) => {
+    const normal = line.replace(/\\/g, "/");
+    return normal.startsWith(`topos: ${path}: `) || normal.startsWith(`topos: ./${path}: `);
+  });
 }
 
 /**

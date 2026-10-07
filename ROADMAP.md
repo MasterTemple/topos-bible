@@ -43,6 +43,7 @@ The phases are in order, and each one leaves the repo working.
 
 - [x] Split the core (`topos-lib`) from `topos-formats` (feature-gated adapters behind a `Format` trait)
 - [x] Generalize match location [#9](https://github.com/MasterTemple/topos-bible/issues/9): plain text, HTML, SRT (multi-line cues), WebVTT, SBV, PDF (MuPDF 0.8; `topos-pdf` removed), EPUB, JSON, XML
+- [x] EPUB CFIs identical to EPUB++'s (real spine positions, UTF-16 offsets across text chunks, one range CFI from `<body>`, optional `[id]` assertions), checked against its `BookText.cfi` on 97 books
 
 ## Phase 4: Formatting, interop, autocomplete
 
@@ -59,6 +60,8 @@ The phases are in order, and each one leaves the repo working.
 - [x] Clarify inputs: `topos [PATH]...` (paths only, like ripgrep), with `--text` or piped stdin for literal text (`-i` already filters by passage)
 - [x] `--config` for custom book, genre and versification data (JSON, via `BibleDataInput`)
 - [x] Cache search results [#2](https://github.com/MasterTemple/topos-bible/issues/2) (`--cache`)
+- [x] `--epub-links wiki|markdown`: an EPUB++ link to each reference in EPUBs (`--cfi-assertions` for `[id]` assertions)
+- [x] EPUB positions in `-m json` (spine index, chapter, offsets and lines in the book's text), so the Obsidian plugin's CLI engine searches EPUBs
 
 ## Phase 6: Bindings and tooling
 

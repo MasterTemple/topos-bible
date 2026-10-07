@@ -67,7 +67,8 @@ export function SearchApp({ plugin }: { plugin: ToposPlugin }) {
     () => [...new Set(groups.flatMap((g) => g.hits.map((h) => h.path)))],
     [groups],
   );
-  const fileLines = useFileLines(plugin, state.context > 0 ? shownPaths : [], indexVersion);
+  // EPUBs have no lines to read (their hits carry their paragraph)
+  const fileLines = useFileLines(plugin, state.context > 0 ? shownPaths.filter((p) => !isEpub(p)) : [], indexVersion);
 
   const setFilters = (update: Partial<Filters>) => {
     plugin.search.set({ filters: { ...state.filters, ...update } });
@@ -466,8 +467,9 @@ function HitRow({
       <div className="topos-hit-head">
         <span className="topos-hit-reference">{reference}</span>
         <span className="topos-hit-location">
-          {showPath ? `${hit.path}:` : ""}
-          {hit.line}
+          {hit.epub
+            ? `${showPath ? `${hit.path}: ` : ""}${hit.epub.chapter ?? `section ${hit.epub.spineIndex + 1}`}`
+            : `${showPath ? `${hit.path}:` : ""}${hit.line}`}
         </span>
         {url && (
           <button
@@ -504,4 +506,8 @@ function ContextLines({ lines, from, to }: { lines: string[]; from: number; to: 
     );
   }
   return <>{shown}</>;
+}
+
+function isEpub(path: string): boolean {
+  return path.toLowerCase().endsWith(".epub");
 }

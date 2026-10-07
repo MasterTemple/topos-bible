@@ -16,8 +16,7 @@ use topos_bible::{
     segments::Passage,
 };
 use topos_bible_formats::{
-    SearchFormat,
-    epub::CfiLocation,
+    epub::{CfiOptions, search_epub},
     srt::{SRTDocument, SRTTimeStamp},
 };
 
@@ -69,6 +68,25 @@ pub struct Hit {
     pub bytes: Option<Range<usize>>,
     /// Where the hit is in other terms, like a timestamp, page, or EPUB CFI
     pub label: Option<String>,
+    /// More about where a hit in an EPUB is
+    pub epub: Option<EpubPlace>,
+}
+
+/// Where a hit in an EPUB is, besides its CFI (for JSON, so the Obsidian plugin can use it)
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct EpubPlace {
+    /// Its content document's position in the spine
+    pub spine_index: usize,
+    /// The table of contents' name for its content document
+    pub chapter: Option<String>,
+    /// Its UTF-16 range in the book's text (every content document's, a blank line apart)
+    pub text_utf16: Range<usize>,
+    /// 1-based, in the book's text
+    pub line: usize,
+    /// 1-based, in UTF-16 code units
+    pub utf16_column: usize,
+    /// The line (paragraph) it starts on
+    pub line_text: String,
 }
 
 /// The hits in one file (or in the text given directly)
@@ -98,6 +116,8 @@ pub struct Searcher {
     pub binary: bool,
     /// `--files`: report the files that would be searched (with no hits), without searching
     pub list_only: bool,
+    /// How EPUB CFIs are written
+    pub cfi: CfiOptions,
 }
 
 /// How directories are walked (the path options)
@@ -118,6 +138,8 @@ pub struct WalkOptions {
     pub extensions: Vec<String>,
     /// Lowercase extensions to skip
     pub exclude_extensions: Vec<String>,
+    /// `--epub-links`: only EPUBs, even when named on the command line
+    pub only_epub: bool,
 }
 
 impl WalkOptions {
@@ -216,6 +238,9 @@ fn walk(searcher: Arc<Searcher>, paths: Vec<PathBuf>, sender: mpsc::Sender<FileR
                 Ok(entry) if entry.depth() > 0 && !searcher.walk.wants(entry.path()) => {
                     return WalkState::Continue;
                 }
+                Ok(entry) if searcher.walk.only_epub && !is_epub(entry.path()) => {
+                    return WalkState::Continue;
+                }
                 Ok(entry) if searcher.list_only => Ok(FileHits {
                     path: Some(entry.path().to_path_buf()),
                     text: None,
@@ -236,6 +261,12 @@ fn walk(searcher: Arc<Searcher>, paths: Vec<PathBuf>, sender: mpsc::Sender<FileR
     });
 }
 
+/// Whether a path ends in `.epub` (in any case)
+pub fn is_epub(path: &Path) -> bool {
+    path.extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("epub"))
+}
+
 impl Searcher {
     /**
     Uses the cache when the file has not changed
@@ -245,7 +276,7 @@ impl Searcher {
     */
     fn search_file(&self, path: &Path) -> Result<Option<FileHits>, String> {
         let Some(cached) = &self.cached else {
-            return search_file(&self.matcher, path, self.binary);
+            return search_file(&self.matcher, path, self.binary, self.cfi);
         };
         let keep = |hits: Vec<Hit>| -> Vec<Hit> {
             hits.into_iter()
@@ -269,7 +300,7 @@ impl Searcher {
                 Ok(Some(FileHits { path, text, hits }))
             }
             None => {
-                let found = search_file(&cached.unfiltered, path, self.binary)?;
+                let found = search_file(&cached.unfiltered, path, self.binary, self.cfi)?;
                 cached
                     .cache
                     .insert(path, found.as_ref().map_or(&[], |f| &f.hits));
@@ -287,6 +318,7 @@ fn search_file(
     matcher: &BibleMatcher,
     path: &Path,
     binary: bool,
+    cfi: CfiOptions,
 ) -> Result<Option<FileHits>, String> {
     let extension = path
         .extension()
@@ -295,16 +327,22 @@ fn search_file(
     let path_buf = Some(path.to_path_buf());
     match extension.as_deref() {
         Some("epub") => {
-            let matches = matcher
-                .search_format::<CfiLocation>(path)
-                .map_err(|e| e.to_string())?;
+            let matches = search_epub(matcher, path, cfi).map_err(|e| e.to_string())?;
             let hits = matches
                 .into_iter()
                 .map(|m| Hit {
                     passage: m.psg,
                     position: None,
                     bytes: None,
-                    label: Some(m.location.start_cfi),
+                    epub: Some(EpubPlace {
+                        spine_index: m.location.spine_index,
+                        chapter: m.location.chapter,
+                        text_utf16: m.location.text_utf16,
+                        line: m.location.line,
+                        utf16_column: m.location.utf16_column,
+                        line_text: m.location.line_text,
+                    }),
+                    label: Some(m.location.cfi),
                 })
                 .collect();
             Ok(Some(FileHits {
@@ -316,6 +354,7 @@ fn search_file(
         #[cfg(feature = "pdf")]
         Some("pdf") => {
             let doc = mupdf::Document::open(path).map_err(|e| e.to_string())?;
+            use topos_bible_formats::SearchFormat;
             let matches = matcher
                 .search_format::<topos_bible_formats::pdf::PDFLocation>(&doc)
                 .map_err(|e| e.to_string())?;
@@ -326,6 +365,7 @@ fn search_file(
                     position: None,
                     bytes: None,
                     label: Some(format!("page {}", m.location.page)),
+                    epub: None,
                 })
                 .collect();
             Ok(Some(FileHits {
@@ -359,6 +399,7 @@ fn search_text(matcher: &BibleMatcher, path: Option<PathBuf>, text: String) -> F
             position: Some((m.location.start, m.location.end)),
             bytes: Some(m.location.bytes.start..m.location.bytes.end),
             label: None,
+            epub: None,
         })
         .collect();
     FileHits {

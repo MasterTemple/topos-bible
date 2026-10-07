@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { Topos } from "topos-bible";
-import { CliOutputParser, OutdatedCliError, parseCliLine } from "../src/core/cli.ts";
+import { cliFailed, CliOutputParser, OutdatedCliError, parseCliLine } from "../src/core/cli.ts";
+import { cliBatches } from "../src/core/epub.ts";
 import { searchText, type Hit } from "../src/core/search.ts";
 import { runCli } from "../src/indexers/cli.ts";
 import { handle } from "../src/indexers/worker.ts";
@@ -37,6 +38,28 @@ test("CLI JSON lines become hits with vault paths", () => {
   assert.deepEqual([hit.start, hit.end, hit.column, hit.lineText], [0, 7, 1, "Jn 3:16"]);
   assert.equal(parseCliLine("  "), null);
   assert.throws(() => parseCliLine(JSON.stringify({ path: "a.md", reference: "John 3:16" })), OutdatedCliError);
+});
+
+test("CLI JSON for EPUBs says where in the book a reference is", () => {
+  const json = JSON.parse(line("Books/b.epub", "John 3:16", 40));
+  json.epub = { spine_index: 3, cfi: "epubcfi(/6/8!/4/2,/1:0,/1:7)", chapter: "One" };
+  const hit = parseCliLine(JSON.stringify(json))!;
+  assert.deepEqual(hit.epub, { spineIndex: 3, cfi: "epubcfi(/6/8!/4/2,/1:0,/1:7)", chapter: "One" });
+  assert.deepEqual([hit.start, hit.end], [40, 47]);
+  assert.equal(parseCliLine(line("a.md", "John 3:16", 0))!.epub, undefined);
+});
+
+test("files the CLI couldn't read are found in its errors", () => {
+  const errors = ["topos: Books/a b.epub: invalid zip", "topos: .\\Books\\c.epub: bad"];
+  assert.ok(cliFailed(errors, "Books/a b.epub"));
+  assert.ok(cliFailed(errors, "Books/c.epub"));
+  assert.ok(!cliFailed(errors, "Books/a.epub"));
+});
+
+test("paths for the CLI are split into batches that fit on a command line", () => {
+  assert.deepEqual(cliBatches(["aaaa", "bb", "cccc", "d"], 12), [["aaaa", "bb"], ["cccc", "d"]]);
+  assert.deepEqual(cliBatches(["a-very-long-path"], 10), [["a-very-long-path"]]);
+  assert.deepEqual(cliBatches([]), []);
 });
 
 test("streamed CLI output is grouped by file, across chunk boundaries", () => {
@@ -89,6 +112,18 @@ test("the CLI and the built-in engine find the same references", { skip: !exists
     const simplify = (h: Hit) => [h.start, h.end, h.line, h.column, h.lineText, h.passage.reference, h.passage.osis, h.passage.segments];
     assert.deepEqual(hits.map(simplify), expected.map(simplify), path);
   }
+});
+
+test("the CLI searches named files, and reports those it can't read", { skip: !existsSync(cli) && "build topos-bible-cli first" }, async () => {
+  const vault = mkdtempSync(join(tmpdir(), "topos-named-"));
+  writeFileSync(join(vault, "-dash.md"), "Jn 3:16");
+  writeFileSync(join(vault, "broken.epub"), "not a zip");
+  const found = new Map<string, Hit[]>();
+  const run = runCli(cli, vault, { cache: false, extensions: [], paths: ["-dash.md", "broken.epub"] }, (path, hits) => found.set(path, hits));
+  await run.done;
+  assert.deepEqual([...found.keys()], ["-dash.md"]);
+  assert.ok(cliFailed(run.errors, "broken.epub"), run.errors.join("\n"));
+  assert.ok(!cliFailed(run.errors, "-dash.md"));
 });
 
 test("a topos that rejects the arguments is an error, not an empty vault", { skip: process.platform === "win32" }, async () => {

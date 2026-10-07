@@ -11,4 +11,5 @@ cache = true                         # reuse results for unchanged files (--no-c
 # exclude-book = ["Song of Solomon"] # always leave out these books
 # query = "pauline"                  # always apply a named query from queries.toml
 # merge-data = ["~/bible/more-names.json"] # add abbreviations, books, or genres to the defaults
+# cfi-assertions = true             # EPUB CFIs with [id] assertions (they break wikilinks)
 # remove-data = "~/bible/fewer-names.json" # remove abbreviations, books, or genres from them

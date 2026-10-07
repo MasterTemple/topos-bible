@@ -18,6 +18,8 @@ export interface ToposSettings {
   linkInReading: boolean;
   /** On desktop, only open references with Ctrl/Cmd-click */
   clickNeedsModifier: boolean;
+  /** On mobile, a tap on a reference in an unfocused editor opens it (instead of placing the cursor) */
+  tapOpensInEditor: boolean;
   /** References' color, like `#d8b4fe` ("" uses the theme's accent color) */
   referenceColor: string;
   /** Suggest chapters, verses, and books while typing */
@@ -29,6 +31,8 @@ export interface ToposSettings {
   format: FormatSettings;
   /** File extensions to search, separated by commas */
   extensions: string;
+  /** Also search EPUBs (needs the EPUB++ plugin, which opens them and shows their references) */
+  searchEpubs: boolean;
   /** Folders to leave out of search, one per line */
   excludeFolders: string;
   /** The sidebar's order and grouping, remembered between sessions */
@@ -54,12 +58,14 @@ export const DEFAULT_SETTINGS: ToposSettings = {
   linkInEditor: true,
   linkInReading: true,
   clickNeedsModifier: true,
+  tapOpensInEditor: false,
   referenceColor: "",
   autocomplete: true,
   bookCompletion: "capitalized",
   suggestionLimit: 20,
   format: DEFAULT_FORMAT,
   extensions: "md, txt",
+  searchEpubs: false,
   excludeFolders: "",
   sort: "file",
   groupBy: "file",

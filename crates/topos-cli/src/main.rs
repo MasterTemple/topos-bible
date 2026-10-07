@@ -91,7 +91,15 @@ fn main() -> ExitCode {
         }
     };
 
-    let mut printer = Printer::new(&args, matcher.data().clone());
+    if args.epub_links.is_some() && matches!(input, Input::Text(_)) {
+        eprintln!("topos: --epub-links searches EPUB files, not text");
+        return ExitCode::from(2);
+    }
+    let roots = match &input {
+        Input::Paths(paths) => paths.clone(),
+        Input::Text(_) => vec![],
+    };
+    let mut printer = Printer::new(&args, matcher.data().clone(), roots);
     let (before, after) = args.context_lines();
     let cached = args
         .cache
@@ -113,6 +121,7 @@ fn main() -> ExitCode {
         walk,
         binary: args.search_binary(),
         list_only: args.files,
+        cfi: args.cfi_options(),
     });
     let results = search(searcher.clone(), input);
     let mut files: Vec<_> = vec![];

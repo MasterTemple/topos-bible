@@ -100,7 +100,7 @@ pub trait Format: Sized {
 | HTML | text fragment and line/column |
 | SRT / WebVTT / SBV | first cue id, its start time, and the last cue's end time |
 | PDF | page and one rectangle per line (built from MuPDF glyphs) |
-| EPUB | start and end CFI |
+| EPUB | a range CFI (as EPUB++ writes it), its start and end, the spine item and its chapter, and the position in the book's text |
 | JSON | JSON Pointer to the string, plus a range within it |
 | XML | path of the deepest element containing the match, plus a range in its text |
 
