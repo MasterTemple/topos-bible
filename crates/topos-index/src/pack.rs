@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use crate::entry::{Detail, FileEntry, Unit};
 
 /// Bumped when any format changes shape, so old files are never misread
-pub const FORMAT: u16 = 1;
+pub const FORMAT: u16 = 2;
 
 /// Deflate's level: fast to write (an edit rewrites a pack), and most of the size saved
 const LEVEL: u8 = 1;

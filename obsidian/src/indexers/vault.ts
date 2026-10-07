@@ -107,6 +107,12 @@ export class VaultIndexer {
         this.index.core.loadPack(new Uint8Array(await this.adapter.readBinary(path)));
         loaded = true;
       } catch (error) {
+        // From another version of the index: its device searches again and rewrites its packs
+        const message = (error as { value?: { message?: string } })?.value?.message ?? String(error);
+        if (/another version/.test(message)) {
+          await this.adapter.remove(path);
+          continue;
+        }
         console.warn(`topos: ignoring the index pack ${name}`, error);
       }
       if (!mine) this.packTimes.set(name, mtime);

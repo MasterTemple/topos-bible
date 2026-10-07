@@ -276,8 +276,11 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   };
   const manifest = { dir: ".obsidian/plugins/topos-bible", version: "0.4.0" };
   mkdirSync(join(vaultPath, manifest.dir), { recursive: true });
-  // The JSON cache from before the index is removed
+  // The JSON cache from before the index is removed, and so are packs in another format
   writeFileSync(join(vaultPath, manifest.dir, "epub-index.json"), "{}");
+  mkdirSync(join(vaultPath, manifest.dir, "index/packs"), { recursive: true });
+  const oldPack = join(vaultPath, manifest.dir, "index/packs/old-03.bin");
+  writeFileSync(oldPack, Buffer.concat([Buffer.from("TOPOSPAK"), Buffer.from([1, 0, 0, 0])]));
   const idle = async (p: any) => {
     await new Promise((r) => setTimeout(r, 5));
     while (p.indexing) await new Promise((r) => setTimeout(r, 5));
@@ -286,6 +289,7 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   await plugin.onload();
   await idle(plugin);
   assert.equal(existsSync(join(vaultPath, manifest.dir, "epub-index.json")), false);
+  assert.equal(existsSync(oldPack), false);
 
   assert.deepEqual(plugin.views, ["topos-bible-search"]);
   assert.deepEqual(
