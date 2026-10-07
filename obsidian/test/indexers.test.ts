@@ -10,6 +10,7 @@ import { ReferenceIndex } from "../src/core/index.ts";
 import { searchText, type Hit } from "../src/core/search.ts";
 import { runCli } from "../src/indexers/cli.ts";
 import { handle } from "../src/indexers/worker.ts";
+import { epub } from "./epub.ts";
 
 const topos = Topos.new();
 // The plugin loads Node's modules with require (desktop only), as Obsidian's CommonJS bundle allows
@@ -81,6 +82,36 @@ test("the worker searches files into index entries, like the main thread", async
 });
 
 const cli = join(import.meta.dirname, "../../target/debug/topos");
+
+test("the worker searches EPUBs like the CLI", { skip: !existsSync(cli) && "build topos-bible-cli first" }, async () => {
+  const bytes = epub(["See Jn 3:16.", "And Romans 8:28 and Ps 23"]);
+  const book = { path: "Books/b.epub", size: bytes.length, mtime: 5, bytes: bytes.slice().buffer };
+  const response = await handle({ type: "book", id: 1, book }, topos);
+  assert.ok(response.type === "book" && "bytes" in response.result, JSON.stringify(response));
+  const fromWorker = new ReferenceIndex(topos);
+  fromWorker.insert(response.result.bytes, "Books/b.epub", book);
+
+  const dir = mkdtempSync(join(tmpdir(), "topos-epub-"));
+  mkdirSync(join(dir, "Books"));
+  writeFileSync(join(dir, "Books/b.epub"), bytes);
+  const fromCli = new ReferenceIndex(topos);
+  await runCli(cli, dir, { cache: false, paths: ["Books/b.epub"] }, (path, entry) => fromCli.insert(entry, path, book)).done;
+
+  const all = (index: ReferenceIndex) => index.all().map((h) => [...simplify(h), h.lineText, h.epub]);
+  assert.deepEqual(all(fromWorker), all(fromCli));
+  const hits = fromWorker.get("Books/b.epub");
+  assert.deepEqual(
+    hits.map((h) => [h.passage.reference, h.epub?.chapter, h.epub?.cfi, h.lineText]),
+    [
+      ["John 3:16", "Chapter 1", "epubcfi(/6/2!/4/2,/1:4,/1:11)", "See Jn 3:16."],
+      ["Romans 8:28", "Chapter 2", "epubcfi(/6/4!/4/2,/1:4,/1:15)", "And Romans 8:28 and Ps 23"],
+      ["Psalm 23", "Chapter 2", "epubcfi(/6/4!/4/2,/1:20,/1:25)", "And Romans 8:28 and Ps 23"],
+    ],
+  );
+  // A file that isn't an EPUB says why
+  const broken = await handle({ type: "book", id: 2, book: { ...book, bytes: new ArrayBuffer(8) } }, topos);
+  assert.ok(broken.type === "book" && "error" in broken.result && /zip|EPUB/i.test(broken.result.error), JSON.stringify(broken));
+});
 
 test("the CLI and the built-in engine index the same references", { skip: !existsSync(cli) && "build topos-bible-cli first" }, async () => {
   const vault = mkdtempSync(join(tmpdir(), "topos-vault-"));

@@ -339,6 +339,36 @@ pub fn epub_entry(
     builder.finish(stamp, written, detail)
 }
 
+/**
+An EPUB's entry and details from the book itself (its bytes, read anywhere: WebAssembly can't
+open files), named for its path; the error says why it couldn't be read
+*/
+#[cfg(feature = "epub")]
+pub fn epub_file_entry(
+    matcher: &BibleMatcher,
+    path: &str,
+    bytes: &[u8],
+    stamp: Stamp,
+    written: u64,
+) -> Result<(FileEntry, Option<Detail>), String> {
+    use topos_bible_formats::epub::{CfiOptions, search_epub_reader};
+    let matches = search_epub_reader(matcher, std::io::Cursor::new(bytes), CfiOptions::default())
+        .map_err(|e| e.to_string())?;
+    let (entry, detail) = epub_entry(matches, stamp, written, detail_name(path, &stamp));
+    // A book without references needs no details
+    Ok(if entry.refs.is_empty() {
+        (
+            FileEntry {
+                detail: None,
+                ..entry
+            },
+            None,
+        )
+    } else {
+        (entry, Some(detail))
+    })
+}
+
 /// A name for an EPUB's details, from its path and version
 pub fn detail_name(path: &str, stamp: &Stamp) -> String {
     let key = format!("{path}\0{}\0{}", stamp.size, stamp.mtime);

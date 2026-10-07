@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import Module, { createRequire } from "node:module";
 import { test } from "node:test";
+import { epub as makeEpub } from "./epub.ts";
 
 class Events {
   on() {
@@ -165,7 +166,8 @@ const obsidian = {
   },
 };
 
-const files: Record<string, string> = {
+const files: Record<string, string | Uint8Array> = {
+  "Books/real.epub": makeEpub(["Read Jn 3:16.", "Then Rev 22:21"]),
   "Sermons/a.md": "Read Jn 3:16 and Rom 8:28.",
   "Sermons/b.md": "Psalm 23 and is 2.5%",
   "Archive/old.md": "Gen 1:1",
@@ -181,7 +183,7 @@ const epub = {
   refreshed: [] as (string[] | undefined)[],
   api: {
     version: 1,
-    extractText: async () => ({
+    extractText: async (_file?: TFile) => ({
       sections: [
         { spineIndex: 0, href: "title.xhtml", text: "Title", title: null },
         { spineIndex: 1, href: "ch1.xhtml", text: epubText, title: "Chapter 1" },
@@ -260,7 +262,12 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
     }),
     vault: Object.assign(new Events(), {
       getFiles: () => Object.keys(files).map((path) => new TFile(path)),
-      cachedRead: async (file: TFile) => files[file.path],
+      cachedRead: async (file: TFile) => files[file.path] as string,
+      readBinary: async (file: TFile) => {
+        const data = files[file.path];
+        const bytes = typeof data === "string" ? Buffer.from(data) : Buffer.from(data);
+        return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      },
       getAbstractFileByPath: (path: string) => (path in files ? new TFile(path) : null),
       getFileByPath: (path: string) => (path in files ? new TFile(path) : null),
       adapter: new FileSystemAdapter(vaultPath),
@@ -500,7 +507,21 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   assert.ok(epub.provider, "registered as an annotation provider");
   assert.equal(plugin.index.get("Books/b.epub").length, 0);
   plugin.settings.searchEpubs = true;
+  const extracted: string[] = [];
+  const extractText = epub.api.extractText;
+  epub.api.extractText = async (file?: TFile) => (extracted.push(file!.path), extractText());
   await plugin.epubs.toggled();
+  epub.api.extractText = extractText;
+  // A real book is searched by the engine (as the CLI would), and only the one it can't read
+  // goes through EPUB++
+  assert.deepEqual(extracted, ["Books/b.epub"]);
+  assert.deepEqual(
+    plugin.index.get("Books/real.epub").map((h: any) => [h.passage.reference, h.epub.chapter, h.epub.cfi]),
+    [
+      ["John 3:16", "Chapter 1", "epubcfi(/6/2!/4/2,/1:5,/1:12)"],
+      ["Revelation 22:21", "Chapter 2", "epubcfi(/6/4!/4/2,/1:5,/1:14)"],
+    ],
+  );
   const [hit, ...rest] = plugin.index.get("Books/b.epub");
   // "See John" / "3 more" are separate paragraphs, so only Romans 8:28 is a reference
   assert.equal(rest.length, 0);
@@ -519,7 +540,6 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   await plugin.openHit(hit);
   assert.deepEqual(epub.opened, [`Books/b.epub#${hit.epub.cfi}`]);
   // A reindex keeps them (from the index); turning the setting off removes them
-  const extractText = epub.api.extractText;
   epub.api.extractText = async () => {
     throw new Error("searched again");
   };

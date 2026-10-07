@@ -236,20 +236,29 @@ export class VaultIndexer {
   }
 
   /**
-   * EPUBs: with the CLI, else through EPUB++ (on mobile only when that's allowed, since a phone
-   * can't search a library: it uses what another device indexed)
+   * EPUBs: with the CLI, else with the engine in the background thread (the same code as the
+   * CLI's), else, for books it can't read, through EPUB++. On mobile only when that's allowed,
+   * since a phone can't search a library: it uses what another device indexed
    */
   private async searchBooks(files: TFile[], current: () => boolean): Promise<void> {
     if (files.length === 0) return;
     const done = await this.searchWithCli(files, current);
     if (!current()) return;
     if (!Platform.isDesktopApp && !this.plugin.settings.searchEpubsOnMobile) return;
+    const { vault } = this.plugin.app;
     for (const file of files) {
       if (done.has(file.path)) continue;
-      const references = await this.plugin.epubs.extract(file);
+      const { size, mtime } = file.stat;
+      const result = await this.plugin.indexBook({ path: file.path, size, mtime, bytes: await vault.readBinary(file) });
       if (!current()) return;
-      if (!references) continue;
-      this.index.setEpub(file.path, file.stat, references);
+      if ("bytes" in result) {
+        this.index.insert(result.bytes, file.path, file.stat);
+      } else {
+        const references = await this.plugin.epubs.extract(file);
+        if (!current()) return;
+        if (!references) continue;
+        this.index.setEpub(file.path, file.stat, references);
+      }
       this.plugin.epubs.refresh([file.path]);
       this.plugin.notifyIndexSoon();
       this.saveSoon();

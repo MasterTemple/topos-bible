@@ -137,7 +137,7 @@ export class ToposSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Search EPUB files")
       .setDesc(
-        `Find references in EPUBs too. Needs the EPUB++ plugin, which opens EPUBs in Obsidian: it shows their references in the book, with a sidebar tab to step through them and save one as a highlight. Results open in the book.${this.plugin.epubs.api ? "" : " (EPUB++ isn't enabled.)"}`,
+        `Find references in EPUBs too. With the EPUB++ plugin, which opens EPUBs in Obsidian, their references show in the book, with a sidebar tab to step through them and save one as a highlight, and results open in the book.${this.plugin.epubs.api ? "" : " (EPUB++ isn't enabled.)"}`,
       )
       .addToggle((t) =>
         t.setValue(settings.searchEpubs).onChange((value) => {

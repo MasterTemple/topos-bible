@@ -6,7 +6,19 @@ import { searchText, type Hit } from "../core/search.ts";
 export type WorkerRequest =
   | { type: "init"; wasm: Uint8Array }
   | { type: "search"; id: number; files: { path: string; text: string }[] }
-  | { type: "index"; id: number; files: IndexRequest[] };
+  | { type: "index"; id: number; files: IndexRequest[] }
+  | { type: "book"; id: number; book: BookRequest };
+
+/** An EPUB to search for the index (its bytes move to the worker) */
+export interface BookRequest {
+  path: string;
+  size: number;
+  mtime: number;
+  bytes: ArrayBuffer;
+}
+
+/** A book's index entry, or why it couldn't be read */
+export type BookResult = { bytes: Uint8Array } | { error: string };
 
 /** A file to search for the index */
 export interface IndexRequest {
@@ -20,6 +32,7 @@ export type WorkerResponse =
   | { type: "ready" }
   | { type: "results"; id: number; results: { path: string; hits: Hit[] }[] }
   | { type: "entries"; id: number; entries: { path: string; bytes: Uint8Array }[] }
+  | { type: "book"; id: number; result: BookResult }
   | { type: "error"; id?: number; message: string };
 
 let topos: Topos | null = null;
@@ -33,6 +46,9 @@ export async function handle(request: WorkerRequest, engine?: Topos): Promise<Wo
   }
   const searcher = engine ?? topos;
   if (!searcher) return { type: "error", id: request.id, message: "the engine is not loaded" };
+  if (request.type === "book") {
+    return { type: "book", id: request.id, result: indexBook(searcher, request.book) };
+  }
   if (request.type === "index") {
     // Entries in the index's format, so the hits never become objects
     const written = Date.now();
@@ -49,13 +65,28 @@ export async function handle(request: WorkerRequest, engine?: Topos): Promise<Wo
   return { type: "results", id: request.id, results };
 }
 
+/** Searches an EPUB with the engine (the same as the CLI's), or says why it can't */
+export function indexBook(topos: Topos, book: BookRequest): BookResult {
+  try {
+    return { bytes: topos.indexEpub(book.path, book.size, book.mtime, new Uint8Array(book.bytes), Date.now()) };
+  } catch (error) {
+    const message = (error as { value?: { message?: string } })?.value?.message;
+    return { error: message ?? String(error) };
+  }
+}
+
 const scope = globalThis as unknown as DedicatedWorkerGlobalScope;
 if (typeof scope.postMessage === "function" && typeof (globalThis as { document?: unknown }).document === "undefined") {
   scope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     try {
       const response = await handle(event.data);
       // The entries' buffers move to the main thread rather than being copied
-      const transfer = response.type === "entries" ? response.entries.map((e) => e.bytes.buffer as ArrayBuffer) : [];
+      const transfer =
+        response.type === "entries"
+          ? response.entries.map((e) => e.bytes.buffer as ArrayBuffer)
+          : response.type === "book" && "bytes" in response.result
+            ? [response.result.bytes.buffer as ArrayBuffer]
+            : [];
       scope.postMessage(response, transfer);
     } catch (error) {
       const id = event.data.type === "init" ? undefined : event.data.id;

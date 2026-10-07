@@ -18,4 +18,4 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 # Named topos_lib here: this crate's own library is topos_bible (the package name BoltFFI uses)
 topos-lib = { package = "topos-bible", path = "../topos-lib" }
-topos-bible-index = { path = "../topos-index", default-features = false }
+topos-bible-index = { path = "../topos-index", default-features = false, features = ["epub"] }

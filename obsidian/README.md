@@ -76,10 +76,10 @@ search, whether to search EPUBs (below), excluded folders, and the search engine
 
 ### EPUBs
 
-With **Search EPUB files** on (off by default) and the [EPUB++](https://github.com/MasterTemple/epub-plus-plus)
-plugin enabled, EPUBs in the vault are searched too. EPUB++ opens EPUBs in Obsidian; it extracts
-each book's text for topos (paragraphs separated by a blank line, so a reference never runs from
-one into the next) and turns the references' positions into CFIs. Then:
+With **Search EPUB files** on (off by default), EPUBs in the vault are searched too. topos reads
+each book itself (paragraphs kept apart, so a reference never runs from one into the next) and
+finds each reference's CFI, exactly as the [EPUB++](https://github.com/MasterTemple/epub-plus-plus)
+plugin, which opens EPUBs in Obsidian, writes them. With EPUB++ enabled:
 
 - The sidebar lists EPUB results with their chapter, and clicking one opens the book there.
 - In the book, references get the same dashed underline and glow as in notes (in the reference
@@ -89,10 +89,10 @@ one into the next) and turns the references' positions into CFIs. Then:
   verses, copy it as OSIS, or **Save as highlight** / **Save with comment**, which turn it into an
   EPUB++ highlight in the book's annotation file.
 
-Books are searched once, on any device (see below). With the CLI engine, the `topos` command
-searches them, which is much faster for a library (EPUB++ extracts one book at a time on
-Obsidian's thread); books it can't read still go through EPUB++. A phone or tablet doesn't search
-books at all unless **Search new EPUBs on this device** is on: it uses what a computer indexed.
+Books are searched once, on any device (see below), in a background thread (with the CLI engine,
+by the `topos` command, several at a time); the few that topos can't read (a damaged ZIP) go
+through EPUB++. A phone or tablet doesn't search books at all unless **Search new EPUBs on this
+device** is on: it uses what a computer indexed.
 
 ### The reference index
 

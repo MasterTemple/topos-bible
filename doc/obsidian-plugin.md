@@ -78,7 +78,8 @@ the reference index (its size, and **Rebuild**).
 ### EPUBs (with EPUB++)
 
 EPUB++ (a separate plugin) opens EPUBs in Obsidian and has an API for annotation providers. With
-**Search EPUB files** on, books the index doesn't have are searched in one of two ways:
+**Search EPUB files** on, books the index doesn't have are searched in one of three ways, each
+the next one's fallback:
 
 - With the CLI engine (desktop), `topos -m index -- <book>...` searches them, named on the command
   line (in batches that fit on one) so ignore files can't skip them, and in parallel off
@@ -86,11 +87,17 @@ EPUB++ (a separate plugin) opens EPUBs in Obsidian and has an API for annotation
   book's text (`topos-bible-formats` extracts text and writes CFIs exactly as EPUB++ does, checked
   on 98 books), so the references are the same as the other way's. Books it can't read, a CLI
   that fails, or one too old for `-m index` fall back to EPUB++.
-- Otherwise topos asks EPUB++ for each book's text (`extractText`, one string per spine item,
-  paragraphs separated by `\n\n`, parsed on Obsidian's main thread one book at a time, which is
-  slow for a library), searches the sections like notes, and asks for each hit's range CFI. On
-  mobile this only happens with **Search new EPUBs on this device**; otherwise books wait for a
-  computer to index them. A book EPUB++ can't read is kept with no references until it changes.
+- Otherwise the engine searches each book in the Web Worker (`Topos.indexEpub`, the same
+  `topos-bible-formats` code as the CLI, so the entries are identical; checked on 97 books): the
+  plugin reads the book's bytes and moves them to the worker, so nothing runs on Obsidian's
+  thread. About 30 ms a book on desktop.
+- For a book the engine can't read (the Rust `zip` crate rejects a few damaged archives), topos
+  asks EPUB++ for its text (`extractText`, parsed on Obsidian's main thread), searches the
+  sections like notes, and asks for each hit's range CFI. A book EPUB++ can't read either is kept
+  with no references until it changes.
+
+On mobile books are searched only with **Search new EPUBs on this device**; otherwise they wait
+for a computer to index them.
 
 Offsets continue through the book, so position order is book order. topos registers a "Bible
 references" provider: EPUB++ draws them (topos picks the style: dashed underline and glow), lists
@@ -127,9 +134,9 @@ Either way the CFIs match the reader's exactly.
   `ToposQuery` (the CLI's rules), and the engine filters, sorts, and counts, keeping every
   reference's order until the index changes; only the page shown becomes objects. Notes' lines
   are read from the notes for the page shown.
-- **EPUBs** (`src/epub/`) are searched by the CLI when it's the engine, else through EPUB++: the
-  text comes from its API, searching uses the same worker, and `src/core/epub.ts` maps section
-  hits to the book.
+- **EPUBs** are searched by the CLI when it's the engine, else by the engine in the worker
+  (`indexBook` in `src/indexers/worker.ts`), else through EPUB++ (`src/epub/`: its text, searched
+  in the same worker, with `src/core/epub.ts` mapping section hits to the book).
 - **Optional CLI engine (desktop)**: runs `topos -m index --no-config [--cache] -- <files>` on the
   files that need searching, and streams each file's entry into the index. Its entries are
   identical to the built-in engine's (tested). Edits during a pass win over its older results.

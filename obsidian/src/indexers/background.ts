@@ -1,5 +1,5 @@
 import type { Hit } from "../core/search.ts";
-import type { IndexRequest, WorkerRequest, WorkerResponse } from "./worker.ts";
+import type { BookRequest, BookResult, IndexRequest, WorkerRequest, WorkerResponse } from "./worker.ts";
 
 /** Searches files in a Web Worker, so indexing never blocks Obsidian */
 export class BackgroundSearcher {
@@ -17,8 +17,8 @@ export class BackgroundSearcher {
       this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
         const message = event.data;
         if (message.type === "ready") resolve();
-        else if (message.type === "results" || message.type === "entries") {
-          const value = message.type === "results" ? message.results : message.entries;
+        else if (message.type === "results" || message.type === "entries" || message.type === "book") {
+          const value = message.type === "results" ? message.results : message.type === "entries" ? message.entries : message.result;
           this.pending.get(message.id)?.resolve(value as never);
           this.pending.delete(message.id);
         } else if (message.type === "error") {
@@ -35,8 +35,8 @@ export class BackgroundSearcher {
     this.post({ type: "init", wasm: wasm.slice() });
   }
 
-  private post(request: WorkerRequest): void {
-    this.worker.postMessage(request);
+  private post(request: WorkerRequest, transfer: Transferable[] = []): void {
+    this.worker.postMessage(request, transfer);
   }
 
   async search(files: { path: string; text: string }[]): Promise<{ path: string; hits: Hit[] }[]> {
@@ -55,6 +55,16 @@ export class BackgroundSearcher {
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve: resolve as (value: never) => void, reject });
       this.post({ type: "index", id, files });
+    });
+  }
+
+  /** Searches an EPUB into its index entry (its bytes move to the worker) */
+  async indexBook(book: BookRequest): Promise<BookResult> {
+    await this.ready;
+    const id = this.nextId++;
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve: resolve as (value: never) => void, reject });
+      this.post({ type: "book", id, book }, [book.bytes]);
     });
   }
 

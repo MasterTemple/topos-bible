@@ -120,7 +120,18 @@ format, limit)` and `formatPassage(passage, format)` take a format directly.
 | Swift | `Utf16` (use `String.utf16` indices) |
 | Rust, C, raw bytes | `Byte` |
 
-**Errors.** `ToposError` is `InvalidConfig { message }` or `InvalidQuery { message }`. Python
+**An index of many files.** `ToposIndex` (from
+[`topos-bible-index`](../topos-index)) keeps the references of many files between runs, compactly
+(about 15 bytes each), and searches only files that changed: `check(path, size, mtime)` says
+whether its entry is current; `indexText` searches a text file, `insert` adds an entry made
+elsewhere (`Topos.indexEntry` on another thread, `Topos.indexEpub` for an EPUB's bytes, or the
+CLI's `-m index`). `query(topos, query, scope, path, order)` filters with a `ToposQuery`, sorts,
+and counts, and `page` reads the results. `takeDirtyPacks` and `takeUnsavedDetails` give the files
+to write, and `loadPack` and `loadDetail` read them back; each device writes its own packs, so
+devices that sync the same files share the index.
+
+**Errors.** `ToposError` is `InvalidConfig { message }`, `InvalidQuery { message }`, or
+`InvalidIndex { message }` (an index file that's damaged or from another version). Python
 raises `ToposErrorException`; JavaScript throws `ToposErrorException`, with the error in its
 `value` (`e.value.message`). `Topos.with_config` is older: in JavaScript it returns `null` on bad
 input instead, so prefer `ToposOptions.create().data(json).build()`, which throws everywhere.

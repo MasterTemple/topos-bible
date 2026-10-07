@@ -24,7 +24,7 @@ import { engineWasm, loadTopos } from "./engine.ts";
 import { BackgroundSearcher } from "./indexers/background.ts";
 import { defaultCliPath } from "./indexers/cli.ts";
 import { VaultIndexer } from "./indexers/vault.ts";
-import type { IndexRequest } from "./indexers/worker.ts";
+import { indexBook, type BookRequest, type BookResult, type IndexRequest } from "./indexers/worker.ts";
 import { EpubSupport } from "./epub/support.ts";
 import workerSource from "topos-worker-source";
 import { GoToReferenceModal, InsertReferenceModal, SavedQueryModal } from "./modals.ts";
@@ -273,6 +273,22 @@ export default class ToposPlugin extends Plugin {
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
     return entries;
+  }
+
+  /** Searches an EPUB into its index entry in the background, or on this thread if the worker fails */
+  async indexBook(book: BookRequest): Promise<BookResult> {
+    const worker = this.background();
+    if (worker) {
+      try {
+        return await worker.indexBook(book);
+      } catch (error) {
+        if (this.worker !== worker) return { error: "stopped" };
+        console.warn("topos: the background indexer failed, indexing on the main thread", error);
+        worker.terminate();
+        this.worker = null;
+      }
+    }
+    return indexBook(this.topos, book);
   }
 
   /** A random name for this device's index packs, kept in this device's storage for the vault */

@@ -16,11 +16,11 @@ pub mod entry;
 pub mod index;
 pub mod pack;
 
-#[cfg(feature = "epub")]
-pub use entry::epub_entry;
 pub use entry::{
     Detail, EpubEntryBuilder, EpubRef, FileEntry, RefDetail, Reference, Section, Stamp, Unit,
     detail_name, snippet, text_entry, text_hash, text_refs,
 };
+#[cfg(feature = "epub")]
+pub use entry::{epub_entry, epub_file_entry};
 pub use index::{Hit, Index, IndexError, Order, PACK_COUNT, Results, Scope, Status};
 pub use pack::{Confirmation, EntryMessage, FORMAT, FormatError, Pack, pack_number};

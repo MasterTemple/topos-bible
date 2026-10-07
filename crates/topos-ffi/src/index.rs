@@ -469,6 +469,36 @@ impl ToposIndex {
 #[export]
 impl Topos {
     /**
+    Searches an EPUB (its bytes) for [`ToposIndex::insert`]: its references (UTF-16 offsets
+    through the book's text) with their CFIs, written as the EPUB++ reader writes them, and the
+    text around each. Errs when the book can't be read (not a ZIP, or no package document)
+    */
+    pub fn index_epub(
+        &self,
+        path: String,
+        size: f64,
+        mtime: f64,
+        bytes: Vec<u8>,
+        written: f64,
+    ) -> Result<Vec<u8>, ToposError> {
+        let stamp = Stamp {
+            size: whole(size),
+            mtime: whole(mtime),
+            hash: None,
+        };
+        let (entry, detail) =
+            topos_bible_index::epub_file_entry(&self.matcher, &path, &bytes, stamp, whole(written))
+                .map_err(invalid)?;
+        Ok(EntryMessage {
+            path,
+            unit: Unit::Utf16,
+            entry,
+            detail,
+        }
+        .encode())
+    }
+
+    /**
     Searches a text file for [`ToposIndex::insert`], in the index's format: lets another thread
     (a Web Worker) search while the index stays where it's queried
     */
