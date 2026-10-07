@@ -4,11 +4,18 @@
   --topos-color: var(--topos-reference-color, var(--text-accent));
   text-shadow: 1px 1px 4px color-mix(in srgb, var(--topos-color) 80%, transparent);
   border-bottom: 1px dashed color-mix(in srgb, var(--topos-color) 50%, transparent);
+  border-radius: var(--radius-s);
   transition: background-color 0.2s ease;
 }
 .topos-reference:hover {
   background-color: color-mix(in srgb, var(--topos-color) 20%, transparent);
   cursor: pointer;
+}
+
+.is-mobile .topos-reference,
+.topos-reference:hover {
+  text-shadow: 1px 1px 6px color-mix(in srgb, var(--topos-color) 100%, transparent);
+  background-color: color-mix(in srgb, var(--topos-color) 20%, transparent);
 }
 
 /* Suggestions */
