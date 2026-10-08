@@ -17,5 +17,11 @@ references in it, on desktop and on phones.
 - **Queries** filter (with any test of a passage, like the CLI's filters), sort (by file or by
   Bible order), count, and page in Rust; each order is kept until the index changes
 
+With the `files` feature (native only), it also searches files and folders the way the `topos`
+CLI does, which the CLI, the language server, and the bindings share: `files::WalkOptions` (like
+ripgrep: ignore files, hidden files, globs, extensions, depth), `files::search` (in parallel, each
+file by its format: EPUBs, subtitles, PDFs with the `pdf` feature, and text), and `files::Cache`
+(each file's unfiltered results until it changes, in the usual folder or one you choose).
+
 The `topos` CLI writes entries with `-m index`, and the bindings (`topos-ffi`) expose the index as
 `ToposIndex`.

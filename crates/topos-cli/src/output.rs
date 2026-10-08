@@ -11,10 +11,9 @@ use topos_bible::{
 };
 use topos_bible_formats::epub::{LinkStyle, epub_link};
 
-use crate::{
-    args::{Args, ColorChoice, OutputMode},
-    search::{FileHits, Hit, is_epub},
-};
+use topos_bible_index::files::{FileHits, Hit, is_epub};
+
+use crate::args::{Args, ColorChoice, OutputMode};
 
 const PATH: &str = "\x1b[35m";
 const LINE: &str = "\x1b[32m";

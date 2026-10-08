@@ -1,6 +1,9 @@
 """Run after `pip install dist/python/wheelhouse/*.whl` (see ../../README.md)."""
 
-from topos_bible import BookStyle, OffsetUnit, Topos, ToposErrorException, ToposOptions, ToposQuery
+import pathlib
+import tempfile
+
+from topos_bible import BookStyle, OffsetUnit, Topos, ToposErrorException, ToposFiles, ToposOptions, ToposQuery
 
 topos = Topos()
 
@@ -36,3 +39,14 @@ try:
     Topos.with_config("{")
 except ToposErrorException as error:
     print("error:", error.error)
+
+# Files and folders, like the CLI: its walking options, every format, and a cache in a folder
+# of your choice (results are kept until a file changes)
+with tempfile.TemporaryDirectory() as folder:
+    notes = pathlib.Path(folder, "notes")
+    notes.mkdir()
+    (notes / "sermon.md").write_text("Text: Rom 8:28\nAlso Ps 23", encoding="utf-8")
+    (notes / "draft.txt").write_text("Gen 1:1", encoding="utf-8")
+    files = ToposFiles.create().extension("md").cache_dir(str(pathlib.Path(folder, "cache")))
+    for found in topos.search_files([str(notes)], files, ToposQuery.create(), OffsetUnit.CHAR):
+        print(pathlib.Path(found.path).name, [(m.passage.reference, m.line, m.column) for m in found.matches])

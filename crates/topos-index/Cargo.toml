@@ -16,8 +16,14 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 postcard = { version = "1", default-features = false, features = ["use-std"] }
 miniz_oxide = "0.8"
+ignore = { version = "0.4.23", optional = true }
+mupdf = { version = "0.8.0", optional = true }
 
 [features]
 default = ["epub"]
 # Entries for EPUBs, from topos-bible-formats' CFIs
 epub = ["dep:topos-bible-formats", "topos-bible-formats/epub"]
+# Searching files and folders like the CLI, with a cache (not for WebAssembly)
+files = ["epub", "dep:ignore", "topos-bible-formats/srt"]
+# Searching PDFs too (builds MuPDF)
+pdf = ["files", "topos-bible-formats/pdf", "dep:mupdf"]

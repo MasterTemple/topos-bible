@@ -13,6 +13,8 @@ files again and again (a notes vault, a library of books)
 
 mod codec;
 pub mod entry;
+#[cfg(feature = "files")]
+pub mod files;
 pub mod index;
 pub mod pack;
 

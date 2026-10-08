@@ -11,12 +11,13 @@ use std::{
     time::SystemTime,
 };
 
-use ignore::{WalkBuilder, WalkState};
+use ignore::WalkState;
 use lsp_types::{Range, Uri};
 use topos_bible::{
     matcher::{BibleMatcher, LineIndex},
     segments::Passage,
 };
+use topos_bible_index::files::WalkOptions;
 
 /// Larger files are skipped (a book-length text is a few MB)
 const MAX_FILE_SIZE: u64 = 50 * 1024 * 1024;
@@ -178,16 +179,14 @@ pub fn references(
             .collect(),
     );
     let seen: Mutex<HashSet<PathBuf>> = Mutex::new(HashSet::new());
-    let Some((first, rest)) = roots.split_first() else {
+    // The CLI's walking rules (ignore files, `.toposignore`, hidden files)
+    let walk = WalkOptions {
+        max_filesize: Some(MAX_FILE_SIZE),
+        ..WalkOptions::default()
+    };
+    let Ok(builder) = walk.builder(roots) else {
         return results.into_inner().unwrap_or_default();
     };
-    let mut builder = WalkBuilder::new(first);
-    for root in rest {
-        builder.add(root);
-    }
-    builder
-        .add_custom_ignore_filename(".toposignore")
-        .max_filesize(Some(MAX_FILE_SIZE));
     builder.build_parallel().run(|| {
         Box::new(|entry| {
             let Ok(entry) = entry else {

@@ -63,6 +63,7 @@ The phases are in order, and each one leaves the repo working.
 - [x] `--epub-links wiki|markdown`: an EPUB++ link to each reference in EPUBs (`--cfi-assertions` for `[id]` assertions)
 - [x] EPUB positions in `-m json` (spine index, chapter, offsets and lines in the book's text)
 - [x] `topos-bible-index`: a persistent, compact index (about 15 bytes a reference) with checks for changed files, per-device packs that sync without conflicts, and filtered, sorted, paged queries; in the bindings (`ToposIndex`) and the CLI (`-m index`); the Obsidian plugin keeps a million references in it and searches only changed files
+- [x] File walking, per-format search, and the cache moved from the CLI into `topos-bible-index` (`files`), shared by the CLI, LSP, and FFI (`Topos.searchFiles` with `ToposFiles`, including `cacheDir`)
 - [x] EPUBs searched in WebAssembly (`Topos.indexEpub`, the CLI's code), so the Obsidian plugin searches books in its Web Worker instead of through EPUB++ (kept for books the Rust ZIP reader rejects)
 
 ## Phase 6: Bindings and tooling

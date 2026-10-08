@@ -130,8 +130,19 @@ and counts, and `page` reads the results. `takeDirtyPacks` and `takeUnsavedDetai
 to write, and `loadPack` and `loadDetail` read them back; each device writes its own packs, so
 devices that sync the same files share the index.
 
-**Errors.** `ToposError` is `InvalidConfig { message }`, `InvalidQuery { message }`, or
-`InvalidIndex { message }` (an index file that's damaged or from another version). Python
+**Files and folders.** `searchFiles(paths, files, query, unit)` searches like the CLI (not in
+WebAssembly, which has no file access): `ToposFiles` holds the CLI's walking options (`hidden`,
+`noIgnore`, `glob`, `extension`, `maxDepth`, and the rest; `.gitignore`, `.ignore`, and
+`.toposignore` files are respected), every format is searched (EPUBs with CFIs, subtitles with
+times, PDFs in builds with MuPDF, anything else as text), and `cacheDir(folder)` keeps each file's
+results until it changes, in a folder of your choice (an app's cache folder on a phone; `cache(true)`
+uses the CLI's). Each file comes back with its `FileMatch`es (`passage`, offsets in your unit,
+`line`, `column`, a `label` like a time or page, and `epub` with the CFI and chapter) or an
+`error`. `listFiles(paths, files)` lists what would be searched.
+
+**Errors.** `ToposError` is `InvalidConfig { message }`, `InvalidQuery { message }`,
+`InvalidIndex { message }` (an index file that's damaged or from another version), or
+`Files { message }` (a bad glob or ignore file, or no file access). Python
 raises `ToposErrorException`; JavaScript throws `ToposErrorException`, with the error in its
 `value` (`e.value.message`). `Topos.with_config` is older: in JavaScript it returns `null` on bad
 input instead, so prefer `ToposOptions.create().data(json).build()`, which throws everywhere.

@@ -20,7 +20,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 use topos_bible::data::books::BookId;
 
-use crate::search::Hit;
+use super::search::Hit;
 
 /// Bumped when entries change shape, so old ones are never misread
 const FORMAT: u32 = 3;
@@ -49,12 +49,12 @@ pub enum Cached {
 }
 
 pub struct Cache {
-    /// `~/.cache/topos/v3/<options>/`
+    /// `<root>/v3/<options>/`
     dir: PathBuf,
 }
 
-/// `$XDG_CACHE_HOME/topos`, else `~/.cache/topos`
-pub fn root() -> Option<PathBuf> {
+/// The cache's usual folder: `$XDG_CACHE_HOME/topos`, else `~/.cache/topos`
+pub fn default_root() -> Option<PathBuf> {
     let base = std::env::var_os("XDG_CACHE_HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".cache")))?;
@@ -69,10 +69,15 @@ fn stable_hash(bytes: &[u8]) -> u64 {
 }
 
 impl Cache {
-    /// `fingerprint` describes every option that changes which references are found
+    /// The cache in its usual folder ([`default_root`]); `fingerprint` describes every option
+    /// that changes which references are found
     pub fn open(fingerprint: &str) -> Option<Self> {
-        let root = root()?;
-        remove_legacy(&root);
+        Self::open_in(&default_root()?, fingerprint)
+    }
+
+    /// The cache in a folder of your choice (an app's cache folder, on a phone)
+    pub fn open_in(root: &Path, fingerprint: &str) -> Option<Self> {
+        remove_legacy(root);
         let key = format!("{}\0{FORMAT}\0{fingerprint}", env!("CARGO_PKG_VERSION"));
         let dir = root
             .join(format!("v{FORMAT}"))
@@ -166,11 +171,12 @@ impl Cache {
     }
 }
 
-/// Deletes the whole cache (`--clear-cache`)
-pub fn clear() -> io::Result<()> {
-    match root() {
-        Some(root) if root.exists() => fs::remove_dir_all(root),
-        _ => Ok(()),
+/// Deletes the whole cache in a folder (the CLI's `--clear-cache`)
+pub fn clear(root: &Path) -> io::Result<()> {
+    if root.exists() {
+        fs::remove_dir_all(root)
+    } else {
+        Ok(())
     }
 }
 

@@ -1,6 +1,8 @@
 use std::{fs, path::PathBuf};
 
-use crate::{complete, search::WalkOptions};
+use topos_bible_index::files::{self, WalkOptions};
+
+use crate::complete;
 
 use clap::{Parser, ValueEnum, ValueHint};
 use clap_complete::engine::ArgValueCompleter;
@@ -440,29 +442,6 @@ impl Args {
     /// How directories are walked, with -u applied
     pub fn walk_options(&self) -> Result<WalkOptions, String> {
         let u = self.unrestricted;
-        let mut overrides = None;
-        if !self.glob.is_empty() || !self.iglob.is_empty() {
-            let root = std::env::current_dir().map_err(|e| e.to_string())?;
-            let mut builder = ignore::overrides::OverrideBuilder::new(root);
-            for glob in &self.glob {
-                builder
-                    .add(glob)
-                    .map_err(|e| format!("--glob {glob}: {e}"))?;
-            }
-            builder.case_insensitive(true).map_err(|e| e.to_string())?;
-            for glob in &self.iglob {
-                builder
-                    .add(glob)
-                    .map_err(|e| format!("--iglob {glob}: {e}"))?;
-            }
-            overrides = Some(builder.build().map_err(|e| e.to_string())?);
-        }
-        let lower = |list: &[String]| -> Vec<String> {
-            list.iter()
-                .map(|ext| ext.trim().trim_start_matches('.').to_ascii_lowercase())
-                .filter(|ext| !ext.is_empty())
-                .collect()
-        };
         Ok(WalkOptions {
             hidden: self.hidden || u >= 2,
             no_ignore: self.no_ignore || u >= 1,
@@ -474,9 +453,10 @@ impl Args {
             max_depth: self.max_depth,
             max_filesize: self.max_filesize,
             one_file_system: self.one_file_system,
-            overrides,
-            extensions: lower(&self.extensions),
-            exclude_extensions: lower(&self.exclude_ext),
+            globs: self.glob.clone(),
+            iglobs: self.iglob.clone(),
+            extensions: WalkOptions::extension_list(&self.extensions),
+            exclude_extensions: WalkOptions::extension_list(&self.exclude_ext),
             only_epub: self.epub_links.is_some(),
         })
     }
@@ -505,22 +485,19 @@ impl Args {
         let data = contents(self.data.as_slice());
         let merge = contents(&self.merge_data);
         let remove = contents(&self.remove_data);
-        // Binary files are cached as having no references unless they are searched
-        let binary = self.search_binary();
-        // EPUB results are stored with their CFIs
-        let cfi = self.cfi_assertions;
-        format!(
+        let config = format!(
             "{:?}",
             (
                 &self.context_book,
                 &self.context_heading,
                 data,
                 merge,
-                remove,
-                binary,
-                cfi
+                remove
             )
-        )
+        );
+        // Binary files are cached as having no references unless they are searched, and EPUB
+        // results are stored with their CFIs
+        files::fingerprint(&config, self.search_binary(), self.cfi_options())
     }
 
     pub fn context_lines(&self) -> (usize, usize) {

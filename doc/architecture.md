@@ -11,7 +11,9 @@ crates/
   topos-formats/   format adapters behind features: html, srt (also WebVTT and SBV), epub,
                    json, xml, and pdf (MuPDF, opt-in)
   topos-index/     a persistent index of many files' references: compact binary entries, checks for
-                   changed files, per-device packs that sync, and filtered, sorted queries
+                   changed files, per-device packs that sync, and filtered, sorted queries; with
+                   `files`, searching files and folders (walking, formats, cache) for the CLI,
+                   LSP, and FFI
   topos-cli/       ripgrep-style binary (depends on topos-lib + topos-formats + topos-index)
   topos-ffi/       one BoltFFI façade over topos-lib and topos-index (TypeScript/WASM, Python, Swift, Kotlin)
   topos-lsp/       a language server: completion, hover, document symbols

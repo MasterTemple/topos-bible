@@ -2,20 +2,20 @@ use std::{process::ExitCode, sync::Arc};
 
 use clap::{CommandFactory, Parser};
 
+use topos_bible_index::files::{self, Cache, CachedSearch, Searcher, search, search_text};
+
 use crate::{
     args::{Args, OutputMode},
-    cache::Cache,
+    input::Input,
     output::Printer,
-    search::{CachedSearch, Input, Searcher, search},
 };
 
 mod args;
-mod cache;
 mod complete;
 mod config;
+mod input;
 mod output;
 mod queries;
-mod search;
 
 /// Like ripgrep: 0 when something matched, 1 when nothing did, 2 on errors
 fn main() -> ExitCode {
@@ -40,7 +40,10 @@ fn main() -> ExitCode {
     };
     let mut args = Args::parse_from(argv);
     if args.clear_cache {
-        return match cache::clear() {
+        let Some(root) = files::default_root() else {
+            return ExitCode::SUCCESS;
+        };
+        return match files::clear(&root) {
             Ok(()) => ExitCode::SUCCESS,
             Err(err) => {
                 eprintln!("topos: could not delete the cache: {err}");
@@ -123,7 +126,14 @@ fn main() -> ExitCode {
         list_only: args.files,
         cfi: args.cfi_options(),
     });
-    let results = search(searcher.clone(), input);
+    let results = match input {
+        Input::Paths(paths) => search(searcher.clone(), paths),
+        Input::Text(text) => {
+            let (sender, receiver) = std::sync::mpsc::channel();
+            let _ = sender.send(Ok(search_text(&searcher.matcher, None, text)));
+            receiver
+        }
+    };
     let mut files: Vec<_> = vec![];
     let (mut found, mut failed) = (false, false);
     for result in results {

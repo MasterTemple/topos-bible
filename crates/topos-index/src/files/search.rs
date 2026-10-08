@@ -1,14 +1,16 @@
+//! Searching files and folders: which files are walked (like ripgrep), how each format is
+//! searched, and the cache
+
 use std::{
     fs,
-    io::{self, Read},
     ops::Range,
     path::{Path, PathBuf},
     sync::{Arc, mpsc},
     thread,
 };
 
-use crate::cache::{Cache, Cached};
-use ignore::{WalkBuilder, WalkState};
+use super::cache::{Cache, Cached};
+use ignore::{WalkBuilder, WalkState, overrides::OverrideBuilder};
 use std::collections::BTreeSet;
 use topos_bible::{
     data::books::BookId,
@@ -19,44 +21,6 @@ use topos_bible_formats::{
     epub::{CfiOptions, search_epub},
     srt::{SRTDocument, SRTTimeStamp},
 };
-
-/// What to search
-pub enum Input {
-    Paths(Vec<PathBuf>),
-    Text(String),
-}
-
-impl Input {
-    /// Paths given on the command line, else `--text`, else stdin when piped, else `.`
-    pub fn new(paths: Vec<PathBuf>, text: Option<String>) -> io::Result<Self> {
-        if let Some(text) = text {
-            return Ok(Self::Text(text));
-        }
-        if !paths.is_empty() {
-            return Ok(Self::Paths(paths));
-        }
-        if stdin_is_readable() {
-            let mut text = String::new();
-            io::stdin().read_to_string(&mut text)?;
-            return Ok(Self::Text(text));
-        }
-        Ok(Self::Paths(vec![PathBuf::from(".")]))
-    }
-}
-
-/// Like ripgrep, only read stdin when it is a pipe or a file (not a terminal or `/dev/null`)
-fn stdin_is_readable() -> bool {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::FileTypeExt;
-        fs::metadata("/dev/stdin").is_ok_and(|m| m.is_file() || m.file_type().is_fifo())
-    }
-    #[cfg(not(unix))]
-    {
-        use std::io::IsTerminal;
-        !io::stdin().is_terminal()
-    }
-}
 
 /// One reference found in a file or text
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -102,7 +66,7 @@ pub struct FileHits {
 /// A result for each searched file, or an error with the file it came from
 pub type FileResult = Result<FileHits, (Option<PathBuf>, String)>;
 
-/// How files are searched
+/// How files are searched (see [`search`])
 pub struct Searcher {
     pub matcher: BibleMatcher,
     /// With a cache: what is searched and stored (`matcher` without filters), and the only books
@@ -120,8 +84,8 @@ pub struct Searcher {
     pub cfi: CfiOptions,
 }
 
-/// How directories are walked (the path options)
-#[derive(Default)]
+/// Which files are searched, like ripgrep's options
+#[derive(Clone, Debug, Default)]
 pub struct WalkOptions {
     pub hidden: bool,
     pub no_ignore: bool,
@@ -133,19 +97,26 @@ pub struct WalkOptions {
     pub max_depth: Option<usize>,
     pub max_filesize: Option<u64>,
     pub one_file_system: bool,
-    pub overrides: Option<ignore::overrides::Override>,
+    /// Globs that files must match (`!` excludes), relative to the current folder
+    pub globs: Vec<String>,
+    /// Globs like `globs`, matched without regard to case
+    pub iglobs: Vec<String>,
     /// Lowercase extensions to search (empty searches every file)
     pub extensions: Vec<String>,
     /// Lowercase extensions to skip
     pub exclude_extensions: Vec<String>,
-    /// `--epub-links`: only EPUBs, even when named on the command line
+    /// Only EPUBs, even files named directly (the CLI's `--epub-links`)
     pub only_epub: bool,
 }
 
 impl WalkOptions {
-    /// A walker over `paths` with these options, like ripgrep's
+    /// A walker over `paths` with these options, like ripgrep's (an error for a bad glob or
+    /// ignore file)
     pub fn builder(&self, paths: &[PathBuf]) -> Result<WalkBuilder, String> {
-        let mut builder = WalkBuilder::new(&paths[0]);
+        let Some(first) = paths.first() else {
+            return Err("no paths to search".into());
+        };
+        let mut builder = WalkBuilder::new(first);
         for path in &paths[1..] {
             builder.add(path);
         }
@@ -170,10 +141,33 @@ impl WalkOptions {
                 return Err(format!("{}: {err}", file.display()));
             }
         }
-        if let Some(overrides) = &self.overrides {
-            builder.overrides(overrides.clone());
+        if !self.globs.is_empty() || !self.iglobs.is_empty() {
+            let root = std::env::current_dir().map_err(|e| e.to_string())?;
+            let mut overrides = OverrideBuilder::new(root);
+            for glob in &self.globs {
+                overrides
+                    .add(glob)
+                    .map_err(|e| format!("--glob {glob}: {e}"))?;
+            }
+            overrides
+                .case_insensitive(true)
+                .map_err(|e| e.to_string())?;
+            for glob in &self.iglobs {
+                overrides
+                    .add(glob)
+                    .map_err(|e| format!("--iglob {glob}: {e}"))?;
+            }
+            builder.overrides(overrides.build().map_err(|e| e.to_string())?);
         }
         Ok(builder)
+    }
+
+    /// Extensions as `--ext` takes them (`.md`, `MD`) in the form these options keep them
+    pub fn extension_list(list: &[String]) -> Vec<String> {
+        list.iter()
+            .map(|ext| ext.trim().trim_start_matches('.').to_ascii_lowercase())
+            .filter(|ext| !ext.is_empty())
+            .collect()
     }
 
     /// Whether `--ext` and `--exclude-ext` allow this file
@@ -204,17 +198,10 @@ impl CachedSearch {
     }
 }
 
-/// Searches the input, sending each file's result as soon as it is ready
-pub fn search(searcher: Arc<Searcher>, input: Input) -> mpsc::Receiver<FileResult> {
+/// Searches files and folders (in parallel), sending each file's result as soon as it's ready
+pub fn search(searcher: Arc<Searcher>, paths: Vec<PathBuf>) -> mpsc::Receiver<FileResult> {
     let (sender, receiver) = mpsc::channel();
-    match input {
-        Input::Text(text) => {
-            let _ = sender.send(Ok(search_text(&searcher.matcher, None, text)));
-        }
-        Input::Paths(paths) => {
-            thread::spawn(move || walk(searcher, paths, sender));
-        }
-    }
+    thread::spawn(move || walk(searcher, paths, sender));
     receiver
 }
 
@@ -251,7 +238,10 @@ fn walk(searcher: Arc<Searcher>, paths: Vec<PathBuf>, sender: mpsc::Sender<FileR
                     Ok(None) => return WalkState::Continue,
                     Err(err) => Err((Some(entry.path().to_path_buf()), err)),
                 },
-                Err(err) => Err((None, err.to_string())),
+                Err(err) => Err(match error_path(&err) {
+                    Some((path, inner)) => (Some(path.to_path_buf()), inner.to_string()),
+                    None => (None, err.to_string()),
+                }),
             };
             match sender.send(result) {
                 Ok(()) => WalkState::Continue,
@@ -259,6 +249,17 @@ fn walk(searcher: Arc<Searcher>, paths: Vec<PathBuf>, sender: mpsc::Sender<FileR
             }
         })
     });
+}
+
+/// The file a walking error is about, and the error without it
+fn error_path(err: &ignore::Error) -> Option<(&Path, &ignore::Error)> {
+    match err {
+        ignore::Error::WithPath { path, err } => Some((path, err)),
+        ignore::Error::WithDepth { err, .. } | ignore::Error::WithLineNumber { err, .. } => {
+            error_path(err)
+        }
+        _ => None,
+    }
 }
 
 /// Whether a path ends in `.epub` (in any case)
@@ -313,8 +314,9 @@ impl Searcher {
     }
 }
 
-/// `Ok(None)` for files that are skipped (binary files without a supported format)
-fn search_file(
+/// Searches one file by its format; `Ok(None)` for a file that is skipped (binary, without a
+/// supported format)
+pub fn search_file(
     matcher: &BibleMatcher,
     path: &Path,
     binary: bool,
@@ -354,7 +356,7 @@ fn search_file(
         #[cfg(feature = "pdf")]
         Some("pdf") => {
             let doc = mupdf::Document::open(path).map_err(|e| e.to_string())?;
-            use topos_bible_formats::SearchFormat;
+            use topos_bible_formats::SearchFormat as _;
             let matches = matcher
                 .search_format::<topos_bible_formats::pdf::PDFLocation>(&doc)
                 .map_err(|e| e.to_string())?;
@@ -390,7 +392,8 @@ fn search_file(
     }
 }
 
-fn search_text(matcher: &BibleMatcher, path: Option<PathBuf>, text: String) -> FileHits {
+/// Searches text (from a file at `path`, or given directly)
+pub fn search_text(matcher: &BibleMatcher, path: Option<PathBuf>, text: String) -> FileHits {
     let hits = matcher
         .search(&text)
         .into_iter()

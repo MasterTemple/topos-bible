@@ -4,8 +4,10 @@
 //! differently: bytes (Rust, C), Unicode scalars (Python), or UTF-16 code units (JavaScript,
 //! Kotlin, Swift's `utf16` view).
 
+mod files;
 mod index;
 
+pub use files::*;
 pub use index::*;
 
 use boltffi::*;
@@ -159,6 +161,9 @@ pub enum ToposError {
     InvalidQuery { message: String },
     /// An index file couldn't be read (damaged, or from another version)
     InvalidIndex { message: String },
+    /// Files can't be searched: a glob or ignore file is wrong, or there's no file access (in
+    /// WebAssembly)
+    Files { message: String },
 }
 
 /// A testament, for [`ToposQuery`]
@@ -494,6 +499,8 @@ pub struct Topos {
     matcher: BibleMatcher,
     /// How references in results are written (see [`ToposOptions::format`])
     format: FormatOptions,
+    /// The data and book context it was built with, which name its cache (see `search_files`)
+    config: String,
 }
 
 #[export]
@@ -503,6 +510,7 @@ impl Topos {
         Self {
             matcher: BibleMatcher::default(),
             format: FormatOptions::default(),
+            config: String::new(),
         }
     }
 
@@ -515,6 +523,7 @@ impl Topos {
         Ok(Self {
             matcher: BibleFilter::new(data).create_matcher(),
             format: FormatOptions::default(),
+            config: config_json,
         })
     }
 
@@ -756,6 +765,16 @@ impl Topos {
                 None => matcher,
             },
             format: options.format.clone(),
+            config: format!(
+                "{:?}",
+                (
+                    &options.data,
+                    &options.merge_data,
+                    &options.remove_data,
+                    &options.context_book,
+                    &options.context_heading
+                )
+            ),
         })
     }
 
