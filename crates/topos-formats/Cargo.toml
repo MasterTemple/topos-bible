@@ -1,6 +1,6 @@
 [package]
 name = "topos-bible-formats"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 license.workspace = true
 repository.workspace = true
@@ -12,7 +12,7 @@ categories = ["text-processing", "parser-implementations"]
 exclude = ["tests"]
 
 [dependencies]
-topos-bible = { path = "../topos-lib", version = "0.4.0" }
+topos-bible = { path = "../topos-lib", version = "0.5.0" }
 itertools = { workspace = true }
 thiserror = { workspace = true }
 

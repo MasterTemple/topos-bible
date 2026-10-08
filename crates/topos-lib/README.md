@@ -14,7 +14,7 @@ tool, and the `topos-bible` packages on [npm](https://www.npmjs.com/package/topo
 
 ```toml
 [dependencies]
-topos-bible = "0.3"
+topos-bible = "0.5"
 ```
 
 ## Search text
