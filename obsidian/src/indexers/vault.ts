@@ -165,6 +165,9 @@ export class VaultIndexer {
     }
     core.retain(wanted);
     this.plugin.notifyIndexSoon();
+    // Books open in EPUB++ (a tab restored at launch) asked for their references before the
+    // index was read, and books confirmed from packs aren't searched, so nothing else redraws them
+    this.plugin.epubs.refresh();
     await this.searchNotes(notes, current);
     await this.searchBooks(books, current);
     if (!current()) return;

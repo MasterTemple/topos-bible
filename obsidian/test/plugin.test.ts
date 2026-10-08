@@ -546,6 +546,28 @@ test("the built plugin loads, indexes, and runs its commands", async () => {
   await plugin.reindex();
   assert.equal(plugin.index.get("Books/b.epub").length, 1);
   epub.api.extractText = extractText;
+
+  // A book open as topos starts (a tab restored at launch) asked for its references before the
+  // index was read; once it is, open books are redrawn, though the book isn't searched again
+  await plugin.indexer.save();
+  const relaunched = new ToposPlugin(app, manifest);
+  relaunched.settings.searchEpubs = true;
+  const loadSettings = relaunched.loadSettings.bind(relaunched);
+  relaunched.loadSettings = async () => {
+    await loadSettings();
+    relaunched.settings.searchEpubs = true;
+  };
+  let searchedBooks = 0;
+  relaunched.indexBook = async () => (searchedBooks++, { error: "not searched" });
+  epub.refreshed.length = 0;
+  await relaunched.onload();
+  await idle(relaunched);
+  assert.equal(searchedBooks, 0);
+  assert.equal(relaunched.index.get("Books/real.epub").length, 2);
+  assert.ok(epub.refreshed.includes(undefined), "every open book is asked again");
+  relaunched.onunload();
+  plugin.epubs.api = null;
+  plugin.epubs.start();
   plugin.settings.searchEpubs = false;
   await plugin.epubs.toggled();
   assert.equal(plugin.index.get("Books/b.epub").length, 0);
